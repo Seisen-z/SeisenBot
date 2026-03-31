@@ -1,7 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async rewrites() {
+    return [
+      {
+        source: '/api/bot/:path*',
+        destination: process.env.API_PROXY_TARGET 
+          ? `${process.env.API_PROXY_TARGET}/api/:path*` 
+          : 'http://localhost:8000/api/:path*'
+      }
+    ];
+  }
 };
 
 export default nextConfig;

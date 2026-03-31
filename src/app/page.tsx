@@ -3,7 +3,12 @@ import { cookies } from "next/headers";
 import { AlertCircle, ChevronDownIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { HexagonBackground } from "@/components/ui/hexagon-background";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:20934";
+// For server-side fetches, we need the absolute internal proxy URL.
+// NEXT_PUBLIC_API_URL is a relative path (/api/bot) that only works in the browser.
+const SERVER_API_BASE = process.env.API_PROXY_TARGET
+  ? `${process.env.API_PROXY_TARGET}/api`
+  : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
 
 export default async function HomePage() {
   const cookieStore = await cookies();
@@ -30,14 +35,15 @@ export default async function HomePage() {
 
     if (resUser.ok) user = await resUser.json();
     if (resGuilds.ok) guilds = await resGuilds.json();
-    else if (resGuilds.status === 401) redirect("/api/auth/discord/logout");
+    // Don't auto-logout on 401 — token may be expired but session is still valid
+    // User will get a graceful empty state instead of being kicked out
   } catch (err) {
     console.error("Failed to fetch Discord data", err);
   }
 
   // Fetch bot guilds separately — feature gracefully degrades if API not deployed yet
   try {
-    const resBotGuilds = await fetch(`${API_BASE}/bot/guilds`, {
+    const resBotGuilds = await fetch(`${SERVER_API_BASE}/bot/guilds`, {
       next: { revalidate: 60 },
     });
     if (resBotGuilds.ok) {
@@ -46,7 +52,7 @@ export default async function HomePage() {
       botFeatureAvailable = botGuildIds.size > 0;
     }
   } catch {
-    // Endpoint not yet deployed — show all servers normally
+    // Bot API unreachable — show all servers normally
   }
 
   const adminGuilds = guilds.filter((g: any) => {

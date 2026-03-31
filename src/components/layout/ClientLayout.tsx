@@ -1,29 +1,46 @@
 "use client";
 
-import { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
+const PUBLIC_PATHS = ['/login', '/auth'];
+
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 export default function ClientLayout({
   children,
-  isAuthenticated
 }: {
   children: React.ReactNode;
-  isAuthenticated: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const guildIdMatch = pathname.match(/^\/dashboard\/(\d+)/);
   const guildId = guildIdMatch ? guildIdMatch[1] : null;
-  const isLandingPage = pathname === "/login" || pathname === "/";
+  const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p));
 
-  // Ensure unauthenticated users don't see the shell before redirection
-  if (!isAuthenticated && !isLandingPage) {
+  useEffect(() => {
+    // Skip auth check on public pages
+    if (isPublicPath) return;
+
+    const token = getCookie('session_token');
+    if (!token) {
+      router.replace('/login');
+    }
+  }, [pathname, isPublicPath, router]);
+
+  // Don't wrap login/auth pages with dashboard shell
+  if (isPublicPath) {
     return <main className="flex h-full min-h-screen">{children}</main>;
   }
 
-  // The landing pages (login & server select) are beautifully standalone now
-  if (isLandingPage) {
+  // Server select page has its own layout
+  if (pathname === '/') {
     return <main className="flex h-full min-h-screen">{children}</main>;
   }
 

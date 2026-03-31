@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
 const PUBLIC_PATHS = ['/login', '/auth'];
-
-function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? decodeURIComponent(match[2]) : null;
-}
 
 export default function ClientLayout({
   children,
@@ -22,17 +16,38 @@ export default function ClientLayout({
   const router = useRouter();
   const guildIdMatch = pathname.match(/^\/dashboard\/(\d+)/);
   const guildId = guildIdMatch ? guildIdMatch[1] : null;
-  const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p));
+  const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p)) || pathname === '/';
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Skip auth check on public pages
-    if (isPublicPath) return;
+    // Check sessionStorage first (most reliable for client-side navigation),
+    // then fall back to cookie parsing.
+    const fromSession = sessionStorage.getItem('seisenAuth') === '1';
+    if (fromSession) {
+      setIsAuthenticated(true);
+      setAuthChecked(true);
+      return;
+    }
+    // Fallback: parse the cookie directly
+    const cookieMatch = document.cookie.match(/(^| )session_token=([^;]+)/);
+    if (cookieMatch) {
+      // Repopulate sessionStorage to avoid repeating cookie parsing
+      sessionStorage.setItem('seisenAuth', '1');
+      setIsAuthenticated(true);
+    } else {
+      setIsAuthenticated(false);
+    }
+    setAuthChecked(true);
+  }, []); // Only run once on first mount
 
-    const token = getCookie('session_token');
-    if (!token) {
+  useEffect(() => {
+    if (!authChecked || isPublicPath) return;
+    if (!isAuthenticated) {
       router.replace('/login');
     }
-  }, [pathname, isPublicPath, router]);
+  }, [authChecked, isAuthenticated, isPublicPath, router]);
+
 
   // Don't wrap login/auth pages with dashboard shell
   if (isPublicPath) {

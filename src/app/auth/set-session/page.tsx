@@ -21,6 +21,9 @@ function SetSessionInner() {
     if (token && userId) {
       setCookie("session_token", token, COOKIE_MAX_AGE);
       setCookie("user_id", userId, COOKIE_MAX_AGE);
+      // Store in sessionStorage so ClientLayout auth check works
+      // reliably on client-side navigations without re-parsing cookies.
+      sessionStorage.setItem('seisenAuth', '1');
       router.replace("/");
     } else {
       router.replace("/login?error=no_session");

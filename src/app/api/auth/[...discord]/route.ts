@@ -49,16 +49,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
       });
       const userData = await userRes.json();
 
-      const cookieStore = await cookies();
-      cookieStore.set("session_token", tokenData.access_token, {
+      const response = NextResponse.redirect(new URL("/", req.url));
+      
+      response.cookies.set("session_token", tokenData.access_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 60 * 60 * 24 * 7, // 1 week
         path: "/",
       });
-      cookieStore.set("user_id", userData.id, { path: "/" });
+      response.cookies.set("user_id", userData.id, { path: "/", maxAge: 60 * 60 * 24 * 7 });
 
-      return NextResponse.redirect(new URL("/", req.url));
+      return response;
     } catch (err) {
       console.error("Auth error", err);
       return NextResponse.redirect(new URL("/login?error=auth_failed", req.url));
@@ -66,10 +68,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
   }
 
   if (action === "logout") {
-    const cookieStore = await cookies();
-    cookieStore.delete("session_token");
-    cookieStore.delete("user_id");
-    return NextResponse.redirect(new URL("/login", req.url));
+    const response = NextResponse.redirect(new URL("/login", req.url));
+    response.cookies.delete("session_token");
+    response.cookies.delete("user_id");
+    return response;
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });

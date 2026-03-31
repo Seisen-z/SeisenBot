@@ -4,12 +4,11 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || "http://localhost:3000/api/auth/discord/callback";
 
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 1 week in seconds
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 1 week
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ discord: string[] }> }) {
   const resolvedParams = await params;
-  const actionPath = resolvedParams.discord;
-  const action = actionPath[actionPath.length - 1];
+  const action = resolvedParams.discord[resolvedParams.discord.length - 1];
 
   // ─── LOGIN ────────────────────────────────────────────────────────────────
   if (action === "login") {
@@ -28,7 +27,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
     }
 
     try {
-      // Exchange code for token
       const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -42,36 +40,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
       });
 
       const tokenData = await tokenRes.json();
-      if (tokenData.error) {
-        throw new Error(tokenData.error_description || tokenData.error);
-      }
+      if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error);
 
-      // Fetch user info
       const userRes = await fetch("https://discord.com/api/users/@me", {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
       const userData = await userRes.json();
 
-      // Build redirect response and attach cookies directly to it
-      const response = NextResponse.redirect(new URL("/", req.url));
+      // Use a 200 HTML response instead of a redirect.
+      // Some CDNs (including Vercel's edge) strip Set-Cookie from 3xx responses.
+      // A 200 response with Set-Cookie is ALWAYS reliably delivered to the browser.
+      const cookieValue = `session_token=${tokenData.access_token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`;
+      const userIdCookie = `user_id=${userData.id}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; Secure`;
 
-      response.cookies.set("session_token", tokenData.access_token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "lax",
-        maxAge: COOKIE_MAX_AGE,
-        path: "/",
+      const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Logging in...</title>
+  </head>
+  <body>
+    <p>Logging you in, please wait...</p>
+    <script>window.location.replace("/");</script>
+  </body>
+</html>`;
+
+      return new NextResponse(html, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html",
+          "Set-Cookie": [cookieValue, userIdCookie].join(", "),
+        },
       });
-
-      response.cookies.set("user_id", userData.id, {
-        httpOnly: false,
-        secure: true,
-        sameSite: "lax",
-        maxAge: COOKIE_MAX_AGE,
-        path: "/",
-      });
-
-      return response;
     } catch (err) {
       console.error("Auth callback error:", err);
       return NextResponse.redirect(new URL("/login?error=auth_failed", req.url));

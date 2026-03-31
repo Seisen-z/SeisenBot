@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 1 week in seconds
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
 function setCookie(name: string, value: string, maxAge: number) {
   const secure = location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
 }
 
-export default function SetSessionPage() {
+function SetSessionInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -19,13 +19,8 @@ export default function SetSessionPage() {
     const userId = searchParams.get("u");
 
     if (token && userId) {
-      // Set cookies client-side — 100% reliable cross-platform.
-      // The browser sends these in the Cookie header on every request,
-      // so the middleware and server components can read them normally.
       setCookie("session_token", token, COOKIE_MAX_AGE);
       setCookie("user_id", userId, COOKIE_MAX_AGE);
-
-      // Replace so the token doesn't stay in browser history
       router.replace("/");
     } else {
       router.replace("/login?error=no_session");
@@ -59,5 +54,29 @@ export default function SetSessionPage() {
       </p>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+  );
+}
+
+export default function SetSessionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "100vh",
+            background: "#1a1b1e",
+          }}
+        >
+          <p style={{ color: "#B5BAC1", fontSize: 14, fontFamily: "sans-serif" }}>
+            Loading…
+          </p>
+        </div>
+      }
+    >
+      <SetSessionInner />
+    </Suspense>
   );
 }

@@ -8,6 +8,9 @@ interface DiscordMessageProps {
   color?: string | number; // Hex string or decimal mapped to hex
   title?: string;
   url?: string;
+  authorName?: string;
+  authorUrl?: string;
+  authorIcon?: string;
   description?: string;
   thumbnailUrl?: string;
   footerText?: string;
@@ -21,6 +24,9 @@ export function DiscordMessagePreview({
   timestamp = "Today at 2:48 PM",
   content,
   color = "#2ecc71", // Default green
+  authorName,
+  authorUrl,
+  authorIcon,
   title,
   url,
   description,
@@ -91,6 +97,18 @@ export function DiscordMessagePreview({
               <div className="flex justify-between gap-4">
                 <div className="flex flex-col gap-2 min-w-0 flex-1">
                   
+                  {/* Author block */}
+                  {(authorName || authorIcon) && (
+                    <div className="flex items-center gap-2 mb-1">
+                      {authorIcon && <img src={authorIcon} className="w-5 h-5 rounded-full object-cover" alt="" />}
+                      {authorName && (
+                        <span className="text-sm font-semibold text-white">
+                          {authorUrl ? <a href={authorUrl} target="_blank" rel="noreferrer" className="hover:underline">{authorName}</a> : authorName}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Title */}
                   {title && (
                     <div className="font-semibold text-white text-[1rem]">

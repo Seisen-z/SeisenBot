@@ -7,6 +7,7 @@ interface DiscordMessageProps {
   content?: string;
   color?: string | number; // Hex string or decimal mapped to hex
   title?: string;
+  url?: string;
   description?: string;
   thumbnailUrl?: string;
   footerText?: string;
@@ -21,6 +22,7 @@ export function DiscordMessagePreview({
   content,
   color = "#2ecc71", // Default green
   title,
+  url,
   description,
   thumbnailUrl,
   footerText,
@@ -92,7 +94,13 @@ export function DiscordMessagePreview({
                   {/* Title */}
                   {title && (
                     <div className="font-semibold text-white text-[1rem]">
-                      {title}
+                      {url ? (
+                        <a href={url} target="_blank" rel="noreferrer" className="text-[#00A8FC] hover:underline cursor-pointer">
+                          {title}
+                        </a>
+                      ) : (
+                        title
+                      )}
                     </div>
                   )}
 

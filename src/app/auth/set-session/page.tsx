@@ -1,45 +1,63 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+"use client";
 
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 1 week
+import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-// Server Action — this is the ONLY reliable way to set httpOnly cookies
-// in Next.js App Router on Vercel production.
-async function setSessionCookies(token: string, userId: string) {
-  "use server";
-  const cookieStore = await cookies();
-  cookieStore.set("session_token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: COOKIE_MAX_AGE,
-    path: "/",
-  });
-  cookieStore.set("user_id", userId, {
-    httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: COOKIE_MAX_AGE,
-    path: "/",
-  });
-  redirect("/");
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 1 week in seconds
+
+function setCookie(name: string, value: string, maxAge: number) {
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
 }
 
-export default async function SetSessionPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ t?: string; u?: string }>;
-}) {
-  const { t: token, u: userId } = await searchParams;
+export default function SetSessionPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // If no token, someone visited this page directly — send to login
-  if (!token || !userId) {
-    redirect("/login?error=no_session");
-  }
+  useEffect(() => {
+    const token = searchParams.get("t");
+    const userId = searchParams.get("u");
 
-  // Call the server action immediately to set cookies and redirect to /
-  await setSessionCookies(token, userId);
+    if (token && userId) {
+      // Set cookies client-side — 100% reliable cross-platform.
+      // The browser sends these in the Cookie header on every request,
+      // so the middleware and server components can read them normally.
+      setCookie("session_token", token, COOKIE_MAX_AGE);
+      setCookie("user_id", userId, COOKIE_MAX_AGE);
 
-  // This is never rendered but needed for TypeScript
-  return null;
+      // Replace so the token doesn't stay in browser history
+      router.replace("/");
+    } else {
+      router.replace("/login?error=no_session");
+    }
+  }, [searchParams, router]);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100vh",
+        background: "#1a1b1e",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          border: "3px solid #5865F2",
+          borderTopColor: "transparent",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+        }}
+      />
+      <p style={{ color: "#B5BAC1", fontSize: 14, fontFamily: "sans-serif" }}>
+        Logging you in…
+      </p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
       return NextResponse.redirect(new URL("/login?error=no_code", req.url));
     }
 
+    let loginSuccess = false;
     try {
       const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
         method: "POST",
@@ -49,29 +51,33 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
       });
       const userData = await userRes.json();
 
-      const response = NextResponse.redirect(new URL("/", req.url));
+      const cookieStore = await cookies();
       
-      response.cookies.set("session_token", tokenData.access_token, {
+      cookieStore.set("session_token", tokenData.access_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         maxAge: 60 * 60 * 24 * 7, // 1 week
         path: "/",
       });
-      response.cookies.set("user_id", userData.id, { path: "/", maxAge: 60 * 60 * 24 * 7 });
+      cookieStore.set("user_id", userData.id, { path: "/", maxAge: 60 * 60 * 24 * 7 });
 
-      return response;
+      loginSuccess = true;
     } catch (err) {
       console.error("Auth error", err);
       return NextResponse.redirect(new URL("/login?error=auth_failed", req.url));
     }
+    
+    if (loginSuccess) {
+       redirect("/");
+    }
   }
 
   if (action === "logout") {
-    const response = NextResponse.redirect(new URL("/login", req.url));
-    response.cookies.delete("session_token");
-    response.cookies.delete("user_id");
-    return response;
+    const cookieStore = await cookies();
+    cookieStore.delete("session_token");
+    cookieStore.delete("user_id");
+    redirect("/login");
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });

@@ -20,7 +20,16 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/autoreply`)
       .then((data) => {
-        const r = data || [];
+        let r = data || [];
+        // Convert any legacy object targets to strings
+        r = r.map((rule: any) => {
+          if (rule.targets && Array.isArray(rule.targets)) {
+            rule.targets = rule.targets.map((t: any) => 
+              typeof t === "object" ? String(t.id) : String(t)
+            );
+          }
+          return rule;
+        });
         setRules(r);
         if (r.length > 0) setActiveIdx(0);
       })

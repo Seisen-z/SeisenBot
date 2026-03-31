@@ -47,31 +47,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
       });
       const userData = await userRes.json();
 
-      // Use a 200 HTML response instead of a redirect.
-      // Some CDNs (including Vercel's edge) strip Set-Cookie from 3xx responses.
-      // A 200 response with Set-Cookie is ALWAYS reliably delivered to the browser.
-      const cookieValue = `session_token=${tokenData.access_token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`;
-      const userIdCookie = `user_id=${userData.id}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; Secure`;
-
-      const html = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Logging in...</title>
-  </head>
-  <body>
-    <p>Logging you in, please wait...</p>
-    <script>window.location.replace("/");</script>
-  </body>
-</html>`;
-
-      return new NextResponse(html, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/html",
-          "Set-Cookie": [cookieValue, userIdCookie].join(", "),
-        },
-      });
+      // Redirect to /auth/set-session with token info.
+      // The session page uses a Server Action (the most reliable way to set
+      // HttpOnly cookies in Next.js App Router on Vercel).
+      const target = new URL("/auth/set-session", req.url);
+      target.searchParams.set("t", tokenData.access_token);
+      target.searchParams.set("u", userData.id);
+      return NextResponse.redirect(target);
     } catch (err) {
       console.error("Auth callback error:", err);
       return NextResponse.redirect(new URL("/login?error=auth_failed", req.url));

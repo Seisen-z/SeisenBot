@@ -1,0 +1,129 @@
+import { HexagonBackground } from "@/components/ui/hexagon-background";
+
+export default function LoginPage() {
+  return (
+    <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden">
+      <HexagonBackground />
+
+      {/* ── Brand ── */}
+      <div className="z-10 mb-10 flex flex-col items-center gap-3 select-none">
+        <div className="relative flex h-16 w-16 items-center justify-center">
+          <div className="absolute inset-0 rounded-full bg-[#5865F2]/20 blur-2xl" />
+          <div
+            className="h-14 w-14 flex items-center justify-center"
+            style={{
+              background: "linear-gradient(145deg, #7289da 0%, #5865F2 60%, #4752C4 100%)",
+              clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+              boxShadow: "0 0 32px rgba(88,101,242,0.55)",
+            }}
+          >
+            <span className="text-white font-black text-xl">S</span>
+          </div>
+        </div>
+        <div className="text-center">
+          <h1
+            className="text-4xl font-black tracking-tight text-white"
+            style={{ textShadow: "0 0 40px rgba(88,101,242,0.25)" }}
+          >
+            Seisen Hub
+          </h1>
+          <p className="text-[11px] font-semibold tracking-[0.28em] uppercase text-[#5865F2]/60 mt-1">
+            Dashboard
+          </p>
+        </div>
+      </div>
+
+      {/* ── Card ── */}
+      <div className="z-10 w-full max-w-[400px] px-4">
+        <div
+          className="relative rounded-2xl p-px"
+          style={{
+            background:
+              "linear-gradient(145deg, rgba(88,101,242,0.35) 0%, rgba(71,82,196,0.12) 50%, rgba(0,0,0,0) 100%)",
+          }}
+        >
+          <div
+            className="rounded-2xl p-8 flex flex-col gap-6"
+            style={{
+              background:
+                "linear-gradient(160deg, rgba(18,20,31,0.97) 0%, rgba(10,11,16,0.98) 100%)",
+              backdropFilter: "blur(28px)",
+            }}
+          >
+            {/* Header */}
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-white tracking-tight">Welcome Back</h2>
+              <p className="text-sm text-[#8b90a0] mt-2 leading-relaxed">
+                Sign in with Discord to access your<br />server's configuration panel.
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#2a2d3e] to-transparent" />
+              <span className="text-[10px] text-[#41455a] font-semibold uppercase tracking-widest">
+                Continue with
+              </span>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#2a2d3e] to-transparent" />
+            </div>
+
+            {/* Discord button */}
+            <a href="/api/auth/discord/login" className="group block w-full">
+              <div
+                className="relative flex w-full items-center justify-center gap-3 rounded-xl py-4 font-bold text-white overflow-hidden transition-all duration-300"
+                style={{
+                  background: "linear-gradient(135deg, #5865F2 0%, #4752C4 100%)",
+                  boxShadow: "0 4px 28px rgba(88,101,242,0.40)",
+                }}
+              >
+                {/* Hover overlay */}
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  style={{ background: "linear-gradient(135deg, #6472f5 0%, #5562d4 100%)" }}
+                />
+                {/* Glow bloom on hover */}
+                <div
+                  className="absolute -inset-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl"
+                  style={{ background: "rgba(88,101,242,0.25)" }}
+                />
+                {/* Discord "D" mark SVG */}
+                <svg
+                  className="relative z-10 h-5 w-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.04.033.052a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                </svg>
+                <span className="relative z-10 text-base">Login with Discord</span>
+              </div>
+            </a>
+
+            {/* Fine print */}
+            <p className="text-center text-[11px] text-[#41455a] leading-relaxed">
+              By continuing, you agree to our{" "}
+              <span className="text-[#5865F2]/60 hover:text-[#5865F2] cursor-pointer transition-colors">
+                Terms of Service
+              </span>{" "}
+              and{" "}
+              <span className="text-[#5865F2]/60 hover:text-[#5865F2] cursor-pointer transition-colors">
+                Privacy Policy
+              </span>
+              .
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Footer ── */}
+      <div className="absolute bottom-6 z-10 flex items-center gap-4 text-[11px] text-[#30344a] select-none">
+        <span>© 2021–2026 Seisen</span>
+        <span>·</span>
+        <span className="cursor-pointer hover:text-[#5865F2]/70 transition-colors">Terms</span>
+        <span>·</span>
+        <span className="cursor-pointer hover:text-[#5865F2]/70 transition-colors">Privacy</span>
+        <span>·</span>
+        <span className="cursor-pointer hover:text-[#5865F2]/70 transition-colors">Legal Notice</span>
+      </div>
+    </div>
+  );
+}

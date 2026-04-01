@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://85.215.229.230:9820/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/bot';
 
 export async function fetchApi(endpoint: string, jwt?: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);

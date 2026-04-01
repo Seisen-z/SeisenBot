@@ -154,15 +154,24 @@ export function AdvancedEmbedEditor({
           <div className="flex justify-center items-start bg-[url('https://discord.com/assets/2f9c5603f7eeb883b632.svg')] bg-[#313338] p-8 rounded border border-[#1E1F22] shadow-inner min-h-[400px]">
             <div className="w-full max-w-[500px]">
               <DiscordMessagePreview
-                botName="Seisen Bot"
-                timestamp="Today at 12:00 PM"
-                content={config.content}
-                title={config.title}
-                description={config.description || "Your custom embed description will appear here."}
-                color={config.color}
-                thumbnailUrl={config.thumbnail_url}
-                footerText={config.footer}
-                buttons={config.buttons}
+                message={{
+                  content: config.content,
+                  embeds: [{
+                    title: config.title,
+                    description: config.description,
+                    color: typeof config.color === "string" && config.color.startsWith("#") 
+                      ? parseInt(config.color.replace("#", ""), 16) 
+                      : parseInt(String(config.color)) || 5814783,
+                    thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : undefined,
+                    footer: config.footer ? { text: config.footer } : undefined,
+                    fields: config.fields || []
+                  }],
+                  components: config.components || []
+                }}
+                botUser={{
+                  username: "Seisen Bot",
+                  avatar: "https://cdn.discordapp.com/embed/avatars/0.png"
+                }}
               />
             </div>
           </div>

@@ -4,207 +4,224 @@ import { useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
-import { Trash2Icon, PlusIcon, EyeIcon, CodeIcon, Send, ListIcon } from "lucide-react";
-import { DiscordMessagePreview } from "@/components/ui/discord-message";
+import { Input } from "@/components/ui/input";
+import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon, FolderIcon, Send, ListIcon, Sparkles } from "lucide-react";
+import { PromptModal } from "@/components/ui/prompt-modal";
+
+// Draft key format: "Category/DraftName" — uncategorized uses "General/DraftName"
+const DEFAULT_CATEGORY = "General";
 
 interface SelectOption {
   label: string;
-  value: string;  // This will be the role ID
+  value: string; // role id
   description: string;
   emoji?: string;
 }
 
-interface SelectMenuMessage {
-  guild_id: number;
-  channel_id: number;
-  message_id?: string;
+interface SelectMenuDraft {
   title: string;
-  description: string[];
-  color: number;
+  description: string;
+  content?: string;
+  color?: string | number;
+  thumbnail_url?: string;
+  footer?: string;
+  channel_id?: string;
+  ping_role_id?: string;
   placeholder: string;
   min_values: number;
   max_values: number;
   options: SelectOption[];
-  custom_id: string;
+}
+
+function parseDrafts(drafts: Record<string, any>) {
+  const map: Record<string, string[]> = {};
+  for (const key of Object.keys(drafts)) {
+    const parts = key.split("/");
+    const cat = parts.length > 1 ? parts[0] : DEFAULT_CATEGORY;
+    if (!map[cat]) map[cat] = [];
+    map[cat].push(key);
+  }
+  return map;
 }
 
 export default function SelectMenuRolesPage({ params }: { params: Promise<{ guildId: string }> }) {
   const resolvedParams = use(params);
   const guildId = resolvedParams.guildId;
   const { toast } = useToast();
-  
-  // State for all messages
-  const [messages, setMessages] = useState<{[messageId: string]: any}>({});
-  const [loading, setLoading] = useState(true);
+
+  const [drafts, setDrafts] = useState<Record<string, SelectMenuDraft>>({});
+  const [activeDraftKey, setActiveDraftKey] = useState<string>("");
+  const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
-  
-  // Current editing message
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [currentMessage, setCurrentMessage] = useState<SelectMenuMessage>({
-    guild_id: parseInt(guildId),
-    channel_id: 0,
-    title: "📢 Stay Updated on Scripts!",
-    description: [
-      "Select a game below to get instant pings whenever its script receives a new update! ⚡🎮",
-      "",
-      "> Only subscribe to the scripts you care about never miss a new feature, fix, or event again!"
-    ],
-    color: 5814783,
-    placeholder: "Select a game to get pinged 📣",
-    min_values: 1,
-    max_values: 1,
-    options: [],
-    custom_id: "SelectRoles"
+  const [posting, setPosting] = useState(false);
+
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptConfig, setPromptConfig] = useState<{ title: string; label: string; action: 'category' | 'draft'; cat?: string }>({
+    title: "", label: "", action: "category"
   });
-  
-  // UI State
-  const [viewMode, setViewMode] = useState<"config" | "preview" | "raw">("config");
-  const [channelId, setChannelId] = useState("");
-  const [channelObj, setChannelObj] = useState<any>(null);
-  
-  // New option form
+
   const [newOptionLabel, setNewOptionLabel] = useState("");
   const [newOptionDescription, setNewOptionDescription] = useState("");
   const [newOptionEmoji, setNewOptionEmoji] = useState("");
   const [newRoleId, setNewRoleId] = useState("");
-  const [rawText, setRawText] = useState("");
+
+  const DEFAULT_DRAFT: SelectMenuDraft = {
+    title: "📣 Self-Assignable Roles",
+    description: "Welcome! Use the dropdown menu below to pick your favorite roles and stay up to date with the server!",
+    placeholder: "Choose roles...",
+    min_values: 1,
+    max_values: 5,
+    options: [],
+    color: "#5865F2",
+    thumbnail_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Discord_logo_purple.svg/1200px-Discord_logo_purple.svg.png",
+    footer: "Seisen Role Management"
+  };
 
   useEffect(() => {
-    loadMessages();
-  }, []);
+    fetchApi(`/guilds/${guildId}/select_menu_roles`)
+      .then((data) => {
+        const d = data || {};
+        setDrafts(d);
+        const keys = Object.keys(d);
+        if (keys.length > 0) setActiveDraftKey(keys[0]);
+      })
+      .catch((err) => {
+        console.error("Load error:", err);
+        toast("Failed to load select menu roles", "error");
+      });
+  }, [guildId, toast]);
 
-  useEffect(() => {
-    setRawText(JSON.stringify(generateRawJSON(), null, 2));
-  }, [currentMessage]);
-
-  const loadMessages = async () => {
+  const handleSave = async () => {
+    setSaving(true);
     try {
-      const data = await fetchApi(`/guilds/${guildId}/select_menu_roles`);
-      setMessages(data);
-      
-      // If there are messages, select the first one
-      const messageIds = Object.keys(data);
-      if (messageIds.length > 0 && !selectedMessageId) {
-        setSelectedMessageId(messageIds[0]);
-        setCurrentMessage(data[messageIds[0]]);
-        setChannelId(String(data[messageIds[0]].channel_id || ""));
-      }
-    } catch (err) {
-      console.error("Failed to load messages:", err);
-      // Don't show error on first load since this is a new feature
+      await fetchApi(`/guilds/${guildId}/select_menu_roles`, undefined, {
+        method: "PUT",
+        body: JSON.stringify(drafts),
+      });
+      toast("Drafts Saved Successfully!");
+    } catch (e) {
+      toast("Failed to save.", "error");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const saveCurrentMessage = async () => {
-    const resolvedChannelId = parseInt(channelId) || currentMessage.channel_id;
-    if (!resolvedChannelId) {
-      toast("Please select a channel", "error");
+  const currentDraft = drafts[activeDraftKey] || DEFAULT_DRAFT;
+
+  const updateDraft = (key: string, val: any) => {
+    setDrafts(prev => ({
+      ...prev,
+      [activeDraftKey]: { ...prev[activeDraftKey], [key]: val }
+    }));
+  };
+
+  const handlePostNow = async () => {
+    if (!currentDraft.channel_id) {
+      toast("Select a target channel first.", "error");
+      return;
+    }
+    if (currentDraft.options.length === 0) {
+      toast("Add at least one role option.", "error");
       return;
     }
 
-    setSaving(true);
+    setPosting(true);
     try {
-      const discordPayload = generateRawJSONFromMessage({
-        ...currentMessage,
-        channel_id: resolvedChannelId,
-      });
-      const payload = {
-        channel_id: resolvedChannelId,
-        message_data: discordPayload,
-        title: currentMessage.title,
-        description: currentMessage.description,
-        color: currentMessage.color,
-        placeholder: currentMessage.placeholder,
-        min_values: currentMessage.min_values,
-        max_values: currentMessage.max_values,
-        options: currentMessage.options,
-        custom_id: currentMessage.custom_id,
+      const discordPayload = {
+        content: currentDraft.content || null,
+        embeds: [{
+          title: currentDraft.title,
+          description: currentDraft.description,
+          color: typeof currentDraft.color === 'string' && currentDraft.color.startsWith('#') 
+            ? parseInt(currentDraft.color.replace('#', ''), 16) 
+            : parseInt(String(currentDraft.color || "5814783")),
+          thumbnail: currentDraft.thumbnail_url ? { url: currentDraft.thumbnail_url } : null,
+          footer: currentDraft.footer ? { text: currentDraft.footer } : null
+        }],
+        components: [{
+          type: 1,
+          components: [{
+            type: 3,
+            custom_id: "role_select",
+            placeholder: currentDraft.placeholder,
+            min_values: currentDraft.min_values,
+            max_values: currentDraft.max_values,
+            options: currentDraft.options.map(opt => ({
+              label: opt.label,
+              value: opt.value,
+              description: opt.description,
+              emoji: opt.emoji ? { name: opt.emoji } : undefined
+            }))
+          }]
+        }]
       };
 
-      if (selectedMessageId) {
-        // Update existing message
-        await fetchApi(`/guilds/${guildId}/select_menu_roles/${selectedMessageId}`, undefined, {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
-        toast("Message updated!", "success");
-      } else {
-        // Create new message
-        const result = await fetchApi(`/guilds/${guildId}/select_menu_roles`, undefined, {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-        toast("Message created!", "success");
-        setSelectedMessageId(result.message_id);
-      }
-
-      await loadMessages();
-    } catch (err) {
-      console.error("Save error:", err);
-      toast("Failed to save message", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const selectMessage = (messageId: string) => {
-    setSelectedMessageId(messageId);
-    const selected = messages[messageId];
-    if (selected?.message_data) {
-      const extracted = messageFromRaw(selected.message_data, selected);
-      setCurrentMessage(extracted);
-      setChannelId(String(extracted.channel_id || ""));
-    } else {
-      setCurrentMessage(selected);
-      setChannelId(selected.channel_id?.toString() || "");
-    }
-  };
-
-  const createNewMessage = () => {
-    setSelectedMessageId(null);
-    setCurrentMessage({
-      guild_id: parseInt(guildId),
-      channel_id: 0,
-      title: "Select Menu Roles",
-      description: ["Choose your roles from the dropdown below!"],
-      color: 5814783,
-      placeholder: "Select roles...",
-      min_values: 1,
-      max_values: 1,
-      options: [],
-      custom_id: "SelectRoles"
-    });
-    setChannelId("");
-    setChannelObj(null);
-  };
-
-  const deleteMessage = async (messageId: string) => {
-    if (!confirm("Are you sure you want to delete this message?")) return;
-
-    setSaving(true);
-    try {
-      await fetchApi(`/guilds/${guildId}/select_menu_roles/${messageId}`, undefined, {
-        method: "DELETE",
+      await fetchApi('/trigger/create_select_menu_role', undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          guild_id: guildId,
+          payload: {
+            channel_id: currentDraft.channel_id,
+            message_data: discordPayload
+          }
+        })
       });
-      
-      // Clear selection if this was the selected message
-      if (selectedMessageId === messageId) {
-        setSelectedMessageId(null);
-        createNewMessage();
-      }
-      
-      await loadMessages();
-      toast("Message deleted!", "success");
-    } catch (err) {
-      toast("Failed to delete message", "error");
+      toast("Select Menu Sent Successfully!");
+    } catch (err: any) {
+      toast(`Error posting: ${err.message}`, "error");
     } finally {
-      setSaving(false);
+      setPosting(false);
     }
+  };
+
+  const addCategory = () => {
+    setPromptConfig({ title: "New Category", label: "Category Name", action: "category" });
+    setPromptOpen(true);
+  };
+
+  const addDraftToCategory = (cat: string) => {
+    setPromptConfig({ title: "New Draft", label: "Draft Name", action: "draft", cat });
+    setPromptOpen(true);
+  };
+
+  const handlePromptConfirm = (value: string) => {
+    if (promptConfig.action === "category") {
+      const key = `${value}/${value} Draft 1`;
+      if (!drafts[key]) {
+        setDrafts(prev => ({ ...prev, [key]: DEFAULT_DRAFT }));
+        setActiveDraftKey(key);
+      }
+    } else if (promptConfig.action === "draft" && promptConfig.cat) {
+      const key = `${promptConfig.cat}/${value}`;
+      if (drafts[key]) {
+        toast("A draft with that name already exists.", "error");
+      } else {
+        setDrafts(prev => ({ ...prev, [key]: DEFAULT_DRAFT }));
+        setActiveDraftKey(key);
+      }
+    }
+    setPromptOpen(false);
+  };
+
+  const deleteDraft = (key: string) => {
+    if (!confirm("Are you sure you want to delete this draft?")) return;
+    const updated = { ...drafts };
+    delete updated[key];
+    setDrafts(updated);
+    setActiveDraftKey(Object.keys(updated)[0] || "");
+  };
+
+  const toggleCategory = (cat: string) => {
+    setCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
+  const categorized = parseDrafts(drafts);
+
+  const draftLabel = (key: string) => {
+    const parts = key.split("/");
+    return parts.length > 1 ? parts.slice(1).join("/") : key;
   };
 
   const addOption = () => {
@@ -217,15 +234,10 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       label: newOptionLabel.trim(),
       value: newRoleId,
       description: newOptionDescription.trim() || `Get the ${newOptionLabel} role`,
-      emoji: newOptionEmoji || undefined,
+      emoji: newOptionEmoji.trim() || undefined,
     };
 
-    setCurrentMessage(prev => ({
-      ...prev,
-      options: [...prev.options, newOption]
-    }));
-
-    // Clear form
+    updateDraft("options", [...currentDraft.options, newOption]);
     setNewOptionLabel("");
     setNewOptionDescription("");
     setNewOptionEmoji("");
@@ -233,338 +245,316 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   };
 
   const removeOption = (index: number) => {
-    setCurrentMessage(prev => ({
-      ...prev,
-      options: prev.options.filter((_, i) => i !== index)
-    }));
+    updateDraft("options", currentDraft.options.filter((_, i) => i !== index));
   };
 
-  const updateOption = (index: number, field: keyof SelectOption, value: string) => {
-    setCurrentMessage(prev => ({
-      ...prev,
-      options: prev.options.map((opt, i) => 
-        i === index ? { ...opt, [field]: value } : opt
-      )
-    }));
+  // Build full message object for preview
+  const previewMessage = {
+    content: currentDraft.content,
+    embeds: [{
+      title: currentDraft.title,
+      description: currentDraft.description,
+      color: typeof currentDraft.color === 'string' && currentDraft.color.startsWith('#') 
+        ? parseInt(currentDraft.color.replace('#', ''), 16) 
+        : parseInt(String(currentDraft.color || "5814783")),
+      thumbnail: currentDraft.thumbnail_url ? { url: currentDraft.thumbnail_url } : undefined,
+      footer: currentDraft.footer ? { text: currentDraft.footer } : undefined
+    }],
+    components: [{
+      type: 1,
+      components: [{
+        type: 3,
+        placeholder: currentDraft.placeholder,
+        options: currentDraft.options.map(o => ({
+            label: o.label,
+            value: o.value,
+            description: o.description,
+            emoji: o.emoji
+        }))
+      }]
+    }]
   };
-
-  const generateRawJSONFromMessage = (msg: SelectMenuMessage) => {
-    return {
-      content: null,
-      embeds: [{
-        title: msg.title,
-        description: msg.description,
-        color: msg.color,
-        fields: []
-      }],
-      components: msg.options.length > 0 ? [{
-        type: 1,
-        components: [{
-          type: 3,
-          custom_id: msg.custom_id,
-          options: msg.options.map(opt => ({
-            label: opt.label,
-            value: opt.value,
-            description: opt.description,
-            emoji: opt.emoji,
-            default: false
-          })),
-          placeholder: msg.placeholder,
-          min_values: msg.min_values,
-          max_values: msg.max_values
-        }]
-      }] : []
-    };
-  };
-
-  const generateRawJSON = () => generateRawJSONFromMessage(currentMessage);
-
-  const messageFromRaw = (raw: any, fallback?: Partial<SelectMenuMessage>): SelectMenuMessage => {
-    const embed = raw?.embeds?.[0] || {};
-    const select = raw?.components?.[0]?.components?.[0] || {};
-    return {
-      guild_id: parseInt(guildId),
-      channel_id: Number(fallback?.channel_id || 0),
-      message_id: fallback?.message_id,
-      title: embed.title || fallback?.title || "Select Menu Roles",
-      description: Array.isArray(embed.description)
-        ? embed.description
-        : String(embed.description || "").split("\n"),
-      color: Number(embed.color ?? fallback?.color ?? 5814783),
-      placeholder: select.placeholder || fallback?.placeholder || "Select roles...",
-      min_values: Number(select.min_values ?? fallback?.min_values ?? 1),
-      max_values: Number(select.max_values ?? fallback?.max_values ?? 1),
-      options: Array.isArray(select.options)
-        ? select.options.map((o: any) => ({
-            label: String(o.label || ""),
-            value: String(o.value || ""),
-            description: String(o.description || ""),
-            emoji: o.emoji ? String(o.emoji) : undefined,
-          }))
-        : fallback?.options || [],
-      custom_id: select.custom_id || fallback?.custom_id || "SelectRoles",
-    };
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-discord-text-muted">Loading select menu roles...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Select Menu Roles</h1>
-        <Button onClick={saveCurrentMessage} disabled={saving}>
-          {saving ? "Saving..." : "Save Config"}
-        </Button>
+        <div>
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-discord-blurple" />
+                Select Menu Roles
+            </h1>
+            <p className="text-sm text-discord-text-muted">Create interactive role-selection menus for your server members.</p>
+        </div>
+        <div className="flex gap-3">
+            <Button variant="outline" onClick={handleSave} disabled={saving}>
+                {saving ? "Saving..." : "Save Drafts"}
+            </Button>
+            <Button variant="discord" onClick={handlePostNow} disabled={posting}>
+                {posting ? "Posting..." : "🚀 Send to Channel"}
+            </Button>
+        </div>
       </div>
 
-      <div className="flex gap-6">
-        <div className="w-60 shrink-0 flex flex-col gap-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-3 h-fit">
+      <div className="flex gap-6 h-full min-h-[700px]">
+        {/* Sidebar */}
+        <div className="w-64 shrink-0 flex flex-col gap-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-3 h-fit">
           <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs font-bold text-discord-text-muted uppercase tracking-wider">Messages</span>
+            <span className="text-xs font-bold text-discord-text-muted uppercase tracking-wider">Saved Menus</span>
             <button
-              title="New Message"
-              onClick={createNewMessage}
+              title="New Category"
+              onClick={addCategory}
               className="flex items-center gap-1 text-xs text-discord-text-muted hover:text-white bg-[#1E1F22] hover:bg-discord-blurple rounded-md px-2 py-1 transition"
             >
-              <PlusIcon className="w-3 h-3" /> Message
+              <PlusIcon className="w-3 h-3" /> Category
             </button>
           </div>
 
-          {!selectedMessageId && (
-            <div className="flex items-center">
-              <div className="flex-1 text-left text-sm px-2 py-1.5 rounded-md bg-discord-blurple text-white font-medium truncate">
-                Unsaved Message
-              </div>
-            </div>
+          {Object.keys(categorized).length === 0 && (
+            <p className="text-xs text-discord-text-muted px-2 py-3 text-center opacity-60">No menus saved yet.</p>
           )}
 
-          {Object.entries(messages).map(([messageId, message]) => (
-            <div key={messageId} className="flex items-center group/item">
-              <button
-                onClick={() => selectMessage(messageId)}
-                className={`flex-1 text-left text-sm px-2 py-1.5 rounded-md transition-colors truncate ${
-                  selectedMessageId === messageId
-                    ? "bg-discord-blurple text-white font-medium"
-                    : "text-discord-text hover:bg-[#383A40]"
-                }`}
-              >
-                {message.title || message.message_data?.embeds?.[0]?.title || "Untitled Message"}
-              </button>
-              <button
-                onClick={() => deleteMessage(messageId)}
-                className="opacity-0 group-hover/item:opacity-100 ml-1 text-red-400 hover:text-red-300 shrink-0 p-0.5 rounded"
-                title="Delete message"
-              >
-                <Trash2Icon className="w-3 h-3" />
-              </button>
+          {Object.entries(categorized).map(([cat, keys]) => (
+            <div key={cat} className="mb-1">
+              <div className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-[#383A40] group">
+                <button
+                  className="flex items-center gap-1.5 flex-1 text-left"
+                  onClick={() => toggleCategory(cat)}
+                >
+                  {collapsedCats[cat]
+                    ? <ChevronRightIcon className="w-3.5 h-3.5 text-discord-text-muted shrink-0" />
+                    : <ChevronDownIcon className="w-3.5 h-3.5 text-discord-text-muted shrink-0" />}
+                  <FolderIcon className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                  <span className="text-sm font-semibold text-discord-text truncate">{cat}</span>
+                </button>
+                <button
+                  onClick={() => addDraftToCategory(cat)}
+                  className="opacity-0 group-hover:opacity-100 text-discord-text-muted hover:text-white bg-[#313338] hover:bg-discord-blurple rounded p-0.5 transition"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {!collapsedCats[cat] && (
+                <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-[#1E1F22] pl-2">
+                  {keys.map(key => (
+                    <div key={key} className="flex items-center group/item">
+                      <button
+                        onClick={() => setActiveDraftKey(key)}
+                        className={`flex-1 text-left text-sm px-2 py-1.5 rounded-md transition-colors truncate ${
+                          activeDraftKey === key
+                            ? 'bg-discord-blurple text-white font-medium'
+                            : 'text-discord-text hover:bg-[#383A40]'
+                        }`}
+                      >
+                        {draftLabel(key)}
+                      </button>
+                      <button
+                        onClick={() => deleteDraft(key)}
+                        className="opacity-0 group-hover/item:opacity-100 ml-1 text-red-400 hover:text-red-300 shrink-0 p-0.5 rounded"
+                      >
+                        <Trash2Icon className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
-
-          {Object.keys(messages).length === 0 && (
-            <div className="text-center py-8 text-discord-text-muted opacity-70">
-              <ListIcon className="w-8 h-8 mx-auto mb-2" />
-              <p className="text-xs">No messages yet.</p>
-            </div>
-          )}
         </div>
 
-        <div className="flex-1">
-          <div className="flex-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6 relative h-full">
-            <div className="flex flex-col gap-4 h-full">
-              <div className="flex justify-between items-center mb-2">
-                <div>
-                  <p className="text-xs text-discord-text-muted">Configuration</p>
-                  <h2 className="text-xl font-bold text-white">{currentMessage.title || "New Message"}</h2>
+        {/* Editor Panel */}
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-0 relative overflow-hidden flex flex-col">
+            {activeDraftKey ? (
+              <div className="flex flex-col h-full">
+                <div className="p-6 border-b border-[#1E1F22] flex justify-between items-center bg-[#242529]">
+                    <div>
+                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-discord-blurple" />
+                            Editing: {draftLabel(activeDraftKey)}
+                        </h2>
+                    </div>
                 </div>
-                <Button variant="discord" onClick={saveCurrentMessage} disabled={saving} size="sm">
-                  <Send className="w-4 h-4 mr-2" />
-                  {saving ? "Saving..." : selectedMessageId ? "Update Message" : "Send Message"}
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                    <AdvancedEmbedEditor
+                    config={{...currentDraft, components: previewMessage.components}}
+                    onChange={updateDraft}
+                    bottomChildren={
+                        <div className="mt-8 pt-8 border-t border-[#1E1F22]">
+                            <h3 className="mb-4 text-sm font-bold text-discord-text-muted uppercase tracking-wide flex items-center gap-2">
+                                <ListIcon className="w-4 h-4" /> Dropdown Configuration
+                            </h3>
+                            
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                                <div>
+                                <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Menu Placeholder</label>
+                                <Input
+                                    value={currentDraft.placeholder}
+                                    onChange={(e) => updateDraft("placeholder", e.target.value)}
+                                    placeholder="Select roles..."
+                                />
+                                </div>
+                                <div>
+                                <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Min Selection</label>
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    max="25"
+                                    value={currentDraft.min_values}
+                                    onChange={(e) => updateDraft("min_values", parseInt(e.target.value) || 1)}
+                                />
+                                </div>
+                                <div>
+                                <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Max Selection</label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    max="25"
+                                    value={currentDraft.max_values}
+                                    onChange={(e) => updateDraft("max_values", parseInt(e.target.value) || 1)}
+                                />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-semibold text-discord-text-muted uppercase">Role Options ({currentDraft.options.length}/25)</label>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                {currentDraft.options.map((option, index) => (
+                                    <div key={index} className="rounded-lg border border-[#1E1F22] bg-[#313338] p-3 flex items-center gap-3 group/opt relative">
+                                        <div className="grid grid-cols-12 gap-3 flex-1">
+                                            <div className="col-span-3">
+                                                <label className="text-[10px] text-discord-text-muted mb-1 block">Label</label>
+                                                <Input 
+                                                    value={option.label}
+                                                    onChange={(e) => {
+                                                        const newOpts = [...currentDraft.options];
+                                                        newOpts[index].label = e.target.value;
+                                                        updateDraft("options", newOpts);
+                                                    }}
+                                                    className="h-8 text-[13px]"
+                                                />
+                                            </div>
+                                            <div className="col-span-6">
+                                                <label className="text-[10px] text-discord-text-muted mb-1 block">Description</label>
+                                                <Input 
+                                                    value={option.description}
+                                                    onChange={(e) => {
+                                                        const newOpts = [...currentDraft.options];
+                                                        newOpts[index].description = e.target.value;
+                                                        updateDraft("options", newOpts);
+                                                    }}
+                                                    className="h-8 text-[13px]"
+                                                />
+                                            </div>
+                                            <div className="col-span-1">
+                                                <label className="text-[10px] text-discord-text-muted mb-1 block text-center">Emoji</label>
+                                                <Input 
+                                                    value={option.emoji || ""}
+                                                    onChange={(e) => {
+                                                        const newOpts = [...currentDraft.options];
+                                                        newOpts[index].emoji = e.target.value;
+                                                        updateDraft("options", newOpts);
+                                                    }}
+                                                    className="h-8 text-center px-1"
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className="text-[10px] text-discord-text-muted mb-1 block">Role ID</label>
+                                                <div className="h-8 flex items-center rounded bg-[#1E1F22] px-2 text-[11px] text-discord-text-muted truncate">
+                                                    {option.value}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => removeOption(index)} 
+                                            className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10 transition"
+                                        >
+                                            <Trash2Icon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                                </div>
+
+                                {currentDraft.options.length < 25 && (
+                                    <div className="rounded-lg border border-dashed border-discord-blurple/30 bg-discord-blurple/5 p-4">
+                                        <h4 className="text-[11px] font-bold text-discord-blurple uppercase mb-3 flex items-center gap-1.5">
+                                            <PlusIcon className="w-3 h-3" /> Add Role Option
+                                        </h4>
+                                        <div className="grid grid-cols-12 gap-3 mb-3">
+                                            <div className="col-span-3">
+                                                <Input value={newOptionLabel} onChange={(e) => setNewOptionLabel(e.target.value)} placeholder="Option Label" className="h-9" />
+                                            </div>
+                                            <div className="col-span-5">
+                                                <Input value={newOptionDescription} onChange={(e) => setNewOptionDescription(e.target.value)} placeholder="Short Description..." className="h-9" />
+                                            </div>
+                                            <div className="col-span-1">
+                                                <Input value={newOptionEmoji} onChange={(e) => setNewOptionEmoji(e.target.value)} placeholder="Emoji" title="Emoji (optional)" className="h-9 text-center px-1" />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <RoleSelect guildId={guildId} value={newRoleId} onChange={setNewRoleId} placeholder="Select role..." className="h-9" />
+                                            </div>
+                                        </div>
+                                        <Button onClick={addOption} size="sm" variant="outline" className="w-full border-discord-blurple/20 hover:bg-discord-blurple/10 text-discord-blurple">
+                                            Add Role to Dropdown
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    }
+                    >
+                    <div className="grid grid-cols-2 gap-4 border-b border-[#1E1F22] pb-8 mb-4">
+                        <div>
+                        <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Target Channel</label>
+                        <ChannelSelect
+                            guildId={guildId}
+                            value={currentDraft.channel_id || ""}
+                            onChange={(id) => updateDraft("channel_id", id)}
+                            placeholder="Where should this menu go?"
+                        />
+                        </div>
+                        <div>
+                        <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Ping Role (Optional)</label>
+                        <RoleSelect
+                            guildId={guildId}
+                            value={currentDraft.ping_role_id || ""}
+                            onChange={(id) => updateDraft("ping_role_id", id)}
+                            placeholder="Ping a role on post?"
+                        />
+                        </div>
+                    </div>
+                    </AdvancedEmbedEditor>
+                </div>
+              </div>
+            ) : (
+              <div className="text-discord-text-muted flex h-[600px] flex-col items-center justify-center gap-4">
+                <div className="p-6 rounded-full bg-[#313338] border border-[#1E1F22]">
+                    <Sparkles className="w-12 h-12 text-discord-blurple opacity-40" />
+                </div>
+                <div className="text-center">
+                    <p className="text-lg font-bold text-white">Select Menu Designer</p>
+                    <p className="text-sm text-discord-text-muted max-w-xs mx-auto">Create and manage interactive role menus. Select a saved menu or add a new category to begin.</p>
+                </div>
+                <Button variant="discord" className="mt-2" onClick={addCategory}>
+                  <PlusIcon className="w-4 h-4 mr-2" /> Create New Menu Category
                 </Button>
               </div>
-
-              <div className="flex border-b border-[#1E1F22] rounded-t-xl overflow-hidden bg-[#1E1F22]">
-                {[
-                  { key: "config", label: "VISUAL" },
-                  { key: "raw", label: "RAW" },
-                  { key: "preview", label: "PREVIEW" },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setViewMode(tab.key as "config" | "preview" | "raw")}
-                    className={`flex-1 py-3 text-[13px] tracking-wide font-bold uppercase transition ${
-                      viewMode === tab.key
-                        ? "bg-[#2B2D31] text-discord-blurple border-t-2 border-discord-blurple shadow-sm"
-                        : "bg-[#2B2D31] hover:bg-[#313338] text-discord-text-muted border-t-2 border-transparent"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="bg-[#2B2D31] rounded-b-xl border border-t-0 border-[#1E1F22] p-6 shadow-sm min-h-[450px]">
-                {viewMode === "config" && (
-                  <div className="flex flex-col gap-5">
-                    <div className="rounded-xl border border-[#1E1F22] bg-[#313338] p-5">
-                      <h3 className="text-lg font-bold text-white mb-4">Message Settings</h3>
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Title</label>
-                          <Input
-                            value={currentMessage.title}
-                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, title: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Embed Color</label>
-                          <Input
-                            type="number"
-                            value={currentMessage.color}
-                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, color: parseInt(e.target.value) || 0 }))}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Description</label>
-                        <Textarea
-                          className="h-32 font-mono text-sm"
-                          value={currentMessage.description.join("\n")}
-                          onChange={(e) => setCurrentMessage(prev => ({ ...prev, description: e.target.value.split("\n") }))}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Target Channel</label>
-                        <ChannelSelect
-                          guildId={guildId}
-                          value={channelId}
-                          onChange={setChannelId}
-                          onChannelSelect={setChannelObj}
-                          placeholder="Select channel..."
-                        />
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-[#1E1F22] bg-[#313338] p-5">
-                      <h3 className="text-lg font-bold text-white mb-4">Dropdown Configuration</h3>
-                      <div className="grid grid-cols-3 gap-4 mb-5">
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Placeholder</label>
-                          <Input
-                            value={currentMessage.placeholder}
-                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, placeholder: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Min Select</label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="25"
-                            value={currentMessage.min_values}
-                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, min_values: parseInt(e.target.value) || 1 }))}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Max Select</label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="25"
-                            value={currentMessage.max_values}
-                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, max_values: parseInt(e.target.value) || 1 }))}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Options ({currentMessage.options.length}/25)</label>
-                        <div className="space-y-2">
-                          {currentMessage.options.map((option, index) => (
-                            <div key={index} className="rounded-lg border border-[#1E1F22] bg-[#2B2D31] p-3">
-                              <div className="grid grid-cols-4 gap-2">
-                                <Input value={option.label} onChange={(e) => updateOption(index, "label", e.target.value)} placeholder="Label" />
-                                <Input value={option.description} onChange={(e) => updateOption(index, "description", e.target.value)} placeholder="Description" />
-                                <Input value={option.emoji || ""} onChange={(e) => updateOption(index, "emoji", e.target.value)} placeholder="Emoji" />
-                                <div className="flex items-center justify-between rounded-md bg-[#1E1F22] px-3 py-2 text-xs text-discord-text-muted">
-                                  <span className="truncate">Role: {option.value}</span>
-                                  <button onClick={() => removeOption(index)} className="ml-2 text-red-400 hover:text-red-300" title="Remove option">
-                                    <Trash2Icon className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {currentMessage.options.length < 25 && (
-                        <div className="rounded-lg border border-[#1E1F22] bg-[#2B2D31] p-4">
-                          <h4 className="text-sm font-semibold text-white mb-3">Add Option</h4>
-                          <div className="grid grid-cols-4 gap-2 mb-3">
-                            <Input value={newOptionLabel} onChange={(e) => setNewOptionLabel(e.target.value)} placeholder="Option Label" />
-                            <Input value={newOptionDescription} onChange={(e) => setNewOptionDescription(e.target.value)} placeholder="Description" />
-                            <Input value={newOptionEmoji} onChange={(e) => setNewOptionEmoji(e.target.value)} placeholder="Emoji" />
-                            <RoleSelect guildId={guildId} value={newRoleId} onChange={setNewRoleId} placeholder="Select role..." />
-                          </div>
-                          <Button onClick={addOption} size="sm">
-                            <PlusIcon className="w-4 h-4 mr-2" />
-                            Add Option
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {viewMode === "preview" && (
-                  <div className="flex justify-center items-start bg-[#313338] p-8 rounded border border-[#1E1F22] shadow-inner min-h-[400px]">
-                    <div className="w-full max-w-[500px]">
-                      <DiscordMessagePreview
-                        message={generateRawJSON()}
-                        botUser={{
-                          username: "Seisen Hub",
-                          avatar: "https://cdn.discordapp.com/embed/avatars/0.png",
-                          discriminator: "0000",
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {viewMode === "raw" && (
-                  <div className="flex flex-col h-full space-y-3">
-                    <div>
-                      <h4 className="text-white text-md font-bold">Raw JSON Source</h4>
-                    </div>
-                    <Textarea
-                      className="flex-1 font-mono text-[13px] bg-[#1E1F22] border-[#111214] min-h-[400px] leading-relaxed text-[#DBDEE1]"
-                      value={rawText || JSON.stringify(generateRawJSON(), null, 2)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setRawText(val);
-                        try {
-                          const parsed = JSON.parse(val);
-                          setCurrentMessage((prev) => messageFromRaw(parsed, prev));
-                        } catch {
-                          // keep typing-friendly behavior
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
+
+      <PromptModal
+        open={promptOpen}
+        title={promptConfig.title}
+        label={promptConfig.label}
+        onConfirm={handlePromptConfirm}
+        onCancel={() => setPromptOpen(false)}
+      />
     </div>
   );
 }

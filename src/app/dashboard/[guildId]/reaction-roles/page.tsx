@@ -55,6 +55,8 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptConfig, setPromptConfig] = useState<{ title: string; label: string; action: 'category' | 'draft' | 'rename'; cat?: string; oldKey?: string }>({
@@ -65,6 +67,33 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   const [newOptionDescription, setNewOptionDescription] = useState("");
   const [newOptionEmoji, setNewOptionEmoji] = useState("");
   const [newRoleId, setNewRoleId] = useState("");
+
+  // Auto-save drafts after changes (with debounce)
+  useEffect(() => {
+    if (!initialLoadComplete) return; // Don't save until initial load is complete
+    if (Object.keys(drafts).length === 0) return; // Don't save empty state
+    
+    const timeoutId = setTimeout(() => {
+      // Auto-save after 2 seconds of no changes
+      setSaving(true);
+      fetchApi(`/guilds/${guildId}/select_menu_roles`, undefined, {
+        method: "PUT",
+        body: JSON.stringify(drafts),
+      })
+        .then(() => {
+          setLastSaved(new Date());
+        })
+        .catch((err) => {
+          console.error("Auto-save failed:", err);
+          toast("Auto-save failed", "error");
+        })
+        .finally(() => {
+          setSaving(false);
+        });
+    }, 2000);
+
+    return () => clearTimeout(timeoutId);
+  }, [drafts, guildId, toast, initialLoadComplete]);
 
   const DEFAULT_DRAFT: SelectMenuDraft = {
     title: "📣 Self-Assignable Roles",
@@ -85,10 +114,12 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
         setDrafts(d);
         const keys = Object.keys(d);
         if (keys.length > 0) setActiveDraftKey(keys[0]);
+        setInitialLoadComplete(true);
       })
       .catch((err) => {
         console.error("Load error:", err);
         toast("Failed to load select menu roles", "error");
+        setInitialLoadComplete(true);
       });
   }, [guildId, toast]);
 
@@ -99,6 +130,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
         method: "PUT",
         body: JSON.stringify(drafts),
       });
+      setLastSaved(new Date());
       toast("Drafts Saved Successfully!");
     } catch (e) {
       toast("Failed to save.", "error");
@@ -107,13 +139,17 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
     }
   };
 
-  const currentDraft = drafts[activeDraftKey] || DEFAULT_DRAFT;
+  const currentDraft = drafts[activeDraftKey] || { ...DEFAULT_DRAFT };
 
   const updateDraft = (key: string, val: any) => {
-    setDrafts(prev => ({
-      ...prev,
-      [activeDraftKey]: { ...prev[activeDraftKey], [key]: val }
-    }));
+    setDrafts(prev => {
+      // Ensure the draft exists in state before updating
+      const existingDraft = prev[activeDraftKey] || { ...DEFAULT_DRAFT };
+      return {
+        ...prev,
+        [activeDraftKey]: { ...existingDraft, [key]: val }
+      };
+    });
   };
 
   const handlePostNow = async () => {
@@ -189,7 +225,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
     if (promptConfig.action === "category") {
       const key = `${value}/${value} Draft 1`;
       if (!drafts[key]) {
-        setDrafts(prev => ({ ...prev, [key]: DEFAULT_DRAFT }));
+        setDrafts(prev => ({ ...prev, [key]: { ...DEFAULT_DRAFT } }));
         setActiveDraftKey(key);
       }
     } else if (promptConfig.action === "draft" && promptConfig.cat) {
@@ -197,7 +233,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       if (drafts[key]) {
         toast("A draft with that name already exists.", "error");
       } else {
-        setDrafts(prev => ({ ...prev, [key]: DEFAULT_DRAFT }));
+        setDrafts(prev => ({ ...prev, [key]: { ...DEFAULT_DRAFT } }));
         setActiveDraftKey(key);
       }
     } else if (promptConfig.action === "rename" && promptConfig.oldKey) {
@@ -309,9 +345,14 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
             </h1>
             <p className="text-sm text-discord-text-muted">Create interactive role-selection menus for your server members.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                ✓ Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
             <Button variant="outline" onClick={handleSave} disabled={saving}>
-                {saving ? "Saving..." : "Save Drafts"}
+                {saving ? "Saving..." : "Save Now"}
             </Button>
             <Button variant="discord" onClick={handlePostNow} disabled={posting}>
                 {posting ? "Posting..." : "🚀 Send to Channel"}

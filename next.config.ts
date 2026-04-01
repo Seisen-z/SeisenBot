@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
         source: '/api/bot/:path*',
         destination: process.env.API_PROXY_TARGET 
           ? `${process.env.API_PROXY_TARGET}/api/:path*` 
-          : 'http://localhost:8000/api/:path*'
+          : 'http://85.215.229.230:9820/api/:path*'
       }
     ];
   }

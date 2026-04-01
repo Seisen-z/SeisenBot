@@ -162,6 +162,18 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       return;
     }
 
+    // Validate Discord requirements for select menu options
+    for (const option of currentDraft.options) {
+      if (!option.label || option.label.length < 1 || option.label.length > 100) {
+        toast("All option labels must be between 1-100 characters.", "error");
+        return;
+      }
+      if (option.description && option.description.length > 100) {
+        toast("All option descriptions must be 100 characters or less.", "error");
+        return;
+      }
+    }
+
     setPosting(true);
     try {
       const discordPayload = {
@@ -290,10 +302,24 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       return;
     }
 
+    // Discord validation rules
+    const label = newOptionLabel.trim();
+    const description = newOptionDescription.trim() || `Get the ${newOptionLabel} role`;
+    
+    if (label.length < 1 || label.length > 100) {
+      toast("Option label must be between 1-100 characters", "error");
+      return;
+    }
+    
+    if (description.length > 100) {
+      toast("Option description must be 100 characters or less", "error");
+      return;
+    }
+
     const newOption: SelectOption = {
-      label: newOptionLabel.trim(),
+      label: label,
       value: newRoleId,
-      description: newOptionDescription.trim() || `Get the ${newOptionLabel} role`,
+      description: description,
       emoji: newOptionEmoji.trim() || undefined,
     };
 

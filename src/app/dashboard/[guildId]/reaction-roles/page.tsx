@@ -264,39 +264,44 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Select Menu Roles</h1>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={createNewMessage}>
-            <PlusIcon className="w-4 h-4 mr-2" />
-            New Message
-          </Button>
-          <Button onClick={saveCurrentMessage} disabled={saving}>
-            <Send className="w-4 h-4 mr-2" />
-            {saving ? "Saving..." : selectedMessageId ? "Update Message" : "Send Message"}
-          </Button>
-        </div>
+        <Button onClick={saveCurrentMessage} disabled={saving}>
+          {saving ? "Saving..." : "Save Config"}
+        </Button>
       </div>
 
-      <div className="flex gap-6 h-[calc(100vh-220px)] min-h-[500px]">
-        <div className="w-64 shrink-0 flex flex-col gap-2 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-3 overflow-y-auto">
+      <div className="flex gap-6">
+        <div className="w-60 shrink-0 flex flex-col gap-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-3 h-fit">
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-xs font-bold text-discord-text-muted uppercase tracking-wider">Messages</span>
+            <button
+              title="New Message"
+              onClick={createNewMessage}
+              className="flex items-center gap-1 text-xs text-discord-text-muted hover:text-white bg-[#1E1F22] hover:bg-discord-blurple rounded-md px-2 py-1 transition"
+            >
+              <PlusIcon className="w-3 h-3" /> Message
+            </button>
           </div>
 
           {Object.entries(messages).map(([messageId, message]) => (
-            <button
-              key={messageId}
-              onClick={() => selectMessage(messageId)}
-              className={`text-left px-3 py-2 rounded-md transition-colors ${
-                selectedMessageId === messageId
-                  ? "bg-discord-blurple text-white font-medium"
-                  : "text-discord-text hover:bg-[#383A40]"
-              }`}
-            >
-              <div className="text-sm truncate">{message.title}</div>
-              <div className={`text-xs mt-1 ${selectedMessageId === messageId ? "text-white/75" : "text-discord-text-muted"}`}>
-                {message.options.length} options
-              </div>
-            </button>
+            <div key={messageId} className="flex items-center group/item">
+              <button
+                onClick={() => selectMessage(messageId)}
+                className={`flex-1 text-left text-sm px-2 py-1.5 rounded-md transition-colors truncate ${
+                  selectedMessageId === messageId
+                    ? "bg-discord-blurple text-white font-medium"
+                    : "text-discord-text hover:bg-[#383A40]"
+                }`}
+              >
+                {message.title || "Untitled Message"}
+              </button>
+              <button
+                onClick={() => deleteMessage(messageId)}
+                className="opacity-0 group-hover/item:opacity-100 ml-1 text-red-400 hover:text-red-300 shrink-0 p-0.5 rounded"
+                title="Delete message"
+              >
+                <Trash2Icon className="w-3 h-3" />
+              </button>
+            </div>
           ))}
 
           {Object.keys(messages).length === 0 && (
@@ -307,222 +312,185 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
           )}
         </div>
 
-        <div className="flex-1 flex flex-col">
-          <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] overflow-hidden h-full flex flex-col">
-            <div className="border-b border-[#1E1F22] px-3">
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setViewMode("config")}
-                  className={`px-3 py-3 text-sm font-medium rounded-t-md transition-colors ${
-                    viewMode === "config"
-                      ? "bg-[#383A40] text-white"
-                      : "text-discord-text-muted hover:text-white"
-                  }`}
-                >
-                  Configure
-                </button>
-                <button
-                  onClick={() => setViewMode("preview")}
-                  className={`px-3 py-3 text-sm font-medium rounded-t-md transition-colors flex items-center gap-2 ${
-                    viewMode === "preview"
-                      ? "bg-[#383A40] text-white"
-                      : "text-discord-text-muted hover:text-white"
-                  }`}
-                >
-                  <EyeIcon className="w-4 h-4" />
-                  Preview
-                </button>
-                <button
-                  onClick={() => setViewMode("raw")}
-                  className={`px-3 py-3 text-sm font-medium rounded-t-md transition-colors flex items-center gap-2 ${
-                    viewMode === "raw"
-                      ? "bg-[#383A40] text-white"
-                      : "text-discord-text-muted hover:text-white"
-                  }`}
-                >
-                  <CodeIcon className="w-4 h-4" />
-                  Raw JSON
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-              {viewMode === "config" && (
-                <div className="flex flex-col gap-6">
-                  <div className="rounded-xl border border-[#1E1F22] bg-[#313338] p-5">
-                    <h3 className="text-lg font-bold text-white mb-4">Message Settings</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Title</label>
-                        <Input
-                          value={currentMessage.title}
-                          onChange={(e) => setCurrentMessage(prev => ({ ...prev, title: e.target.value }))}
-                          placeholder="Message title..."
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Embed Color</label>
-                        <Input
-                          type="number"
-                          value={currentMessage.color}
-                          onChange={(e) => setCurrentMessage(prev => ({ ...prev, color: parseInt(e.target.value) || 0 }))}
-                          placeholder="5814783"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <label className="mb-2 block text-sm font-medium text-discord-text-muted">Description (one line per array item)</label>
-                      <Textarea
-                        value={currentMessage.description.join("\n")}
-                        onChange={(e) => setCurrentMessage(prev => ({ ...prev, description: e.target.value.split("\n") }))}
-                        rows={4}
-                        placeholder="Line 1&#10;&#10;> Quote text"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-discord-text-muted">Target Channel</label>
-                      <ChannelSelect
-                        guildId={guildId}
-                        value={channelId}
-                        onChange={setChannelId}
-                        onChannelSelect={setChannelObj}
-                        placeholder="Select channel to send to..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[#1E1F22] bg-[#313338] p-5">
-                    <h3 className="text-lg font-bold text-white mb-4">Dropdown Configuration</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Placeholder</label>
-                        <Input
-                          value={currentMessage.placeholder}
-                          onChange={(e) => setCurrentMessage(prev => ({ ...prev, placeholder: e.target.value }))}
-                          placeholder="Select an option..."
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Min Select</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="25"
-                          value={currentMessage.min_values}
-                          onChange={(e) => setCurrentMessage(prev => ({ ...prev, min_values: parseInt(e.target.value) || 1 }))}
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Max Select</label>
-                        <Input
-                          type="number"
-                          min="1"
-                          max="25"
-                          value={currentMessage.max_values}
-                          onChange={(e) => setCurrentMessage(prev => ({ ...prev, max_values: parseInt(e.target.value) || 1 }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <label className="mb-2 block text-sm font-medium text-discord-text-muted">Options ({currentMessage.options.length}/25)</label>
-                      <div className="space-y-2">
-                        {currentMessage.options.map((option, index) => (
-                          <div key={index} className="rounded-lg border border-[#1E1F22] bg-[#2B2D31] p-3">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                              <Input
-                                value={option.label}
-                                onChange={(e) => updateOption(index, "label", e.target.value)}
-                                placeholder="Label"
-                              />
-                              <Input
-                                value={option.description}
-                                onChange={(e) => updateOption(index, "description", e.target.value)}
-                                placeholder="Description"
-                              />
-                              <Input
-                                value={option.emoji || ""}
-                                onChange={(e) => updateOption(index, "emoji", e.target.value)}
-                                placeholder="Emoji (optional)"
-                              />
-                              <div className="flex items-center justify-between rounded-md bg-[#1E1F22] px-3 py-2 text-xs text-discord-text-muted">
-                                <span className="truncate">Role: {option.value}</span>
-                                <button
-                                  onClick={() => removeOption(index)}
-                                  className="ml-2 text-red-400 hover:text-red-300"
-                                  title="Remove option"
-                                >
-                                  <Trash2Icon className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {currentMessage.options.length < 25 && (
-                      <div className="rounded-lg border border-[#1E1F22] bg-[#2B2D31] p-4">
-                        <h4 className="text-sm font-semibold text-white mb-3">Add Option</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
-                          <Input value={newOptionLabel} onChange={(e) => setNewOptionLabel(e.target.value)} placeholder="Option Label" />
-                          <Input value={newOptionDescription} onChange={(e) => setNewOptionDescription(e.target.value)} placeholder="Description" />
-                          <Input value={newOptionEmoji} onChange={(e) => setNewOptionEmoji(e.target.value)} placeholder="Emoji" />
-                          <RoleSelect
-                            guildId={guildId}
-                            value={newRoleId}
-                            onChange={setNewRoleId}
-                            placeholder="Select role..."
-                          />
-                        </div>
-                        <Button onClick={addOption} size="sm">
-                          <PlusIcon className="w-4 h-4 mr-2" />
-                          Add Option
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+        <div className="flex-1">
+          <div className="flex-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6 relative h-full">
+            <div className="flex flex-col gap-4 h-full">
+              <div className="flex justify-between items-center mb-2">
+                <div>
+                  <p className="text-xs text-discord-text-muted">Configuration</p>
+                  <h2 className="text-xl font-bold text-white">{currentMessage.title || "New Message"}</h2>
                 </div>
-              )}
-
-              {viewMode === "preview" && (
-                <div className="max-w-3xl">
-                  <h3 className="text-lg font-bold text-white mb-4">Message Preview</h3>
-                  <DiscordMessagePreview
-                    message={generateRawJSON()}
-                    botUser={{
-                      username: "Seisen Hub",
-                      avatar: "/bot-avatar.png",
-                      discriminator: "0000",
-                    }}
-                  />
-                </div>
-              )}
-
-              {viewMode === "raw" && (
-                <div className="max-w-4xl">
-                  <h3 className="text-lg font-bold text-white mb-4">Raw JSON</h3>
-                  <div className="rounded-xl border border-[#1E1F22] bg-[#313338] p-4">
-                    <pre className="text-sm text-discord-text overflow-auto">{JSON.stringify(generateRawJSON(), null, 2)}</pre>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {selectedMessageId && (
-              <div className="border-t border-[#1E1F22] p-4 flex justify-end">
-                <Button
-                  onClick={() => deleteMessage(selectedMessageId)}
-                  variant="ghost"
-                  className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                >
-                  <Trash2Icon className="w-4 h-4 mr-2" />
-                  Delete Message
+                <Button variant="discord" onClick={saveCurrentMessage} disabled={saving} size="sm">
+                  <Send className="w-4 h-4 mr-2" />
+                  {saving ? "Saving..." : selectedMessageId ? "Update Message" : "Send Message"}
                 </Button>
               </div>
-            )}
+
+              <div className="flex border-b border-[#1E1F22] rounded-t-xl overflow-hidden bg-[#1E1F22]">
+                {[
+                  { key: "config", label: "VISUAL" },
+                  { key: "raw", label: "RAW" },
+                  { key: "preview", label: "PREVIEW" },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setViewMode(tab.key as "config" | "preview" | "raw")}
+                    className={`flex-1 py-3 text-[13px] tracking-wide font-bold uppercase transition ${
+                      viewMode === tab.key
+                        ? "bg-[#2B2D31] text-discord-blurple border-t-2 border-discord-blurple shadow-sm"
+                        : "bg-[#2B2D31] hover:bg-[#313338] text-discord-text-muted border-t-2 border-transparent"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="bg-[#2B2D31] rounded-b-xl border border-t-0 border-[#1E1F22] p-6 shadow-sm min-h-[450px]">
+                {viewMode === "config" && (
+                  <div className="flex flex-col gap-5">
+                    <div className="rounded-xl border border-[#1E1F22] bg-[#313338] p-5">
+                      <h3 className="text-lg font-bold text-white mb-4">Message Settings</h3>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Title</label>
+                          <Input
+                            value={currentMessage.title}
+                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, title: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Embed Color</label>
+                          <Input
+                            type="number"
+                            value={currentMessage.color}
+                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, color: parseInt(e.target.value) || 0 }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Description</label>
+                        <Textarea
+                          className="h-32 font-mono text-sm"
+                          value={currentMessage.description.join("\n")}
+                          onChange={(e) => setCurrentMessage(prev => ({ ...prev, description: e.target.value.split("\n") }))}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Target Channel</label>
+                        <ChannelSelect
+                          guildId={guildId}
+                          value={channelId}
+                          onChange={setChannelId}
+                          onChannelSelect={setChannelObj}
+                          placeholder="Select channel..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[#1E1F22] bg-[#313338] p-5">
+                      <h3 className="text-lg font-bold text-white mb-4">Dropdown Configuration</h3>
+                      <div className="grid grid-cols-3 gap-4 mb-5">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Placeholder</label>
+                          <Input
+                            value={currentMessage.placeholder}
+                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, placeholder: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Min Select</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="25"
+                            value={currentMessage.min_values}
+                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, min_values: parseInt(e.target.value) || 1 }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-discord-text-muted">Max Select</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="25"
+                            value={currentMessage.max_values}
+                            onChange={(e) => setCurrentMessage(prev => ({ ...prev, max_values: parseInt(e.target.value) || 1 }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-discord-text-muted">Options ({currentMessage.options.length}/25)</label>
+                        <div className="space-y-2">
+                          {currentMessage.options.map((option, index) => (
+                            <div key={index} className="rounded-lg border border-[#1E1F22] bg-[#2B2D31] p-3">
+                              <div className="grid grid-cols-4 gap-2">
+                                <Input value={option.label} onChange={(e) => updateOption(index, "label", e.target.value)} placeholder="Label" />
+                                <Input value={option.description} onChange={(e) => updateOption(index, "description", e.target.value)} placeholder="Description" />
+                                <Input value={option.emoji || ""} onChange={(e) => updateOption(index, "emoji", e.target.value)} placeholder="Emoji" />
+                                <div className="flex items-center justify-between rounded-md bg-[#1E1F22] px-3 py-2 text-xs text-discord-text-muted">
+                                  <span className="truncate">Role: {option.value}</span>
+                                  <button onClick={() => removeOption(index)} className="ml-2 text-red-400 hover:text-red-300" title="Remove option">
+                                    <Trash2Icon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {currentMessage.options.length < 25 && (
+                        <div className="rounded-lg border border-[#1E1F22] bg-[#2B2D31] p-4">
+                          <h4 className="text-sm font-semibold text-white mb-3">Add Option</h4>
+                          <div className="grid grid-cols-4 gap-2 mb-3">
+                            <Input value={newOptionLabel} onChange={(e) => setNewOptionLabel(e.target.value)} placeholder="Option Label" />
+                            <Input value={newOptionDescription} onChange={(e) => setNewOptionDescription(e.target.value)} placeholder="Description" />
+                            <Input value={newOptionEmoji} onChange={(e) => setNewOptionEmoji(e.target.value)} placeholder="Emoji" />
+                            <RoleSelect guildId={guildId} value={newRoleId} onChange={setNewRoleId} placeholder="Select role..." />
+                          </div>
+                          <Button onClick={addOption} size="sm">
+                            <PlusIcon className="w-4 h-4 mr-2" />
+                            Add Option
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {viewMode === "preview" && (
+                  <div className="flex justify-center items-start bg-[#313338] p-8 rounded border border-[#1E1F22] shadow-inner min-h-[400px]">
+                    <div className="w-full max-w-[500px]">
+                      <DiscordMessagePreview
+                        message={generateRawJSON()}
+                        botUser={{
+                          username: "Seisen Hub",
+                          avatar: "https://cdn.discordapp.com/embed/avatars/0.png",
+                          discriminator: "0000",
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {viewMode === "raw" && (
+                  <div className="flex flex-col h-full space-y-3">
+                    <div>
+                      <h4 className="text-white text-md font-bold">Raw JSON Source</h4>
+                    </div>
+                    <Textarea
+                      className="flex-1 font-mono text-[13px] bg-[#1E1F22] border-[#111214] min-h-[400px] leading-relaxed text-[#DBDEE1]"
+                      value={JSON.stringify(generateRawJSON(), null, 2)}
+                      readOnly
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

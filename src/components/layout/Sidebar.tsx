@@ -23,7 +23,7 @@ export default function Sidebar({ guildId }: { guildId: string }) {
     { name: "Auto Reply", href: `/dashboard/${guildId}/autoreply`, icon: MessageSquareReply },
     { name: "AI Help", href: `/dashboard/${guildId}/ai-help`, icon: Bot },
     { name: "Announcements", href: `/dashboard/${guildId}/announcements`, icon: Megaphone },
-    { name: "Reaction Roles", href: `/dashboard/${guildId}/reaction-roles`, icon: UserPlus },
+    { name: "Select Menu Roles", href: `/dashboard/${guildId}/reaction-roles`, icon: UserPlus },
     { name: "Tickets", href: `/dashboard/${guildId}/tickets`, icon: Ticket },
     { name: "Roblox Monitor", href: `/dashboard/${guildId}/roblox`, icon: Gamepad2 },
     { name: "Sticky Messages", href: `/dashboard/${guildId}/sticky`, icon: Pin },

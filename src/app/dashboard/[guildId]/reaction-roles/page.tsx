@@ -7,47 +7,69 @@ import { useToast } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
-import { Trash2Icon, PlusIcon, EditIcon, SparklesIcon } from "lucide-react";
+import { Trash2Icon, PlusIcon, EditIcon, SparklesIcon, EyeIcon, CodeIcon, Settings, Send, ListIcon } from "lucide-react";
+import { DiscordMessagePreview } from "@/components/ui/discord-message";
 
-interface ReactionRoleMessage {
-  guild_id: number;
-  channel_id: number;
-  title: string;
+interface SelectOption {
+  label: string;
+  value: string;  // This will be the role ID
   description: string;
-  roles: {
-    [emoji: string]: {
-      role_id: number;
-      label: string;
-    };
-  };
+  emoji?: string;
 }
 
-export default function ReactionRolesPage({ params }: { params: Promise<{ guildId: string }> }) {
+interface SelectMenuMessage {
+  guild_id: number;
+  channel_id: number;
+  message_id?: string;
+  title: string;
+  description: string[];
+  color: number;
+  placeholder: string;
+  min_values: number;
+  max_values: number;
+  options: SelectOption[];
+  custom_id: string;
+}
+
+export default function SelectMenuRolesPage({ params }: { params: Promise<{ guildId: string }> }) {
   const resolvedParams = use(params);
   const guildId = resolvedParams.guildId;
   const { toast } = useToast();
   
-  const [messages, setMessages] = useState<{[messageId: string]: ReactionRoleMessage}>({});
+  // State for all messages
+  const [messages, setMessages] = useState<{[messageId: string]: SelectMenuMessage}>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [editingMessage, setEditingMessage] = useState<string | null>(null);
   
-  // New message form
-  const [newTitle, setNewTitle] = useState("Reaction Roles");
-  const [newDescription, setNewDescription] = useState("Select a role below by reacting with the corresponding emoji!");
-  const [newChannelId, setNewChannelId] = useState("");
-  const [newChannelObj, setNewChannelObj] = useState<any>(null);
+  // Current editing message
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [currentMessage, setCurrentMessage] = useState<SelectMenuMessage>({
+    guild_id: parseInt(guildId),
+    channel_id: 0,
+    title: "📢 Stay Updated on Scripts!",
+    description: [
+      "Select a game below to get instant pings whenever its script receives a new update! ⚡🎮",
+      "",
+      "> Only subscribe to the scripts you care about never miss a new feature, fix, or event again!"
+    ],
+    color: 5814783,
+    placeholder: "Select a game to get pinged 📣",
+    min_values: 1,
+    max_values: 1,
+    options: [],
+    custom_id: "SelectRoles"
+  });
   
-  // Editing form
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editRoles, setEditRoles] = useState<{[emoji: string]: {role_id: number, label: string}}>({});
+  // UI State
+  const [viewMode, setViewMode] = useState<"config" | "preview" | "raw">("config");
+  const [channelId, setChannelId] = useState("");
+  const [channelObj, setChannelObj] = useState<any>(null);
   
-  // New role form
-  const [newEmoji, setNewEmoji] = useState("");
+  // New option form
+  const [newOptionLabel, setNewOptionLabel] = useState("");
+  const [newOptionDescription, setNewOptionDescription] = useState("");
+  const [newOptionEmoji, setNewOptionEmoji] = useState("");
   const [newRoleId, setNewRoleId] = useState("");
-  const [newRoleObj, setNewRoleObj] = useState<any>(null);
-  const [newLabel, setNewLabel] = useState("");
 
   useEffect(() => {
     loadMessages();
@@ -55,118 +77,103 @@ export default function ReactionRolesPage({ params }: { params: Promise<{ guildI
 
   const loadMessages = async () => {
     try {
-      const data = await fetchApi(`/guilds/${guildId}/reaction_roles`);
+      const data = await fetchApi(`/guilds/${guildId}/select_menu_roles`);
       setMessages(data);
+      
+      // If there are messages, select the first one
+      const messageIds = Object.keys(data);
+      if (messageIds.length > 0 && !selectedMessageId) {
+        setSelectedMessageId(messageIds[0]);
+        setCurrentMessage(data[messageIds[0]]);
+      }
     } catch (err) {
-      toast("Failed to load reaction role messages", "error");
+      console.error("Failed to load messages:", err);
+      // Don't show error on first load since this is a new feature
     } finally {
       setLoading(false);
     }
   };
 
-  const createMessage = async () => {
-    if (!newChannelObj) {
+  const saveCurrentMessage = async () => {
+    if (!channelObj && !selectedMessageId) {
       toast("Please select a channel", "error");
       return;
     }
 
     setSaving(true);
     try {
-      await fetchApi(`/guilds/${guildId}/reaction_roles`, undefined, {
-        method: "POST",
-        body: JSON.stringify({
-          title: newTitle,
-          description: newDescription,
-          channel_id: newChannelId,
-        }),
-      });
+      const messageData = {
+        ...currentMessage,
+        channel_id: parseInt(channelId) || currentMessage.channel_id,
+      };
 
-      toast("Reaction role message created!", "success");
-      setNewTitle("Reaction Roles");
-      setNewDescription("Select a role below by reacting with the corresponding emoji!");
-      setNewChannelId("");
-      setNewChannelObj(null);
+      if (selectedMessageId) {
+        // Update existing message
+        await fetchApi(`/guilds/${guildId}/select_menu_roles/${selectedMessageId}`, undefined, {
+          method: "PUT",
+          body: JSON.stringify(messageData),
+        });
+        toast("Message updated!", "success");
+      } else {
+        // Create new message
+        const result = await fetchApi(`/guilds/${guildId}/select_menu_roles`, undefined, {
+          method: "POST",
+          body: JSON.stringify(messageData),
+        });
+        toast("Message created!", "success");
+        setSelectedMessageId(result.message_id);
+      }
+
       await loadMessages();
     } catch (err) {
-      toast("Failed to create message", "error");
+      console.error("Save error:", err);
+      toast("Failed to save message", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  const startEditing = (messageId: string) => {
-    const message = messages[messageId];
-    setEditingMessage(messageId);
-    setEditTitle(message.title);
-    setEditDescription(message.description);
-    setEditRoles({...message.roles});
+  const selectMessage = (messageId: string) => {
+    setSelectedMessageId(messageId);
+    setCurrentMessage(messages[messageId]);
+    setChannelId(messages[messageId].channel_id.toString());
   };
 
-  const saveMessage = async () => {
-    if (!editingMessage) return;
-
-    setSaving(true);
-    try {
-      await fetchApi(`/guilds/${guildId}/reaction_roles/${editingMessage}`, undefined, {
-        method: "PUT",
-        body: JSON.stringify({
-          title: editTitle,
-          description: editDescription,
-          roles: editRoles,
-        }),
-      });
-
-      toast("Message updated!", "success");
-      setEditingMessage(null);
-      await loadMessages();
-    } catch (err) {
-      toast("Failed to update message", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addRole = () => {
-    if (!newEmoji || !newRoleId) {
-      toast("Please enter an emoji and select a role", "error");
-      return;
-    }
-
-    const roleInfo = {
-      role_id: parseInt(newRoleId),
-      label: newLabel || `Role ${newRoleId}`,
-    };
-
-    setEditRoles(prev => ({
-      ...prev,
-      [newEmoji]: roleInfo
-    }));
-
-    setNewEmoji("");
-    setNewRoleId("");
-    setNewRoleObj(null);
-    setNewLabel("");
-  };
-
-  const removeRole = (emoji: string) => {
-    setEditRoles(prev => {
-      const updated = {...prev};
-      delete updated[emoji];
-      return updated;
+  const createNewMessage = () => {
+    setSelectedMessageId(null);
+    setCurrentMessage({
+      guild_id: parseInt(guildId),
+      channel_id: 0,
+      title: "Select Menu Roles",
+      description: ["Choose your roles from the dropdown below!"],
+      color: 5814783,
+      placeholder: "Select roles...",
+      min_values: 1,
+      max_values: 1,
+      options: [],
+      custom_id: "SelectRoles"
     });
+    setChannelId("");
+    setChannelObj(null);
   };
 
   const deleteMessage = async (messageId: string) => {
-    if (!confirm("Are you sure you want to delete this reaction role message?")) return;
+    if (!confirm("Are you sure you want to delete this message?")) return;
 
     setSaving(true);
     try {
-      await fetchApi(`/guilds/${guildId}/reaction_roles/${messageId}`, undefined, {
+      await fetchApi(`/guilds/${guildId}/select_menu_roles/${messageId}`, undefined, {
         method: "DELETE",
       });
-
-      toast("Message deleted!", "success");
+      
+      // Clear selection if this was the selected message
+      if (selectedMessageId === messageId) {
+        setSelectedMessageId(null);
+        createNewMessage();
+      }
+      
       await loadMessages();
+      toast("Message deleted!", "success");
     } catch (err) {
       toast("Failed to delete message", "error");
     } finally {
@@ -174,229 +181,382 @@ export default function ReactionRolesPage({ params }: { params: Promise<{ guildI
     }
   };
 
+  const addOption = () => {
+    if (!newOptionLabel.trim() || !newRoleId) {
+      toast("Please enter a label and select a role", "error");
+      return;
+    }
+
+    const newOption: SelectOption = {
+      label: newOptionLabel.trim(),
+      value: newRoleId,
+      description: newOptionDescription.trim() || `Get the ${newOptionLabel} role`,
+      emoji: newOptionEmoji || undefined,
+    };
+
+    setCurrentMessage(prev => ({
+      ...prev,
+      options: [...prev.options, newOption]
+    }));
+
+    // Clear form
+    setNewOptionLabel("");
+    setNewOptionDescription("");
+    setNewOptionEmoji("");
+    setNewRoleId("");
+  };
+
+  const removeOption = (index: number) => {
+    setCurrentMessage(prev => ({
+      ...prev,
+      options: prev.options.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateOption = (index: number, field: keyof SelectOption, value: string) => {
+    setCurrentMessage(prev => ({
+      ...prev,
+      options: prev.options.map((opt, i) => 
+        i === index ? { ...opt, [field]: value } : opt
+      )
+    }));
+  };
+
+  const generateRawJSON = () => {
+    return {
+      content: null,
+      embeds: [{
+        title: currentMessage.title,
+        description: currentMessage.description,
+        color: currentMessage.color,
+        fields: null
+      }],
+      components: currentMessage.options.length > 0 ? [{
+        type: 1,
+        components: [{
+          type: 3,
+          custom_id: currentMessage.custom_id,
+          options: currentMessage.options.map(opt => ({
+            label: opt.label,
+            value: opt.value,
+            description: opt.description,
+            emoji: opt.emoji,
+            default: false
+          })),
+          placeholder: currentMessage.placeholder,
+          min_values: currentMessage.min_values,
+          max_values: currentMessage.max_values
+        }]
+      }] : []
+    };
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-discord-text-muted">Loading reaction roles...</div>
+        <div className="text-discord-text-muted">Loading select menu roles...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Reaction Roles</h1>
-        <p className="text-discord-text-muted mt-2">
-          Create interactive messages where users can react with emojis to get roles automatically.
-        </p>
-      </div>
-
-      {/* Create New Message */}
-      <div className="bg-discord-secondary rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <SparklesIcon className="w-5 h-5" />
-          Create New Reaction Role Message
-        </h2>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-discord-text mb-2">Title</label>
-            <Input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="Reaction Roles"
-              className="w-full"
-            />
+    <div className="flex h-screen">
+      {/* Sidebar */}
+      <div className="w-80 bg-discord-secondary border-r border-discord-tertiary flex flex-col">
+        <div className="p-4 border-b border-discord-tertiary">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">Select Menu Roles</h2>
+            <Button onClick={createNewMessage} size="sm">
+              <PlusIcon className="w-4 h-4" />
+            </Button>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-discord-text mb-2">Description</label>
-            <Textarea
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              placeholder="Select a role below by reacting with the corresponding emoji!"
-              rows={3}
-              className="w-full"
-            />
+          
+          {/* Message List */}
+          <div className="space-y-2">
+            {Object.entries(messages).map(([messageId, message]) => (
+              <div
+                key={messageId}
+                className={`p-3 rounded cursor-pointer transition-colors ${
+                  selectedMessageId === messageId 
+                    ? "bg-discord-primary text-white" 
+                    : "bg-discord-tertiary hover:bg-discord-darkest text-discord-text"
+                }`}
+                onClick={() => selectMessage(messageId)}
+              >
+                <div className="font-medium text-sm truncate">{message.title}</div>
+                <div className="text-xs text-discord-text-muted mt-1">
+                  {message.options.length} options • #{message.channel_id}
+                </div>
+              </div>
+            ))}
+            
+            {Object.keys(messages).length === 0 && (
+              <div className="text-center py-8 text-discord-text-muted">
+                <ListIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No messages yet</p>
+              </div>
+            )}
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-discord-text mb-2">Channel</label>
-            <ChannelSelect
-              guildId={guildId}
-              value={newChannelId}
-              onChange={setNewChannelId}
-              onChannelSelect={setNewChannelObj}
-              placeholder="Select a channel..."
-              className="w-full"
-            />
-          </div>
-
-          <Button
-            onClick={createMessage}
-            disabled={saving || !newChannelObj}
+        {/* Quick Actions */}
+        <div className="p-4 space-y-2">
+          <Button 
+            onClick={saveCurrentMessage} 
+            disabled={saving}
             className="w-full"
           >
-            {saving ? "Creating..." : "Create Message"}
+            <Send className="w-4 h-4 mr-2" />
+            {saving ? "Saving..." : selectedMessageId ? "Update Message" : "Send Message"}
           </Button>
+          
+          {selectedMessageId && (
+            <Button 
+              onClick={() => deleteMessage(selectedMessageId)} 
+              variant="destructive"
+              size="sm"
+              className="w-full"
+            >
+              <Trash2Icon className="w-4 h-4 mr-2" />
+              Delete Message
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Existing Messages */}
-      <div className="space-y-4">
-        {Object.entries(messages).length === 0 ? (
-          <div className="bg-discord-secondary rounded-lg p-8 text-center">
-            <SparklesIcon className="w-12 h-12 text-discord-text-muted mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">No reaction role messages yet</h3>
-            <p className="text-discord-text-muted">Create your first reaction role message to get started!</p>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* View Mode Tabs */}
+        <div className="border-b border-discord-tertiary bg-discord-secondary">
+          <div className="flex">
+            <button
+              onClick={() => setViewMode("config")}
+              className={`px-4 py-3 flex items-center gap-2 border-b-2 transition-colors ${
+                viewMode === "config"
+                  ? "border-discord-primary text-white bg-discord-tertiary"
+                  : "border-transparent text-discord-text-muted hover:text-white"
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              Configure
+            </button>
+            <button
+              onClick={() => setViewMode("preview")}
+              className={`px-4 py-3 flex items-center gap-2 border-b-2 transition-colors ${
+                viewMode === "preview"
+                  ? "border-discord-primary text-white bg-discord-tertiary"
+                  : "border-transparent text-discord-text-muted hover:text-white"
+              }`}
+            >
+              <EyeIcon className="w-4 h-4" />
+              Preview
+            </button>
+            <button
+              onClick={() => setViewMode("raw")}
+              className={`px-4 py-3 flex items-center gap-2 border-b-2 transition-colors ${
+                viewMode === "raw"
+                  ? "border-discord-primary text-white bg-discord-tertiary"
+                  : "border-transparent text-discord-text-muted hover:text-white"
+              }`}
+            >
+              <CodeIcon className="w-4 h-4" />
+              Raw JSON
+            </button>
           </div>
-        ) : (
-          Object.entries(messages).map(([messageId, message]) => (
-            <div key={messageId} className="bg-discord-secondary rounded-lg p-6">
-              {editingMessage === messageId ? (
-                // Editing Form
-                <div className="space-y-4">
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto p-6">
+          {viewMode === "config" && (
+            <div className="max-w-4xl space-y-6">
+              {/* Basic Settings */}
+              <div className="bg-discord-secondary rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Message Settings</h3>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-discord-text mb-2">Title</label>
                     <Input
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      className="w-full"
+                      value={currentMessage.title}
+                      onChange={(e) => setCurrentMessage(prev => ({...prev, title: e.target.value}))}
+                      placeholder="Message title..."
                     />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-discord-text mb-2">Description</label>
-                    <Textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      rows={3}
-                      className="w-full"
+                    <label className="block text-sm font-medium text-discord-text mb-2">Embed Color</label>
+                    <Input
+                      type="number"
+                      value={currentMessage.color}
+                      onChange={(e) => setCurrentMessage(prev => ({...prev, color: parseInt(e.target.value) || 0}))}
+                      placeholder="5814783"
                     />
                   </div>
+                </div>
 
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-discord-text mb-2">Description (one line per array item)</label>
+                  <Textarea
+                    value={currentMessage.description.join('\n')}
+                    onChange={(e) => setCurrentMessage(prev => ({...prev, description: e.target.value.split('\n')}))}
+                    rows={4}
+                    placeholder="Line 1&#10;&#10;> Quote text"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-discord-text mb-2">Channel</label>
+                  <ChannelSelect
+                    guildId={guildId}
+                    value={channelId}
+                    onChange={setChannelId}
+                    onChannelSelect={setChannelObj}
+                    placeholder="Select channel to send to..."
+                  />
+                </div>
+              </div>
+
+              {/* Select Menu Settings */}
+              <div className="bg-discord-secondary rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Dropdown Configuration</h3>
+                
+                <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-discord-text mb-2">Roles</label>
-                    
-                    {/* Existing Roles */}
-                    <div className="space-y-2 mb-4">
-                      {Object.entries(editRoles).map(([emoji, roleInfo]) => (
-                        <div key={emoji} className="flex items-center gap-3 bg-discord-tertiary p-3 rounded">
-                          <span className="text-2xl">{emoji}</span>
-                          <span className="text-discord-text flex-1">{roleInfo.label}</span>
-                          <Button
-                            onClick={() => removeRole(emoji)}
-                            variant="destructive"
-                            size="sm"
-                          >
-                            <Trash2Icon className="w-4 h-4" />
-                          </Button>
+                    <label className="block text-sm font-medium text-discord-text mb-2">Placeholder</label>
+                    <Input
+                      value={currentMessage.placeholder}
+                      onChange={(e) => setCurrentMessage(prev => ({...prev, placeholder: e.target.value}))}
+                      placeholder="Select an option..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-discord-text mb-2">Min Select</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="25"
+                      value={currentMessage.min_values}
+                      onChange={(e) => setCurrentMessage(prev => ({...prev, min_values: parseInt(e.target.value) || 1}))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-discord-text mb-2">Max Select</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="25"
+                      value={currentMessage.max_values}
+                      onChange={(e) => setCurrentMessage(prev => ({...prev, max_values: parseInt(e.target.value) || 1}))}
+                    />
+                  </div>
+                </div>
+
+                {/* Options List */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-discord-text mb-2">Options ({currentMessage.options.length}/25)</label>
+                  <div className="space-y-2">
+                    {currentMessage.options.map((option, index) => (
+                      <div key={index} className="flex items-center gap-2 bg-discord-tertiary p-3 rounded">
+                        <div className="flex-1 grid grid-cols-4 gap-2 text-sm">
+                          <Input
+                            value={option.label}
+                            onChange={(e) => updateOption(index, 'label', e.target.value)}
+                            placeholder="Label"
+                            className="text-xs"
+                          />
+                          <Input
+                            value={option.description}
+                            onChange={(e) => updateOption(index, 'description', e.target.value)}
+                            placeholder="Description"
+                            className="text-xs"
+                          />
+                          <Input
+                            value={option.emoji || ""}
+                            onChange={(e) => updateOption(index, 'emoji', e.target.value)}
+                            placeholder="📝 (optional)"
+                            className="text-xs"
+                          />
+                          <div className="text-xs text-discord-text-muted truncate">
+                            Role: {option.value}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-
-                    {/* Add New Role */}
-                    <div className="bg-discord-tertiary p-4 rounded space-y-3">
-                      <h4 className="text-sm font-medium text-discord-text">Add Role</h4>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="📝"
-                          value={newEmoji}
-                          onChange={(e) => setNewEmoji(e.target.value)}
-                          className="w-20"
-                        />
-                        <RoleSelect
-                          guildId={guildId}
-                          value={newRoleId}
-                          onChange={(roleId) => {
-                            setNewRoleId(roleId);
-                            // Find the role object for the label
-                            const role = roleId ? { id: roleId, name: "Role" } : null;
-                            setNewRoleObj(role);
-                          }}
-                          placeholder="Select role..."
-                          className="flex-1"
-                        />
-                        <Input
-                          placeholder="Label (optional)"
-                          value={newLabel}
-                          onChange={(e) => setNewLabel(e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button onClick={addRole}>
-                          <PlusIcon className="w-4 h-4" />
+                        <Button
+                          onClick={() => removeOption(index)}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          <Trash2Icon className="w-3 h-3" />
                         </Button>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button onClick={saveMessage} disabled={saving}>
-                      {saving ? "Saving..." : "Save Changes"}
-                    </Button>
-                    <Button
-                      onClick={() => setEditingMessage(null)}
-                      variant="secondary"
-                    >
-                      Cancel
-                    </Button>
+                    ))}
                   </div>
                 </div>
-              ) : (
-                // View Mode
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">{message.title}</h3>
-                      <p className="text-discord-text-muted text-sm">
-                        Channel: <span className="text-discord-text">#{message.channel_id}</span> • 
-                        Message ID: <span className="font-mono text-xs">{messageId}</span>
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => startEditing(messageId)}
-                        size="sm"
-                        variant="secondary"
-                      >
-                        <EditIcon className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        onClick={() => deleteMessage(messageId)}
-                        size="sm"
-                        variant="destructive"
-                      >
-                        <Trash2Icon className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
 
-                  <div className="bg-discord-tertiary p-4 rounded mb-4">
-                    <p className="text-discord-text">{message.description}</p>
+                {/* Add New Option */}
+                {currentMessage.options.length < 25 && (
+                  <div className="bg-discord-tertiary p-4 rounded">
+                    <h4 className="text-sm font-medium text-discord-text mb-3">Add New Option</h4>
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      <Input
+                        value={newOptionLabel}
+                        onChange={(e) => setNewOptionLabel(e.target.value)}
+                        placeholder="Option Label"
+                        className="text-sm"
+                      />
+                      <Input
+                        value={newOptionDescription}
+                        onChange={(e) => setNewOptionDescription(e.target.value)}
+                        placeholder="Description"
+                        className="text-sm"
+                      />
+                      <Input
+                        value={newOptionEmoji}
+                        onChange={(e) => setNewOptionEmoji(e.target.value)}
+                        placeholder="📝 Emoji"
+                        className="text-sm"
+                      />
+                      <RoleSelect
+                        guildId={guildId}
+                        value={newRoleId}
+                        onChange={setNewRoleId}
+                        placeholder="Select role..."
+                        className="text-sm"
+                      />
+                    </div>
+                    <Button onClick={addOption} size="sm" className="w-full">
+                      <PlusIcon className="w-4 h-4 mr-2" />
+                      Add Option
+                    </Button>
                   </div>
-
-                  <div>
-                    <h4 className="text-sm font-medium text-discord-text mb-2">
-                      Roles ({Object.keys(message.roles).length})
-                    </h4>
-                    {Object.keys(message.roles).length === 0 ? (
-                      <p className="text-discord-text-muted text-sm italic">No roles configured yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {Object.entries(message.roles).map(([emoji, roleInfo]) => (
-                          <div key={emoji} className="flex items-center gap-3 text-sm">
-                            <span className="text-lg">{emoji}</span>
-                            <span className="text-discord-text">{roleInfo.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          ))
-        )}
+          )}
+
+          {viewMode === "preview" && (
+            <div className="max-w-2xl">
+              <h3 className="text-lg font-semibold text-white mb-4">Message Preview</h3>
+              <DiscordMessagePreview 
+                message={generateRawJSON()}
+                botUser={{
+                  username: "Seisen Hub",
+                  avatar: "/bot-avatar.png",
+                  discriminator: "0000"
+                }}
+              />
+            </div>
+          )}
+
+          {viewMode === "raw" && (
+            <div className="max-w-4xl">
+              <h3 className="text-lg font-semibold text-white mb-4">Raw JSON</h3>
+              <div className="bg-discord-tertiary rounded-lg p-4">
+                <pre className="text-sm text-discord-text overflow-auto">
+                  {JSON.stringify(generateRawJSON(), null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

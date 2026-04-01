@@ -10,8 +10,17 @@ export default function Header({ activeGuildId }: { activeGuildId: string | null
 
   useEffect(() => {
     fetch("/api/guilds_proxy")
-      .then(res => res.json())
+      .then(res => {
+        if (res.status === 401) {
+          // Session expired - redirect to login
+          console.warn("Session expired, redirecting to login...");
+          window.location.href = "/login";
+          return;
+        }
+        return res.json();
+      })
       .then(data => {
+        if (!data) return; // Already redirected
         if (Array.isArray(data)) {
           const adminGuilds = data.filter((g: any) => {
             const perms = BigInt(g.permissions);
@@ -20,7 +29,9 @@ export default function Header({ activeGuildId }: { activeGuildId: string | null
           setGuilds(adminGuilds);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error("Failed to load guilds:", err);
+      });
   }, []);
 
   return (

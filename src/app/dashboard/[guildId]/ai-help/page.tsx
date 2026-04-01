@@ -7,21 +7,41 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { ChannelSelect } from "@/components/ui/discord-selects";
-import { Trash2Icon, PlusIcon } from "lucide-react";
+import { Trash2Icon, PlusIcon, CheckIcon, SparklesIcon } from "lucide-react";
+
+interface AIModel {
+  id: string;
+  name: string;
+  recommended: boolean;
+}
 
 export default function AIHelpPage({ params }: { params: Promise<{ guildId: string }> }) {
   const resolvedParams = use(params);
   const guildId = resolvedParams.guildId;
   const { toast } = useToast();
   const [config, setConfig] = useState<any>(null);
+  const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
   const [saving, setSaving] = useState(false);
   const [newChannelId, setNewChannelId] = useState("");
   const [newChannelObj, setNewChannelObj] = useState<any>(null);
 
   useEffect(() => {
+    console.log("[AI Help] Component mounted, loading config...");
+    // Load AI config
     fetchApi("/ai_help")
-      .then((data) => setConfig(data || {}))
+      .then((data) => {
+        console.log("[AI Help] Config loaded:", data);
+        setConfig(data || {});
+      })
       .catch((err) => toast("Failed to load AI Help Config", "error"));
+    
+    // Load available models
+    fetchApi("/ai_help/models")
+      .then((data) => {
+        console.log("[AI Help] Models loaded:", data?.models);
+        setAvailableModels(data?.models || []);
+      })
+      .catch((err) => console.error("Failed to load models", err));
   }, [toast]);
 
   const handleSave = async () => {
@@ -76,6 +96,24 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
     updateGuildConfig("targets", newTargets);
   };
 
+  const toggleModel = (modelId: string) => {
+    const currentModels = guildConfig.models || [];
+    const isSelected = currentModels.includes(modelId);
+    
+    if (isSelected) {
+      // Remove model
+      updateGuildConfig("models", currentModels.filter((m: string) => m !== modelId));
+    } else {
+      // Add model
+      updateGuildConfig("models", [...currentModels, modelId]);
+    }
+  };
+
+  const isModelSelected = (modelId: string) => {
+    const currentModels = guildConfig.models || [];
+    return currentModels.includes(modelId);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -103,10 +141,13 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
         <div className="mt-4">
           <label className="mb-2 block text-sm font-medium text-discord-text-muted">OpenRouter Default Model</label>
           <Input 
-            placeholder="e.g. nvidia/nemotron-3-super-120b-a12b:free (leave blank to let bot.py decide fallback defaults)"
+            placeholder="e.g. qwen/qwen3.6-plus-preview:free"
             value={config.default_model || ""}
             onChange={(e) => setConfig({ ...config, default_model: e.target.value })}
           />
+          <p className="mt-1 text-xs text-discord-text-muted">
+            This is the primary model used globally. Leave blank to use bot defaults.
+          </p>
         </div>
 
         <hr className="border-[#1E1F22] my-4" />
@@ -162,6 +203,60 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
                         <PlusIcon className="w-4 h-4 mr-1"/> Add
                     </Button>
                 </div>
+            </div>
+
+            <div className="w-full md:w-1/2">
+                <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <SparklesIcon className="w-4 h-4 text-yellow-400" />
+                  AI Models (Multi-Select)
+                </h4>
+                <p className="text-xs text-discord-text-muted mb-4">
+                  Select multiple models to use as fallbacks. The bot will try them in order until one succeeds.
+                </p>
+                
+                <div className="flex flex-col gap-2">
+                    {availableModels.length > 0 ? (
+                      availableModels.map((model) => {
+                        const selected = isModelSelected(model.id);
+                        return (
+                          <button
+                            key={model.id}
+                            onClick={() => toggleModel(model.id)}
+                            className={`flex items-center justify-between p-3 rounded border transition-all ${
+                              selected 
+                                ? 'bg-discord-blurple/20 border-discord-blurple text-white' 
+                                : 'bg-[#2B2D31] border-[#1E1F22] text-discord-text hover:border-discord-blurple/50'
+                            }`}
+                          >
+                            <div className="flex flex-col items-start gap-1">
+                              <span className="text-sm font-medium flex items-center gap-2">
+                                {model.name}
+                                {model.recommended && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                    Recommended
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-xs text-discord-text-muted font-mono">{model.id}</span>
+                            </div>
+                            {selected && (
+                              <div className="flex items-center justify-center w-5 h-5 rounded bg-discord-blurple">
+                                <CheckIcon className="w-3 h-3 text-white" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="text-xs text-discord-text-muted italic py-2">Loading models...</div>
+                    )}
+                </div>
+                
+                {(guildConfig.models?.length || 0) > 0 && (
+                  <div className="mt-3 p-2 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
+                    ✓ {guildConfig.models.length} model{guildConfig.models.length > 1 ? 's' : ''} selected
+                  </div>
+                )}
             </div>
         </div>
 

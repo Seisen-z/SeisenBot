@@ -37,7 +37,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   const { toast } = useToast();
   
   // State for all messages
-  const [messages, setMessages] = useState<{[messageId: string]: SelectMenuMessage}>({});
+  const [messages, setMessages] = useState<{[messageId: string]: any}>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -70,10 +70,15 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   const [newOptionDescription, setNewOptionDescription] = useState("");
   const [newOptionEmoji, setNewOptionEmoji] = useState("");
   const [newRoleId, setNewRoleId] = useState("");
+  const [rawText, setRawText] = useState("");
 
   useEffect(() => {
     loadMessages();
   }, []);
+
+  useEffect(() => {
+    setRawText(JSON.stringify(generateRawJSON(), null, 2));
+  }, [currentMessage]);
 
   const loadMessages = async () => {
     try {
@@ -96,30 +101,43 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   };
 
   const saveCurrentMessage = async () => {
-    if (!channelObj && !selectedMessageId) {
+    const resolvedChannelId = parseInt(channelId) || currentMessage.channel_id;
+    if (!resolvedChannelId) {
       toast("Please select a channel", "error");
       return;
     }
 
     setSaving(true);
     try {
-      const messageData = {
+      const discordPayload = generateRawJSONFromMessage({
         ...currentMessage,
-        channel_id: parseInt(channelId) || currentMessage.channel_id,
+        channel_id: resolvedChannelId,
+      });
+      const payload = {
+        channel_id: resolvedChannelId,
+        message_data: discordPayload,
+        title: currentMessage.title,
+        description: currentMessage.description,
+        color: currentMessage.color,
+        placeholder: currentMessage.placeholder,
+        min_values: currentMessage.min_values,
+        max_values: currentMessage.max_values,
+        options: currentMessage.options,
+        custom_id: currentMessage.custom_id,
       };
 
       if (selectedMessageId) {
         // Update existing message
         await fetchApi(`/guilds/${guildId}/select_menu_roles/${selectedMessageId}`, undefined, {
           method: "PUT",
-          body: JSON.stringify(messageData),
+          body: JSON.stringify(payload),
         });
         toast("Message updated!", "success");
       } else {
         // Create new message
         const result = await fetchApi(`/guilds/${guildId}/select_menu_roles`, undefined, {
           method: "POST",
-          body: JSON.stringify(messageData),
+          body: JSON.stringify(payload),
         });
         toast("Message created!", "success");
         setSelectedMessageId(result.message_id);
@@ -136,8 +154,15 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
 
   const selectMessage = (messageId: string) => {
     setSelectedMessageId(messageId);
-    setCurrentMessage(messages[messageId]);
-    setChannelId(messages[messageId].channel_id.toString());
+    const selected = messages[messageId];
+    if (selected?.message_data) {
+      const extracted = messageFromRaw(selected.message_data, selected);
+      setCurrentMessage(extracted);
+      setChannelId(String(extracted.channel_id || ""));
+    } else {
+      setCurrentMessage(selected);
+      setChannelId(selected.channel_id?.toString() || "");
+    }
   };
 
   const createNewMessage = () => {
@@ -223,32 +248,61 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
     }));
   };
 
-  const generateRawJSON = () => {
+  const generateRawJSONFromMessage = (msg: SelectMenuMessage) => {
     return {
       content: null,
       embeds: [{
-        title: currentMessage.title,
-        description: currentMessage.description,
-        color: currentMessage.color,
+        title: msg.title,
+        description: msg.description,
+        color: msg.color,
         fields: []
       }],
-      components: currentMessage.options.length > 0 ? [{
+      components: msg.options.length > 0 ? [{
         type: 1,
         components: [{
           type: 3,
-          custom_id: currentMessage.custom_id,
-          options: currentMessage.options.map(opt => ({
+          custom_id: msg.custom_id,
+          options: msg.options.map(opt => ({
             label: opt.label,
             value: opt.value,
             description: opt.description,
             emoji: opt.emoji,
             default: false
           })),
-          placeholder: currentMessage.placeholder,
-          min_values: currentMessage.min_values,
-          max_values: currentMessage.max_values
+          placeholder: msg.placeholder,
+          min_values: msg.min_values,
+          max_values: msg.max_values
         }]
       }] : []
+    };
+  };
+
+  const generateRawJSON = () => generateRawJSONFromMessage(currentMessage);
+
+  const messageFromRaw = (raw: any, fallback?: Partial<SelectMenuMessage>): SelectMenuMessage => {
+    const embed = raw?.embeds?.[0] || {};
+    const select = raw?.components?.[0]?.components?.[0] || {};
+    return {
+      guild_id: parseInt(guildId),
+      channel_id: Number(fallback?.channel_id || 0),
+      message_id: fallback?.message_id,
+      title: embed.title || fallback?.title || "Select Menu Roles",
+      description: Array.isArray(embed.description)
+        ? embed.description
+        : String(embed.description || "").split("\n"),
+      color: Number(embed.color ?? fallback?.color ?? 5814783),
+      placeholder: select.placeholder || fallback?.placeholder || "Select roles...",
+      min_values: Number(select.min_values ?? fallback?.min_values ?? 1),
+      max_values: Number(select.max_values ?? fallback?.max_values ?? 1),
+      options: Array.isArray(select.options)
+        ? select.options.map((o: any) => ({
+            label: String(o.label || ""),
+            value: String(o.value || ""),
+            description: String(o.description || ""),
+            emoji: o.emoji ? String(o.emoji) : undefined,
+          }))
+        : fallback?.options || [],
+      custom_id: select.custom_id || fallback?.custom_id || "SelectRoles",
     };
   };
 
@@ -282,6 +336,14 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
             </button>
           </div>
 
+          {!selectedMessageId && (
+            <div className="flex items-center">
+              <div className="flex-1 text-left text-sm px-2 py-1.5 rounded-md bg-discord-blurple text-white font-medium truncate">
+                Unsaved Message
+              </div>
+            </div>
+          )}
+
           {Object.entries(messages).map(([messageId, message]) => (
             <div key={messageId} className="flex items-center group/item">
               <button
@@ -292,7 +354,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
                     : "text-discord-text hover:bg-[#383A40]"
                 }`}
               >
-                {message.title || "Untitled Message"}
+                {message.title || message.message_data?.embeds?.[0]?.title || "Untitled Message"}
               </button>
               <button
                 onClick={() => deleteMessage(messageId)}
@@ -484,8 +546,17 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
                     </div>
                     <Textarea
                       className="flex-1 font-mono text-[13px] bg-[#1E1F22] border-[#111214] min-h-[400px] leading-relaxed text-[#DBDEE1]"
-                      value={JSON.stringify(generateRawJSON(), null, 2)}
-                      readOnly
+                      value={rawText || JSON.stringify(generateRawJSON(), null, 2)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRawText(val);
+                        try {
+                          const parsed = JSON.parse(val);
+                          setCurrentMessage((prev) => messageFromRaw(parsed, prev));
+                        } catch {
+                          // keep typing-friendly behavior
+                        }
+                      }}
                     />
                   </div>
                 )}

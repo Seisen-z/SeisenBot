@@ -127,14 +127,14 @@ export default function ReactionRolesPage({ params }: { params: Promise<{ guildI
   };
 
   const addRole = () => {
-    if (!newEmoji || !newRoleObj) {
+    if (!newEmoji || !newRoleId) {
       toast("Please enter an emoji and select a role", "error");
       return;
     }
 
     const roleInfo = {
       role_id: parseInt(newRoleId),
-      label: newLabel || newRoleObj.name,
+      label: newLabel || `Role ${newRoleId}`,
     };
 
     setEditRoles(prev => ({
@@ -224,11 +224,9 @@ export default function ReactionRolesPage({ params }: { params: Promise<{ guildI
             <label className="block text-sm font-medium text-discord-text mb-2">Channel</label>
             <ChannelSelect
               guildId={guildId}
-              value={newChannelObj}
-              onChange={(channel) => {
-                setNewChannelObj(channel);
-                setNewChannelId(channel?.id || "");
-              }}
+              value={newChannelId}
+              onChange={setNewChannelId}
+              onChannelSelect={setNewChannelObj}
               placeholder="Select a channel..."
               className="w-full"
             />
@@ -309,10 +307,12 @@ export default function ReactionRolesPage({ params }: { params: Promise<{ guildI
                         />
                         <RoleSelect
                           guildId={guildId}
-                          value={newRoleObj}
-                          onChange={(role) => {
+                          value={newRoleId}
+                          onChange={(roleId) => {
+                            setNewRoleId(roleId);
+                            // Find the role object for the label
+                            const role = roleId ? { id: roleId, name: "Role" } : null;
                             setNewRoleObj(role);
-                            setNewRoleId(role?.id || "");
                           }}
                           placeholder="Select role..."
                           className="flex-1"

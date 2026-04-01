@@ -28,7 +28,6 @@ interface SelectMenuDraft {
   thumbnail_url?: string;
   footer?: string;
   channel_id?: string;
-  ping_role_id?: string;
   placeholder: string;
   min_values: number;
   max_values: number;
@@ -58,7 +57,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   const [posting, setPosting] = useState(false);
 
   const [promptOpen, setPromptOpen] = useState(false);
-  const [promptConfig, setPromptConfig] = useState<{ title: string; label: string; action: 'category' | 'draft'; cat?: string }>({
+  const [promptConfig, setPromptConfig] = useState<{ title: string; label: string; action: 'category' | 'draft' | 'rename'; cat?: string; oldKey?: string }>({
     title: "", label: "", action: "category"
   });
 
@@ -201,6 +200,20 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
         setDrafts(prev => ({ ...prev, [key]: DEFAULT_DRAFT }));
         setActiveDraftKey(key);
       }
+    } else if (promptConfig.action === "rename" && promptConfig.oldKey) {
+      const oldKey = promptConfig.oldKey;
+      const cat = oldKey.split("/")[0];
+      const newKey = `${cat}/${value}`;
+      if (drafts[newKey]) {
+        toast("A draft with that name already exists.", "error");
+      } else {
+        const updated = { ...drafts };
+        updated[newKey] = updated[oldKey];
+        delete updated[oldKey];
+        setDrafts(updated);
+        setActiveDraftKey(newKey);
+        toast("Draft renamed!");
+      }
     }
     setPromptOpen(false);
   };
@@ -222,6 +235,17 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   const draftLabel = (key: string) => {
     const parts = key.split("/");
     return parts.length > 1 ? parts.slice(1).join("/") : key;
+  };
+
+  const renameDraft = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPromptConfig({ 
+        title: "Rename Draft", 
+        label: "New Draft Name", 
+        action: "rename", 
+        oldKey: key 
+    });
+    setPromptOpen(true);
   };
 
   const addOption = () => {
@@ -347,6 +371,13 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
                         }`}
                       >
                         {draftLabel(key)}
+                      </button>
+                      <button
+                        onClick={(e) => renameDraft(key, e)}
+                        className="opacity-0 group-hover/item:opacity-100 ml-1 text-discord-text-muted hover:text-white shrink-0 p-0.5 rounded"
+                        title="Rename draft"
+                      >
+                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
                       <button
                         onClick={() => deleteDraft(key)}
@@ -507,7 +538,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
                         </div>
                     }
                     >
-                    <div className="grid grid-cols-2 gap-4 border-b border-[#1E1F22] pb-8 mb-4">
+                    <div className="grid grid-cols-1 gap-4 border-b border-[#1E1F22] pb-8 mb-4">
                         <div>
                         <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Target Channel</label>
                         <ChannelSelect
@@ -515,15 +546,6 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
                             value={currentDraft.channel_id || ""}
                             onChange={(id) => updateDraft("channel_id", id)}
                             placeholder="Where should this menu go?"
-                        />
-                        </div>
-                        <div>
-                        <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Ping Role (Optional)</label>
-                        <RoleSelect
-                            guildId={guildId}
-                            value={currentDraft.ping_role_id || ""}
-                            onChange={(id) => updateDraft("ping_role_id", id)}
-                            placeholder="Ping a role on post?"
                         />
                         </div>
                     </div>

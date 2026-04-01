@@ -176,16 +176,20 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
 
     setPosting(true);
     try {
+      // Format description as array of lines (split by newlines)
+      const descriptionLines = currentDraft.description 
+        ? currentDraft.description.split('\n') 
+        : [];
+
       const discordPayload = {
         content: currentDraft.content || null,
         embeds: [{
           title: currentDraft.title,
-          description: currentDraft.description,
+          description: descriptionLines,
           color: typeof currentDraft.color === 'string' && currentDraft.color.startsWith('#') 
             ? parseInt(currentDraft.color.replace('#', ''), 16) 
             : parseInt(String(currentDraft.color || "5814783")),
-          thumbnail: currentDraft.thumbnail_url ? { url: currentDraft.thumbnail_url } : null,
-          footer: currentDraft.footer ? { text: currentDraft.footer } : null
+          fields: null
         }],
         components: [{
           type: 1,
@@ -193,13 +197,13 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
             type: 3,
             custom_id: "role_select",
             placeholder: currentDraft.placeholder,
-            min_values: currentDraft.min_values,
-            max_values: currentDraft.max_values,
+            min_values: Math.min(currentDraft.min_values, currentDraft.options.length) || 1,
+            max_values: Math.min(currentDraft.max_values, currentDraft.options.length) || 1,
             options: currentDraft.options.map(opt => ({
               label: opt.label,
               value: opt.value,
               description: opt.description,
-              emoji: opt.emoji ? { name: opt.emoji } : undefined
+              default: false
             }))
           }]
         }]
@@ -336,26 +340,28 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
 
   // Build full message object for preview
   const previewMessage = {
-    content: currentDraft.content,
+    content: currentDraft.content || null,
     embeds: [{
       title: currentDraft.title,
-      description: currentDraft.description,
+      description: currentDraft.description ? currentDraft.description.split('\n') : [],
       color: typeof currentDraft.color === 'string' && currentDraft.color.startsWith('#') 
         ? parseInt(currentDraft.color.replace('#', ''), 16) 
         : parseInt(String(currentDraft.color || "5814783")),
-      thumbnail: currentDraft.thumbnail_url ? { url: currentDraft.thumbnail_url } : undefined,
-      footer: currentDraft.footer ? { text: currentDraft.footer } : undefined
+      fields: null
     }],
     components: [{
       type: 1,
       components: [{
         type: 3,
+        custom_id: "role_select",
         placeholder: currentDraft.placeholder,
+        min_values: Math.min(currentDraft.min_values, currentDraft.options.length) || 1,
+        max_values: Math.min(currentDraft.max_values, currentDraft.options.length) || 1,
         options: currentDraft.options.map(o => ({
             label: o.label,
             value: o.value,
             description: o.description,
-            emoji: o.emoji
+            default: false
         }))
       }]
     }]

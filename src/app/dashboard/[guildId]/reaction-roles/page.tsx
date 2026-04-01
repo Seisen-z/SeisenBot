@@ -229,7 +229,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
         title: currentMessage.title,
         description: currentMessage.description,
         color: currentMessage.color,
-        fields: null
+        fields: []
       }],
       components: currentMessage.options.length > 0 ? [{
         type: 1,

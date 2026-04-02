@@ -20,6 +20,23 @@ import {
   UsersIcon,
 } from "lucide-react";
 
+type GiveawayKeyTier = "none" | "weekly" | "monthly" | "lifetime";
+
+function normalizeKeyTier(value: unknown): GiveawayKeyTier {
+  const tier = String(value || "none").trim().toLowerCase();
+  if (tier === "weekly" || tier === "monthly" || tier === "lifetime") {
+    return tier;
+  }
+  return "none";
+}
+
+function keyTierLabel(tier: GiveawayKeyTier): string {
+  if (tier === "weekly") return "Weekly";
+  if (tier === "monthly") return "Monthly";
+  if (tier === "lifetime") return "Lifetime";
+  return "None";
+}
+
 interface GiveawayDraft {
   name: string;
   reward_title: string;
@@ -29,6 +46,7 @@ interface GiveawayDraft {
   duration_minutes: number;
   ping_role_id: string;
   emoji: string;
+  key_tier: GiveawayKeyTier;
 }
 
 interface GiveawayItem {
@@ -55,6 +73,15 @@ interface GiveawayItem {
   last_rerolled_at?: string | null;
   last_rerolled_by?: string | null;
   last_reroll_winners?: string[];
+  key_tier?: GiveawayKeyTier;
+  key_delivery?: {
+    tier?: GiveawayKeyTier;
+    delivered_count?: number;
+    failed_count?: number;
+    failed_user_ids?: string[];
+    last_delivery_at?: string | null;
+  } | null;
+  awarded_user_ids?: string[];
   is_active?: boolean;
   is_pending_end?: boolean;
 }
@@ -74,12 +101,14 @@ const DEFAULT_DRAFT: GiveawayDraft = {
   duration_minutes: 60,
   ping_role_id: "",
   emoji: "🎉",
+  key_tier: "none",
 };
 
 function normalizeDraft(raw: any, fallbackName: string): GiveawayDraft {
   const winnerCount = Math.max(1, Math.min(25, Number(raw?.winner_count || 1)));
   const durationMinutes = Math.max(1, Math.min(10080, Number(raw?.duration_minutes || 60)));
   const emoji = String(raw?.emoji || "🎉").trim() || "🎉";
+  const keyTier = normalizeKeyTier(raw?.key_tier);
 
   return {
     ...DEFAULT_DRAFT,
@@ -92,6 +121,7 @@ function normalizeDraft(raw: any, fallbackName: string): GiveawayDraft {
     duration_minutes: durationMinutes,
     ping_role_id: String(raw?.ping_role_id || ""),
     emoji,
+    key_tier: keyTier,
   };
 }
 
@@ -310,6 +340,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
             ping_role_id: activeDraft.ping_role_id || null,
             host_user_id: hostUserId,
             emoji: activeDraft.emoji || "🎉",
+            key_tier: normalizeKeyTier(activeDraft.key_tier),
           },
         }),
       });
@@ -493,7 +524,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
                   <div>
                     <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-discord-text-muted">Winners</label>
                     <Input
@@ -530,6 +561,20 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                       placeholder="🎉"
                     />
                   </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-discord-text-muted">Key Tier</label>
+                    <select
+                      value={normalizeKeyTier(activeDraft.key_tier)}
+                      onChange={(e) => updateDraft({ key_tier: normalizeKeyTier(e.target.value) })}
+                      className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm text-discord-text outline-none transition focus:border-discord-blurple"
+                    >
+                      <option value="none">No key reward</option>
+                      <option value="weekly">Weekly key</option>
+                      <option value="monthly">Monthly key</option>
+                      <option value="lifetime">Lifetime key</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -560,6 +605,12 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                     <span className="flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Join with {activeDraft.emoji || "🎉"}</span>
                     <span className="flex items-center gap-1.5"><Clock3Icon className="h-3.5 w-3.5" /> Auto end</span>
                   </div>
+
+                  {normalizeKeyTier(activeDraft.key_tier) !== "none" && (
+                    <div className="mt-3 rounded-md bg-[#4a4d57] px-2.5 py-2 text-xs text-[#d9dde1]">
+                      🔑 Winner key delivery: {keyTierLabel(normalizeKeyTier(activeDraft.key_tier))} tier via DM
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -595,6 +646,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
               const label = statusLabel(item);
               const entries = Math.max(0, Number(item.entry_count || 0));
               const messageId = item.message_id || "";
+              const itemKeyTier = normalizeKeyTier(item.key_tier);
 
               return (
                 <div key={messageId || `${item.reward_title}-${item.end_at}`} className="rounded-lg border border-white/10 bg-[#202225]/80 p-4">
@@ -623,6 +675,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                         <span className="flex items-center gap-1"><TrophyIcon className="h-3.5 w-3.5" /> Winners: {item.winner_count}</span>
                         <span className="flex items-center gap-1"><UsersIcon className="h-3.5 w-3.5" /> Entries: {entries}</span>
                         <span className="flex items-center gap-1"><Clock3Icon className="h-3.5 w-3.5" /> Ends: {formatRemaining(item.end_at)}</span>
+                        {itemKeyTier !== "none" && <span>Key: {keyTierLabel(itemKeyTier)}</span>}
                         {messageId && <span>ID: {messageId}</span>}
                       </div>
 
@@ -678,6 +731,10 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
               const winners = Array.isArray(item.winners) ? item.winners : [];
               const rerollWinners = Array.isArray(item.last_reroll_winners) ? item.last_reroll_winners : [];
               const messageId = item.message_id || "";
+              const itemKeyTier = normalizeKeyTier(item.key_tier);
+              const keyDelivery = item.key_delivery && typeof item.key_delivery === "object" ? item.key_delivery : null;
+              const deliveredCount = Math.max(0, Number(keyDelivery?.delivered_count || 0));
+              const failedCount = Math.max(0, Number(keyDelivery?.failed_count || 0));
 
               return (
                 <div key={`ended-${messageId || `${item.reward_title}-${item.ended_at}`}`} className="rounded-lg border border-white/10 bg-[#202225]/80 p-4">
@@ -693,6 +750,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#b5bac1]">
                         <span className="flex items-center gap-1"><TrophyIcon className="h-3.5 w-3.5" /> Winners: {item.winner_count}</span>
                         <span className="flex items-center gap-1"><UsersIcon className="h-3.5 w-3.5" /> Entries: {entries}</span>
+                        {itemKeyTier !== "none" && <span>Key: {keyTierLabel(itemKeyTier)}</span>}
                         {messageId && <span>ID: {messageId}</span>}
                       </div>
 
@@ -709,6 +767,13 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                       {rerollWinners.length > 0 && (
                         <div className="mt-1 text-xs text-sky-300">
                           Last reroll: {rerollWinners.map((id) => `<@${id}>`).join(", ")}
+                        </div>
+                      )}
+
+                      {itemKeyTier !== "none" && (
+                        <div className="mt-1 text-xs text-amber-300">
+                          Key delivery: {deliveredCount} sent
+                          {failedCount > 0 ? ` • ${failedCount} failed` : ""}
                         </div>
                       )}
                     </div>

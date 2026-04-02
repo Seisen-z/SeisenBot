@@ -66,6 +66,7 @@ export interface WelcomeDynamicImage {
   name: string;
   width: number;
   height: number;
+  background_color: string;
   layers: WelcomeDynamicImageLayer[];
 }
 
@@ -301,6 +302,7 @@ export function createWelcomeDynamicImage(name = "Dynamic Image 1"): WelcomeDyna
     name,
     width: 500,
     height: 350,
+    background_color: "#0E1824",
     layers: [
       {
         ...createWelcomeDynamicLayer("block", "Card"),
@@ -471,6 +473,7 @@ export function normalizeWelcomeDynamicImages(raw: unknown): WelcomeDynamicImage
       name: toStringValue(entry.name, `Dynamic Image ${index + 1}`),
       width: clampNumber(entry.width, 500, 128, 4000),
       height: clampNumber(entry.height, 350, 128, 4000),
+      background_color: toStringValue(entry.background_color, "#0E1824"),
       layers,
     });
   }
@@ -782,6 +785,7 @@ function DynamicImageCanvas({
 
     const scale = Math.max(0.01, frameWidth / Math.max(1, image.width));
     const scaledHeight = Math.max(1, image.height * scale);
+    const canvasBackground = String(image.background_color || "#0E1824").trim() || "#0E1824";
 
     const sortedLayers = [...image.layers].sort((a, b) => {
       const rank = (layer: WelcomeDynamicImageLayer) => (layer.z_position === "back" ? 0 : 1);
@@ -826,8 +830,11 @@ function DynamicImageCanvas({
     return (
       <div
         ref={frameRef}
-        className={`relative w-full overflow-hidden rounded-xl border border-white/15 bg-[#0e1824] ${onClick ? "cursor-pointer" : ""} ${className || ""}`}
-        style={{ height: `${scaledHeight}px` }}
+        className={`relative w-full overflow-hidden rounded-xl ${editable ? "border border-white/15" : ""} ${onClick ? "cursor-pointer" : ""} ${className || ""}`}
+        style={{
+          height: `${scaledHeight}px`,
+          background: canvasBackground,
+        }}
         onClick={onClick}
       >
         <div

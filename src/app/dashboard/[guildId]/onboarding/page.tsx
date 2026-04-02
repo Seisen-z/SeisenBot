@@ -227,6 +227,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
       name: String(image.name || "Dynamic Image"),
       width: Math.max(128, Number(image.width || 500)),
       height: Math.max(128, Number(image.height || 350)),
+      background_color: String(image.background_color || "#0E1824"),
       layers: (image.layers || []).map((layer) => ({
         id: String(layer.id || ""),
         name: String(layer.name || "Layer"),

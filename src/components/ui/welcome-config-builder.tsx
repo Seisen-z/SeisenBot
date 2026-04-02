@@ -107,6 +107,8 @@ const PREVIEW_TOKENS: Record<string, string> = {
   "${userid}": "171442868190314497",
 };
 
+let PREVIEW_AVATAR_URL = "";
+
 const DEFAULT_GROUP_ID = "group-main";
 
 function randomId(prefix: string): string {
@@ -151,6 +153,56 @@ function getCookieValue(name: string): string {
     return decodeURIComponent(match[1]);
   } catch {
     return match[1];
+  }
+}
+
+function buildDiscordAvatarUrl(userId: string, avatarHash: string): string {
+  const safeUserId = String(userId || "").trim();
+  const safeHash = String(avatarHash || "").trim();
+  if (!/^\d{17,20}$/.test(safeUserId) || !safeHash) {
+    return "";
+  }
+  return `https://cdn.discordapp.com/avatars/${safeUserId}/${safeHash}.png?size=256`;
+}
+
+function applyPreviewContext(context: {
+  guildName?: string;
+  memberCount?: number;
+  username?: string;
+  globalName?: string;
+  userId?: string;
+  avatarUrl?: string;
+}) {
+  const guildName = String(context.guildName || "").trim();
+  if (guildName) {
+    PREVIEW_TOKENS["${guildname}"] = guildName;
+  }
+
+  const memberCount = Number(context.memberCount);
+  if (Number.isFinite(memberCount) && memberCount > 0) {
+    const countText = String(Math.trunc(memberCount));
+    PREVIEW_TOKENS["${guildmembercount}"] = countText;
+    PREVIEW_TOKENS["${membercount}"] = countText;
+  }
+
+  const username = String(context.username || "").trim();
+  const globalName = String(context.globalName || username || "").trim();
+  if (username) {
+    PREVIEW_TOKENS["${username}"] = username;
+  }
+  if (globalName) {
+    PREVIEW_TOKENS["${userglobalnickname}"] = globalName;
+    PREVIEW_TOKENS["${usermention}"] = `@${globalName}`;
+  }
+
+  const userId = String(context.userId || "").trim();
+  if (/^\d{17,20}$/.test(userId)) {
+    PREVIEW_TOKENS["${userid}"] = userId;
+  }
+
+  const avatarUrl = String(context.avatarUrl || "").trim();
+  if (avatarUrl.startsWith("http")) {
+    PREVIEW_AVATAR_URL = avatarUrl;
   }
 }
 
@@ -822,6 +874,9 @@ function DynamicImageCanvas({
             }
 
             if (layer.type === "avatar") {
+              const previewName = (PREVIEW_TOKENS["${userglobalnickname}"] || PREVIEW_TOKENS["${username}"] || "U").trim();
+              const previewInitial = previewName.slice(0, 1).toUpperCase() || "U";
+              const hasPreviewAvatar = PREVIEW_AVATAR_URL.startsWith("http");
               return (
                 <div
                   key={layer.id}
@@ -836,10 +891,15 @@ function DynamicImageCanvas({
                     color: "white",
                     fontWeight: 700,
                     fontSize: `${Math.max(10, layer.width * 0.32)}px`,
+                    overflow: "hidden",
                   }}
                   {...interactiveProps}
                 >
-                  U
+                  {hasPreviewAvatar ? (
+                    <img src={PREVIEW_AVATAR_URL} alt="Avatar" className="h-full w-full object-cover" />
+                  ) : (
+                    previewInitial
+                  )}
                 </div>
               );
             }
@@ -1486,6 +1546,68 @@ export function WelcomeConfigBuilder({
   const [simulationSelectedGroupIds, setSimulationSelectedGroupIds] = useState<string[]>(groups.map((group) => group.id));
   const [simulationResults, setSimulationResults] = useState<WelcomeMessageTemplate[]>([]);
   const [simulationSending, setSimulationSending] = useState(false);
+  const [, setPreviewContextVersion] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncPreviewContext = async () => {
+      try {
+        const [meResponse, guildsResponse] = await Promise.all([
+          fetch("/api/auth/me", { cache: "no-store" }).catch(() => null),
+          fetch("/api/guilds_proxy", { cache: "no-store" }).catch(() => null),
+        ]);
+
+        const context: {
+          guildName?: string;
+          memberCount?: number;
+          username?: string;
+          globalName?: string;
+          userId?: string;
+          avatarUrl?: string;
+        } = {};
+
+        if (meResponse?.ok) {
+          const me = await meResponse.json().catch(() => null);
+          const meId = String(me?.id || "").trim();
+          context.userId = meId;
+          context.username = String(me?.username || "").trim();
+          context.globalName = String(me?.global_name || me?.username || "").trim();
+          context.avatarUrl = buildDiscordAvatarUrl(meId, String(me?.avatar || ""));
+        }
+
+        if (guildsResponse?.ok) {
+          const guilds = await guildsResponse.json().catch(() => []);
+          if (Array.isArray(guilds)) {
+            const matchedGuild = guilds.find((entry: any) => String(entry?.id || "") === String(guildId));
+            if (matchedGuild) {
+              const name = String(matchedGuild?.name || "").trim();
+              if (name) {
+                context.guildName = name;
+              }
+
+              const approxCount = Number(matchedGuild?.approximate_member_count);
+              if (Number.isFinite(approxCount) && approxCount > 0) {
+                context.memberCount = approxCount;
+              }
+            }
+          }
+        }
+
+        applyPreviewContext(context);
+        if (!cancelled) {
+          setPreviewContextVersion((prev) => prev + 1);
+        }
+      } catch {
+        // Keep default preview tokens on fetch failures.
+      }
+    };
+
+    void syncPreviewContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [guildId]);
 
   const groupedMessages = useMemo(() => {
     const map = new Map<string, WelcomeMessageTemplate[]>();
@@ -1897,6 +2019,9 @@ export function WelcomeConfigBuilder({
           <p className="text-sm text-discord-text-muted">
             Dynamic images are attached per message. Layers support text tokens, member avatar blocks, and styled backgrounds.
           </p>
+          <p className="text-xs text-discord-text-muted/80">
+            Note: token values like username, avatar, and member count will change per target member when messages are actually sent.
+          </p>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {dynamicImages.map((image) => (
@@ -1953,6 +2078,7 @@ export function WelcomeConfigBuilder({
       {tab === "simulation" && (
         <div className="space-y-4">
           <p className="text-sm text-discord-text-muted">Run local simulations to preview which messages are selected from each randomized group.</p>
+          <p className="text-xs text-discord-text-muted/80">Simulation renders with your logged-in Discord identity for tokenized fields.</p>
           <div className="flex items-center gap-2">
             <Button onClick={() => setSimulationOpen(true)} className="bg-[#1c6fbd] text-white hover:bg-[#1a62a5]">
               <PlayIcon className="mr-1 h-4 w-4" />

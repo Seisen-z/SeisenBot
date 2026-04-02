@@ -1609,7 +1609,7 @@ function AttachDynamicImageModal({
   messages: WelcomeMessageTemplate[];
   groups: WelcomeMessageGroup[];
   onClose: () => void;
-  onAttach: (messageId: string) => void;
+  onAttach: (messageId: string, attach: boolean) => void;
 }) {
   if (!open || !image) return null;
 
@@ -1632,7 +1632,8 @@ function AttachDynamicImageModal({
           </div>
 
           <h3 className="mb-2 text-2xl font-bold tracking-tight text-white">Select a message</h3>
-          <p className="mb-3 text-xs text-discord-text-muted">Green messages are already using this dynamic image.</p>
+          <p className="mb-1 text-xs text-discord-text-muted">Green messages are already using this dynamic image.</p>
+          <p className="mb-3 text-xs text-discord-text-muted/80">Click an active message again to unselect it.</p>
 
           <div className="space-y-2">
             {messages.map((message, index) => {
@@ -1643,8 +1644,7 @@ function AttachDynamicImageModal({
                   key={message.id}
                   type="button"
                   onClick={() => {
-                    onAttach(message.id);
-                    onClose();
+                    onAttach(message.id, !isAttached);
                   }}
                   className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition ${
                     isAttached
@@ -1656,7 +1656,9 @@ function AttachDynamicImageModal({
                     <p className="text-lg font-semibold">{message.name || `Message ${index + 1}`}</p>
                     <p className={`text-xs ${isAttached ? "text-white/75" : "text-discord-text-muted"}`}>{groupName}</p>
                   </div>
-                  <span className={`text-xl leading-none ${isAttached ? "text-white" : "text-discord-text-muted"}`}>›</span>
+                  <span className={`text-xs font-semibold uppercase tracking-wide ${isAttached ? "text-white" : "text-discord-text-muted"}`}>
+                    {isAttached ? "Active" : "Select"}
+                  </span>
                 </button>
               );
             })}
@@ -2371,7 +2373,7 @@ export function WelcomeConfigBuilder({
         messages={messages}
         groups={groups}
         onClose={() => setAttachImageId(null)}
-        onAttach={(messageId) => attachDynamicImageToMessage(attachImage?.id || "", messageId)}
+        onAttach={(messageId, attach) => attachDynamicImageToMessage(attach ? attachImage?.id || "" : "", messageId)}
       />
     </div>
   );

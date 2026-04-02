@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { ChannelSelect, RoleMultiSelect } from "@/components/ui/discord-selects";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
+import { TicketIcon } from "lucide-react";
 
 export default function TicketsPage({ params }: { params: Promise<{ guildId: string }> }) {
   const resolvedParams = use(params);
@@ -14,32 +17,49 @@ export default function TicketsPage({ params }: { params: Promise<{ guildId: str
   
   const [config, setConfig] = useState<any>({ support_role_ids: [] });
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [posting, setPosting] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/tickets`)
       .then((data) => setConfig(data || { support_role_ids: [] }))
-      .catch(() => toast("Failed to load Tickets config", "error"));
+      .catch(() => toast("Failed to load Tickets config", "error"))
+      .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  const persistConfig = useCallback(async (nextConfig: any) => {
+    await fetchApi(`/guilds/${guildId}/tickets`, undefined, {
+      method: "PUT",
+      body: JSON.stringify({
+        ...nextConfig,
+        support_role_ids: (nextConfig.support_role_ids || []).map(String),
+        panel_channel_id: nextConfig.panel_channel_id || null,
+        panel_message_id: nextConfig.panel_message_id || null,
+        ticket_category_id: nextConfig.ticket_category_id || null,
+        embed_title: nextConfig.embed_title || "",
+        embed_description: nextConfig.embed_description || "",
+        embed_color: nextConfig.embed_color || null,
+        embed_thumbnail: nextConfig.embed_thumbnail || null,
+        embed_footer: nextConfig.embed_footer || null,
+      }),
+    });
+    setLastSaved(new Date());
+  }, [guildId]);
+
+  useDebouncedAutoSave({
+    value: config,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistConfig,
+    onError: () => toast("Auto-save failed for tickets", "error"),
+  });
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi(`/guilds/${guildId}/tickets`, undefined, {
-        method: "PUT",
-        body: JSON.stringify({
-          ...config,
-          support_role_ids: (config.support_role_ids || []).map(String),
-          panel_channel_id: config.panel_channel_id || null,
-          panel_message_id: config.panel_message_id || null,
-          ticket_category_id: config.ticket_category_id || null,
-          embed_title: config.embed_title || "",
-          embed_description: config.embed_description || "",
-          embed_color: config.embed_color || null,
-          embed_thumbnail: config.embed_thumbnail || null,
-          embed_footer: config.embed_footer || null,
-        }),
-      });
+      await persistConfig(config);
       toast("Tickets Config Saved!");
     } catch (e) {
       toast("Failed to save.", "error");
@@ -97,20 +117,38 @@ export default function TicketsPage({ params }: { params: Promise<{ guildId: str
 
   const updateConfig = (key: string, val: any) => setConfig({ ...config, [key]: val });
   const openTicketCount = Object.keys(config.open_tickets || {}).length;
+  const hasPanelChannel = Boolean(config.panel_channel_id);
+  const hasCategory = Boolean(config.ticket_category_id);
+  const supportRoleCount = (config.support_role_ids || []).length;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Ticket System</h1>
-        <div className="flex gap-3">
-          <Button variant="discord" onClick={handleRepostPanel} disabled={posting}>
-            {posting ? "Posting..." : "🚀 Re-post Panel"}
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save Config"}
-          </Button>
-        </div>
-      </div>
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
+      <DashboardPageHero
+        icon={TicketIcon}
+        title="Ticket System"
+        subtitle="Configure your support panel, route tickets into categories, and control support team visibility."
+        stats={[
+          { label: "Panel Channel", value: hasPanelChannel ? "Configured" : "Missing" },
+          { label: "Ticket Category", value: hasCategory ? "Configured" : "Missing" },
+          { label: "Support Roles", value: supportRoleCount },
+          { label: "Open Tickets", value: openTicketCount },
+        ]}
+        actions={
+          <div className="flex items-center gap-3">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
+            <Button variant="discord" onClick={handleRepostPanel} disabled={posting}>
+              {posting ? "Posting..." : "Re-post Panel"}
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Config"}
+            </Button>
+          </div>
+        }
+      />
 
       <AdvancedEmbedEditor
         config={{

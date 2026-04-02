@@ -1,30 +1,111 @@
 @import "tailwindcss";
 
 @theme {
-  --color-discord-blurple: #5865F2;
-  --color-discord-blurple-hover: #4752C4;
-  --color-discord-dark: #313338;
-  --color-discord-darker: #2B2D31;
-  --color-discord-darkest: #1E1F22;
-  --color-discord-red: #DA373C;
-  --color-discord-green: #23A559;
-  --color-discord-text: #F2F3F5;
-  --color-discord-text-muted: #B5BAC1;
+  --color-discord-blurple: #2dc4b7;
+  --color-discord-blurple-hover: #1ea89d;
+  --color-discord-dark: #111c29;
+  --color-discord-darker: #0d1722;
+  --color-discord-darkest: #080f18;
+  --color-discord-red: #ff5f71;
+  --color-discord-green: #33c88a;
+  --color-discord-text: #eaf1f9;
+  --color-discord-text-muted: #8ea2ba;
 }
 
 :root {
   --background: var(--color-discord-dark);
   --foreground: var(--color-discord-text);
+  --surface: #152335;
+  --surface-2: #0f1a29;
+  --stroke: rgba(145, 170, 196, 0.22);
+  --stroke-strong: rgba(145, 170, 196, 0.34);
   color-scheme: dark;
 }
 
+html,
 body {
-  background-color: var(--background);
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(900px 500px at 10% -5%, rgba(49, 196, 183, 0.16), transparent 65%),
+    radial-gradient(1000px 540px at 92% 102%, rgba(91, 151, 245, 0.18), transparent 72%),
+    linear-gradient(160deg, #070c13 0%, #101d2d 54%, #09111b 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), "Segoe UI", sans-serif;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(400px 400px at 80% 20%, rgba(45, 196, 183, 0.14), transparent 72%),
+    radial-gradient(500px 500px at 24% 78%, rgba(139, 210, 255, 0.1), transparent 74%);
+  filter: blur(2px);
+  z-index: -2;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(149, 180, 210, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(149, 180, 210, 0.03) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+  z-index: -1;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: rgba(45, 196, 183, 0.28);
+  color: #ffffff;
+}
+
+.glass-card {
+  border: 1px solid var(--stroke);
+  background: linear-gradient(165deg, rgba(19, 34, 51, 0.84) 0%, rgba(9, 16, 25, 0.92) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(196, 223, 255, 0.08),
+    0 14px 34px rgba(2, 8, 15, 0.45);
+  backdrop-filter: blur(14px);
+}
+
+.page-enter {
+  animation: page-enter 0.45s ease-out both;
+}
+
+.title-glow {
+  text-shadow: 0 0 22px rgba(45, 196, 183, 0.22);
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Custom Scrollbar for Discord feel */
@@ -33,12 +114,12 @@ body {
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-discord-darkest); 
+  background: #060b12;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1A1B1E; 
+  background: #1a2b3e;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #111214; 
+  background: #25415e;
 }

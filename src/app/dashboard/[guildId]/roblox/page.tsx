@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
 import { DiscordMessagePreview } from "@/components/ui/discord-message";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { Trash2Icon, PlusIcon, GamepadIcon } from "lucide-react";
 
 interface RobloxMonitor {
@@ -23,6 +24,19 @@ interface GameInfo {
   thumbnail_url: string;
 }
 
+interface RobloxMonitorHealth {
+  monitor_count: number;
+  loop_healthy: boolean;
+  is_stale: boolean;
+  age_seconds: number | null;
+  loop_started_at: string | null;
+  last_poll_started: string | null;
+  last_poll_finished: string | null;
+  last_poll_seconds: number | null;
+  last_notifications: number;
+  last_error: string | null;
+}
+
 export default function RobloxMonitorsPage({ params }: { params: Promise<{ guildId: string }> }) {
   const resolvedParams = use(params);
   const guildId = resolvedParams.guildId;
@@ -33,11 +47,30 @@ export default function RobloxMonitorsPage({ params }: { params: Promise<{ guild
   const [gameInfos, setGameInfos] = useState<Record<string, GameInfo>>({});
   
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [forcing, setForcing] = useState(false);
   const [loadingGames, setLoadingGames] = useState<Record<string, boolean>>({});
   const [mode, setMode] = useState<"edit" | "preview">("edit");
+  const [monitorHealth, setMonitorHealth] = useState<RobloxMonitorHealth | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
+    const loadMonitorHealth = async (silent = false) => {
+      try {
+        const health = await fetchApi(`/guilds/${guildId}/roblox/health`);
+        if (mounted) setMonitorHealth(health as RobloxMonitorHealth);
+      } catch {
+        if (!silent && mounted) {
+          toast("Failed to load Roblox monitor status", "error");
+        }
+      } finally {
+        if (mounted) setHealthLoading(false);
+      }
+    };
+
     fetchApi(`/guilds/${guildId}/roblox`)
       .then((data: RobloxMonitor[]) => {
         const mods = data || [];
@@ -49,8 +82,46 @@ export default function RobloxMonitorsPage({ params }: { params: Promise<{ guild
           if (m.universe_id) fetchGameInfo(m.universe_id);
         });
       })
-      .catch(() => toast("Failed to load Roblox monitors", "error"));
+      .catch(() => toast("Failed to load Roblox monitors", "error"))
+      .finally(() => {
+        if (mounted) setInitialLoadComplete(true);
+      });
+
+    loadMonitorHealth(true);
+    const healthTimer = window.setInterval(() => {
+      loadMonitorHealth(true);
+    }, 30000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(healthTimer);
+    };
   }, [guildId, toast]);
+
+  const persistMonitors = useCallback(async (nextMonitors: RobloxMonitor[]) => {
+    await fetchApi(`/guilds/${guildId}/roblox`, undefined, {
+      method: "PUT",
+      body: JSON.stringify(
+        nextMonitors.map(m => ({
+          name: m.name || null,
+          universe_id: m.universe_id ? String(m.universe_id) : null,
+          channel_id: m.channel_id ? String(m.channel_id) : null,
+          role_id: m.role_id ? String(m.role_id) : null,
+          last_updated: m.last_updated || null
+        }))
+      ),
+    });
+    setLastSaved(new Date());
+  }, [guildId]);
+
+  useDebouncedAutoSave({
+    value: monitors,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1500,
+    onSave: persistMonitors,
+    onError: () => toast("Auto-save failed for Roblox monitors", "error"),
+  });
 
   const fetchGameInfo = async (uid: string) => {
     if (!uid || gameInfos[uid] || loadingGames[uid]) return;
@@ -69,18 +140,7 @@ export default function RobloxMonitorsPage({ params }: { params: Promise<{ guild
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi(`/guilds/${guildId}/roblox`, undefined, {
-        method: "PUT",
-        body: JSON.stringify(
-          monitors.map(m => ({
-            name: m.name || null,
-            universe_id: m.universe_id ? String(m.universe_id) : null,
-            channel_id: m.channel_id ? String(m.channel_id) : null,
-            role_id: m.role_id ? String(m.role_id) : null,
-            last_updated: m.last_updated || null
-          }))
-        ),
-      });
+      await persistMonitors(monitors);
       toast("Roblox Monitors Saved Successfully!");
     } catch (e) {
       toast("Failed to save.", "error");
@@ -103,10 +163,19 @@ export default function RobloxMonitorsPage({ params }: { params: Promise<{ guild
           guild_id: guildId, 
           payload: { 
             universe_id: monitor.universe_id, 
-            channel_id: monitor.channel_id 
+            channel_id: monitor.channel_id,
+            role_id: monitor.role_id || null,
           } 
         })
       });
+
+      try {
+        const health = await fetchApi(`/guilds/${guildId}/roblox/health`);
+        setMonitorHealth(health as RobloxMonitorHealth);
+      } catch {
+        // Ignore health refresh errors after force check.
+      }
+
       toast("Requested force check successfully!");
     } catch (err: any) {
       toast(`Error forcing check: ${err.message}`, "error");
@@ -124,13 +193,69 @@ export default function RobloxMonitorsPage({ params }: { params: Promise<{ guild
   const activeMonitor = monitors[activeIdx];
   const activeGameInfo = activeMonitor?.universe_id ? gameInfos[activeMonitor.universe_id] : null;
 
+  const formatDateTime = (value: string | null | undefined) => {
+    if (!value) return "Never";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "Unknown";
+    return parsed.toLocaleString();
+  };
+
+  const formatAge = (seconds: number | null | undefined) => {
+    if (seconds === null || seconds === undefined) return "N/A";
+    if (seconds < 60) return `${seconds}s ago`;
+    const mins = Math.floor(seconds / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    return `${hours}h ${mins % 60}m ago`;
+  };
+
+  const statusLabel = healthLoading
+    ? "Checking"
+    : monitorHealth?.loop_healthy
+      ? "Healthy"
+      : monitorHealth?.last_error
+        ? "Error"
+        : "Stale";
+
+  const statusDotClass = healthLoading
+    ? "bg-slate-400"
+    : monitorHealth?.loop_healthy
+      ? "bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.75)]"
+      : monitorHealth?.last_error
+        ? "bg-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.75)]"
+        : "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.75)]";
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Roblox Game Monitors</h1>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save Monitors"}
-        </Button>
+        <div className="flex items-center gap-3">
+          {lastSaved && !saving && (
+            <span className="text-xs text-green-400">
+              Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+            </span>
+          )}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save Monitors"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-[#1E1F22] bg-[#202225]/80 p-4">
+        <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm">
+          <div className="flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 rounded-full ${statusDotClass}`} />
+            <span className="font-semibold text-white">Monitor Loop: {statusLabel}</span>
+          </div>
+          <span className="text-discord-text-muted">Last Poll: {formatDateTime(monitorHealth?.last_poll_finished)}</span>
+          <span className="text-discord-text-muted">Age: {formatAge(monitorHealth?.age_seconds)}</span>
+          <span className="text-discord-text-muted">Duration: {monitorHealth?.last_poll_seconds ?? "N/A"}s</span>
+          <span className="text-discord-text-muted">Notifications: {monitorHealth?.last_notifications ?? 0}</span>
+          <span className="text-discord-text-muted">Monitors: {monitorHealth?.monitor_count ?? monitors.length}</span>
+        </div>
+        {monitorHealth?.last_error && (
+          <p className="mt-2 text-xs text-rose-300">Last Loop Error: {monitorHealth.last_error}</p>
+        )}
       </div>
 
       <div className="flex gap-6 h-[calc(100vh-220px)] min-h-[500px]">

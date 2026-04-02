@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { ChannelSelect } from "@/components/ui/discord-selects";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { MessageSquareIcon, PlusIcon, Trash2Icon, SendIcon, StickyNoteIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -17,7 +19,9 @@ export default function StickyMessagesPage({ params }: { params: Promise<{ guild
   const { toast } = useToast();
   const [stickies, setStickies] = useState<Stickies>({});
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [sending, setSending] = useState<string | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [newChannelId, setNewChannelId] = useState("");
@@ -30,16 +34,31 @@ export default function StickyMessagesPage({ params }: { params: Promise<{ guild
         const keys = Object.keys(d);
         if (keys.length > 0) setActiveChannelId(keys[0]);
       })
-      .catch(() => toast("Failed to load Sticky Messages", "error"));
+      .catch(() => toast("Failed to load Sticky Messages", "error"))
+      .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  const persistStickies = useCallback(async (nextStickies: Stickies) => {
+    await fetchApi(`/guilds/${guildId}/sticky`, undefined, {
+      method: "PUT",
+      body: JSON.stringify(nextStickies),
+    });
+    setLastSaved(new Date());
+  }, [guildId]);
+
+  useDebouncedAutoSave({
+    value: stickies,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistStickies,
+    onError: () => toast("Auto-save failed for sticky messages", "error"),
+  });
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi(`/guilds/${guildId}/sticky`, undefined, {
-        method: "PUT",
-        body: JSON.stringify(stickies),
-      });
+      await persistStickies(stickies);
       toast("Sticky Messages Config Saved!");
     } catch (e) {
       toast("Failed to save.", "error");
@@ -85,15 +104,33 @@ export default function StickyMessagesPage({ params }: { params: Promise<{ guild
   };
 
   const activeData = activeChannelId ? stickies[activeChannelId] : null;
+  const stickyCount = Object.keys(stickies).length;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Sticky Messages</h1>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save Config"}
-        </Button>
-      </div>
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
+      <DashboardPageHero
+        icon={StickyNoteIcon}
+        title="Sticky Messages"
+        subtitle="Pin recurring reminders to key channels and force-send updated copies whenever needed."
+        stats={[
+          { label: "Configured Stickies", value: stickyCount },
+          { label: "Active Channel", value: activeChannelId || "None" },
+          { label: "Ready To Send", value: activeData?.content ? "Yes" : "No" },
+          { label: "Auto Update", value: "Enabled" },
+        ]}
+        actions={
+          <div className="flex items-center gap-3">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Config"}
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex gap-6 h-[calc(100vh-160px)] min-h-[500px]">
         {/* Sidebar */}

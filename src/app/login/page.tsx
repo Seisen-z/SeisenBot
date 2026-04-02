@@ -1,128 +1,103 @@
-import { HexagonBackground } from "@/components/ui/hexagon-background";
+import { BotIcon, CheckCircle2Icon, LockIcon, SparklesIcon } from "lucide-react";
 
-export default function LoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  no_code: "Discord did not return an authorization code. Please try signing in again.",
+  auth_failed: "Discord authentication failed. Your session may have expired.",
+  no_session: "Session setup was interrupted. Please log in again.",
+};
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; next?: string }>;
+}) {
+  const resolvedParams = await searchParams;
+  const errorText = resolvedParams.error ? ERROR_MESSAGES[resolvedParams.error] ?? "Unable to log you in right now." : null;
+  const nextPath = typeof resolvedParams.next === "string" && resolvedParams.next.startsWith("/")
+    ? resolvedParams.next
+    : undefined;
+  const loginHref = nextPath
+    ? `/api/auth/discord/login?next=${encodeURIComponent(nextPath)}`
+    : "/api/auth/discord/login";
+
   return (
-    <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden">
-      <HexagonBackground />
-
-      {/* ── Brand ── */}
-      <div className="z-10 mb-10 flex flex-col items-center gap-3 select-none">
-        <div className="relative flex h-16 w-16 items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-[#5865F2]/20 blur-2xl" />
-          <div
-            className="h-14 w-14 flex items-center justify-center"
-            style={{
-              background: "linear-gradient(145deg, #7289da 0%, #5865F2 60%, #4752C4 100%)",
-              clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
-              boxShadow: "0 0 32px rgba(88,101,242,0.55)",
-            }}
-          >
-            <span className="text-white font-black text-xl">S</span>
-          </div>
-        </div>
-        <div className="text-center">
-          <h1
-            className="text-4xl font-black tracking-tight text-white"
-            style={{ textShadow: "0 0 40px rgba(88,101,242,0.25)" }}
-          >
-            Seisen Hub
-          </h1>
-          <p className="text-[11px] font-semibold tracking-[0.28em] uppercase text-[#5865F2]/60 mt-1">
-            Dashboard
-          </p>
-        </div>
-      </div>
-
-      {/* ── Card ── */}
-      <div className="z-10 w-full max-w-[400px] px-4">
-        <div
-          className="relative rounded-2xl p-px"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(88,101,242,0.35) 0%, rgba(71,82,196,0.12) 50%, rgba(0,0,0,0) 100%)",
-          }}
-        >
-          <div
-            className="rounded-2xl p-8 flex flex-col gap-6"
-            style={{
-              background:
-                "linear-gradient(160deg, rgba(18,20,31,0.97) 0%, rgba(10,11,16,0.98) 100%)",
-              backdropFilter: "blur(28px)",
-            }}
-          >
-            {/* Header */}
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-white tracking-tight">Welcome Back</h2>
-              <p className="text-sm text-[#8b90a0] mt-2 leading-relaxed">
-                Sign in with Discord to access your<br />server's configuration panel.
-              </p>
+    <div className="relative flex min-h-screen w-full items-center justify-center px-4 py-10 sm:px-8">
+      <div className="mx-auto grid w-full max-w-6xl items-center gap-6 page-enter lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="glass-card hidden rounded-3xl p-8 lg:flex lg:flex-col lg:justify-between">
+          <div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-discord-blurple/40 bg-discord-blurple/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-discord-blurple">
+              <SparklesIcon className="h-3.5 w-3.5" />
+              Seisen Dashboard
             </div>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#2a2d3e] to-transparent" />
-              <span className="text-[10px] text-[#41455a] font-semibold uppercase tracking-widest">
-                Continue with
-              </span>
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#2a2d3e] to-transparent" />
-            </div>
-
-            {/* Discord button */}
-            <a href="/api/auth/discord/login" className="group block w-full">
-              <div
-                className="relative flex w-full items-center justify-center gap-3 rounded-xl py-4 font-bold text-white overflow-hidden transition-all duration-300"
-                style={{
-                  background: "linear-gradient(135deg, #5865F2 0%, #4752C4 100%)",
-                  boxShadow: "0 4px 28px rgba(88,101,242,0.40)",
-                }}
-              >
-                {/* Hover overlay */}
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  style={{ background: "linear-gradient(135deg, #6472f5 0%, #5562d4 100%)" }}
-                />
-                {/* Glow bloom on hover */}
-                <div
-                  className="absolute -inset-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl"
-                  style={{ background: "rgba(88,101,242,0.25)" }}
-                />
-                {/* Discord "D" mark SVG */}
-                <svg
-                  className="relative z-10 h-5 w-5 shrink-0"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.04.033.052a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
-                </svg>
-                <span className="relative z-10 text-base">Login with Discord</span>
-              </div>
-            </a>
-
-            {/* Fine print */}
-            <p className="text-center text-[11px] text-[#41455a] leading-relaxed">
-              By continuing, you agree to our{" "}
-              <span className="text-[#5865F2]/60 hover:text-[#5865F2] cursor-pointer transition-colors">
-                Terms of Service
-              </span>{" "}
-              and{" "}
-              <span className="text-[#5865F2]/60 hover:text-[#5865F2] cursor-pointer transition-colors">
-                Privacy Policy
-              </span>
-              .
+            <h1 className="title-glow text-5xl font-bold leading-tight text-white">
+              Manage Your Bot
+              <br />
+              Like a Product Team.
+            </h1>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-discord-text-muted">
+              Configure automation, AI support, tickets, boost systems, and channel workflows from one focused control plane.
             </p>
           </div>
-        </div>
-      </div>
 
-      {/* ── Footer ── */}
-      <div className="absolute bottom-6 z-10 flex items-center gap-4 text-[11px] text-[#30344a] select-none">
-        <span>© 2021–2026 Seisen</span>
-        <span>·</span>
-        <span className="cursor-pointer hover:text-[#5865F2]/70 transition-colors">Terms</span>
-        <span>·</span>
-        <span className="cursor-pointer hover:text-[#5865F2]/70 transition-colors">Privacy</span>
-        <span>·</span>
-        <span className="cursor-pointer hover:text-[#5865F2]/70 transition-colors">Legal Notice</span>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {[
+              ["Secure OAuth", "Discord-based sign-in with short-lived tokens."],
+              ["Guild Smart Routing", "Manage only the servers where you have control."],
+              ["Always-On Modules", "AI, tickets, announcements, and automations in one place."],
+            ].map(([title, desc]) => (
+              <div key={title} className="rounded-2xl border border-white/10 bg-[#0f1b2a]/80 p-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+                  <CheckCircle2Icon className="h-4 w-4 text-discord-green" />
+                  {title}
+                </div>
+                <p className="text-xs leading-relaxed text-discord-text-muted">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="glass-card rounded-3xl p-6 sm:p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-discord-text-muted">Seisen Hub Access</p>
+              <h2 className="mt-1 text-3xl font-bold text-white">Sign In</h2>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#0f1b2a] text-discord-blurple">
+              <BotIcon className="h-5 w-5" />
+            </div>
+          </div>
+
+          <p className="mb-5 text-sm leading-relaxed text-discord-text-muted">
+            Use Discord OAuth to continue to your server dashboard. We only request identity and guild access.
+          </p>
+
+          {errorText && (
+            <div className="mb-5 rounded-2xl border border-discord-red/50 bg-discord-red/15 px-4 py-3 text-sm text-[#ffd7dd]">
+              {errorText}
+            </div>
+          )}
+
+          <a
+            href={loginHref}
+            className="group relative flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-discord-blurple to-[#4f8ff7] px-4 text-sm font-bold text-white shadow-[0_10px_28px_rgba(45,196,183,0.35)] transition-transform hover:-translate-y-0.5"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M20.317 4.3698a19.791 19.791 0 0 0-4.8851-1.5152.074.074 0 0 0-.0785.0371 13.587 13.587 0 0 0-.6084 1.2648 18.27 18.27 0 0 0-5.487 0 13.134 13.134 0 0 0-.6171-1.2648.077.077 0 0 0-.0785-.037A19.736 19.736 0 0 0 3.677 4.3698a.066.066 0 0 0-.0315.0276C.5334 9.0467-.32 13.5799.099 18.0578a.082.082 0 0 0 .0315.0561 19.924 19.924 0 0 0 6.0409 3.0615.078.078 0 0 0 .0842-.0276 14.091 14.091 0 0 0 1.2352-1.9942.076.076 0 0 0-.0416-.1057 13.107 13.107 0 0 1-1.872-.8923.077.077 0 0 1-.0077-.1277c.1258-.0943.2498-.1923.3689-.2914a.074.074 0 0 1 .0776-.0105c3.9278 1.7933 8.18 1.7933 12.0617 0a.074.074 0 0 1 .0789.0094c.119.0991.2431.1981.369.2924a.077.077 0 0 1-.0066.1276 12.299 12.299 0 0 1-1.873.8923.076.076 0 0 0-.0409.1067c.3604.698.775 1.3588 1.2408 1.993a.076.076 0 0 0 .0842.0286 19.907 19.907 0 0 0 6.0419-3.0615.082.082 0 0 0 .0315-.0552c.5004-5.177-.838-9.6739-3.5485-13.6607a.061.061 0 0 0-.0315-.028Z" />
+              <path d="M8.02 15.331c-1.183 0-2.158-1.086-2.158-2.419 0-1.334.956-2.419 2.158-2.419 1.211 0 2.167 1.095 2.158 2.419 0 1.333-.957 2.419-2.158 2.419Zm7.975 0c-1.183 0-2.158-1.086-2.158-2.419 0-1.334.956-2.419 2.158-2.419 1.211 0 2.167 1.095 2.158 2.419 0 1.333-.947 2.419-2.158 2.419Z" />
+            </svg>
+            Continue with Discord
+            <span className="absolute inset-0 rounded-xl border border-white/20" />
+          </a>
+
+          <div className="mt-6 rounded-2xl border border-white/10 bg-[#0f1b2a]/75 px-4 py-3 text-xs text-discord-text-muted">
+            <div className="mb-1 flex items-center gap-2 font-semibold text-white">
+              <LockIcon className="h-3.5 w-3.5 text-discord-green" />
+              Session Security
+            </div>
+            Tokens stay in secure browser storage and are used only for authenticated dashboard actions.
+          </div>
+        </section>
       </div>
     </div>
   );

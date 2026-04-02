@@ -13,7 +13,21 @@ export async function fetchApi(endpoint: string, jwt?: string, init?: RequestIni
   });
 
   if (!res.ok) {
-    throw new Error(`API Error: ${res.statusText}`);
+    let details = '';
+
+    try {
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        details = data?.detail || data?.message || JSON.stringify(data);
+      } else {
+        details = (await res.text()).trim();
+      }
+    } catch {
+      // Ignore parse failures and fall back to status text only.
+    }
+
+    throw new Error(`API Error ${res.status}: ${details || res.statusText}`);
   }
 
   return await res.json();

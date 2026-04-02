@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+function decodeCookieToken(value: string | undefined) {
+  if (!value) return undefined;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export async function GET() {
   const cookieStore = await cookies();
-  const token = cookieStore.get("session_token")?.value;
+  const token = decodeCookieToken(cookieStore.get("session_token")?.value);
 
   if (!token) {
     console.error("[guilds_proxy] No session token found in cookies");

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
-import { ChannelSelect, RoleMultiSelect } from "@/components/ui/discord-selects";
-import { RoleSelect } from "@/components/ui/discord-selects";
+import { RoleMultiSelect } from "@/components/ui/discord-selects";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
+import { ShieldCheckIcon } from "lucide-react";
 
 const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
   "Administration & Moderation": [
@@ -110,29 +111,46 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
   const { toast } = useToast();
   const [commands, setCommands] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [expandedCmd, setExpandedCmd] = useState<string | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/commands`)
       .then((data) => setCommands(data?.commands || {}))
-      .catch(() => toast("Failed to load commands config", "error"));
+      .catch(() => toast("Failed to load commands config", "error"))
+      .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    
+  const persistCommands = useCallback(async (nextCommands: Record<string, string[]>) => {
     const cleanedCommands: Record<string, string[]> = {};
-    for (const [cmd, roles] of Object.entries(commands)) {
+    for (const [cmd, roles] of Object.entries(nextCommands)) {
       if (roles && roles.length > 0) {
         cleanedCommands[cmd] = roles;
       }
     }
 
+    await fetchApi(`/guilds/${guildId}/commands`, undefined, {
+      method: "PUT",
+      body: JSON.stringify({ commands: cleanedCommands }),
+    });
+    setLastSaved(new Date());
+  }, [guildId]);
+
+  useDebouncedAutoSave({
+    value: commands,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistCommands,
+    onError: () => toast("Auto-save failed for command access", "error"),
+  });
+
+  const handleSave = async () => {
+    setSaving(true);
+
     try {
-      await fetchApi(`/guilds/${guildId}/commands`, undefined, {
-        method: "PUT",
-        body: JSON.stringify({ commands: cleanedCommands }),
-      });
+      await persistCommands(commands);
       toast("Command Config Saved!");
     } catch (e) {
       toast("Failed to save.", "error");
@@ -148,19 +166,35 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
     }));
   };
 
+  const totalCommands = Object.values(COMMAND_GROUPS).reduce((sum, list) => sum + list.length, 0);
+  const restrictedCommands = Object.values(commands).filter((roles) => (roles?.length || 0) > 0).length;
+  const totalRolesLinked = Object.values(commands).reduce((sum, roles) => sum + (roles?.length || 0), 0);
+
   return (
-    <div className="flex flex-col gap-8 pb-96">
-      <div className="flex items-center justify-between sticky top-0 bg-[#313338]/95 backdrop-blur-md z-20 py-5 border-b border-[#1E1F22] -mx-6 px-6 shadow-sm">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Command Access Control</h1>
-          <p className="text-sm text-[#B5BAC1] mt-1">
-            Restrict specific bot commands to certain roles. Leave blank to allow everyone.
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving} className="bg-[#5865F2] hover:bg-[#4752C4] shadow-md transition-all">
-          {saving ? "Saving..." : "Save Config"}
-        </Button>
-      </div>
+    <div className="glass-card flex flex-col gap-8 rounded-3xl p-6 pb-96">
+      <DashboardPageHero
+        icon={ShieldCheckIcon}
+        title="Command Access Control"
+        subtitle="Restrict sensitive commands to trusted roles while keeping public utilities open for everyone."
+        stats={[
+          { label: "Command Groups", value: Object.keys(COMMAND_GROUPS).length },
+          { label: "Total Commands", value: totalCommands },
+          { label: "Restricted Commands", value: restrictedCommands },
+          { label: "Role Links", value: totalRolesLinked },
+        ]}
+        actions={
+          <div className="flex items-center gap-3">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
+            <Button onClick={handleSave} disabled={saving} className="bg-[#5865F2] hover:bg-[#4752C4] shadow-md transition-all">
+              {saving ? "Saving..." : "Save Config"}
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex flex-col gap-10">
         {Object.entries(COMMAND_GROUPS).map(([category, cmdList]) => (

@@ -1,71 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { ChevronRightIcon, LogOutIcon, MenuIcon } from "lucide-react";
 
-export default function Header({ activeGuildId }: { activeGuildId: string | null }) {
-  const [guilds, setGuilds] = useState<any[]>([]);
-  const router = useRouter();
-
-  useEffect(() => {
-    fetch("/api/guilds_proxy")
-      .then(res => {
-        if (res.status === 401) {
-          // Session expired - redirect to login
-          console.warn("Session expired, redirecting to login...");
-          window.location.href = "/login";
-          return;
-        }
-        return res.json();
-      })
-      .then(data => {
-        if (!data) return; // Already redirected
-        if (Array.isArray(data)) {
-          const adminGuilds = data.filter((g: any) => {
-            const perms = BigInt(g.permissions);
-            return (perms & BigInt(0x8)) === BigInt(0x8) || (perms & BigInt(0x20)) === BigInt(0x20);
-          });
-          setGuilds(adminGuilds);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load guilds:", err);
-      });
-  }, []);
-
+export default function Header({
+  showMenuButton,
+  onOpenSidebar,
+}: {
+  showMenuButton?: boolean;
+  onOpenSidebar?: () => void;
+}) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-[#1E1F22] bg-[#313338] px-6 shadow-sm">
-      <div className="flex items-center gap-4">
-        {activeGuildId ? (
-          <select 
-            className="rounded-md border border-[#1E1F22] bg-[#2B2D31] px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-discord-blurple"
-            value={activeGuildId}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val) router.push(`/dashboard/${val}/autoreply`);
-            }}
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0a1320]/80 px-4 py-3 backdrop-blur-xl sm:px-6">
+      <div className="mx-auto flex w-full max-w-[1520px] items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          {showMenuButton && (
+            <button
+              type="button"
+              onClick={onOpenSidebar}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[#122033] text-discord-text transition hover:bg-[#18304a] lg:hidden"
+              aria-label="Open sidebar"
+            >
+              <MenuIcon className="h-5 w-5" />
+            </button>
+          )}
+
+          <Link
+            href="/"
+            className="group flex items-center gap-3 rounded-xl border border-white/10 bg-[#0f1c2b]/80 px-3 py-2 transition hover:border-discord-blurple/50"
           >
-            <option value="" disabled>Select a server</option>
-            {guilds.map(g => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-            {/* Fallback if active guild isn't loaded yet but we are on it */}
-            {!guilds.find(g => g.id === activeGuildId) && <option value={activeGuildId}>Loading Guild {activeGuildId}...</option>}
-          </select>
-        ) : (
-          <div className="text-sm font-semibold text-[#B5BAC1]">
-             Select a Guild
-          </div>
-        )}
-      </div>
-      <div>
-        <Link 
-          href="/api/auth/discord/logout"
-          className="rounded-md border border-[#1E1F22] bg-[#2B2D31] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-discord-red"
-        >
-          Logout
-        </Link>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-discord-blurple to-[#4ea7ff] text-sm font-black text-white shadow-[0_6px_16px_rgba(45,196,183,0.35)]">
+              S
+            </div>
+            <div className="hidden sm:block">
+              <p className="text-sm font-bold text-white">Seisen Hub</p>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-discord-text-muted">Bot Control</p>
+            </div>
+            <ChevronRightIcon className="hidden h-4 w-4 text-discord-text-muted transition group-hover:text-discord-blurple sm:block" />
+          </Link>
+        </div>
+
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+          <Link
+            href="/api/auth/discord/logout"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#122033] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-discord-red/40 hover:bg-discord-red/20 hover:text-white"
+          >
+            <LogOutIcon className="h-4 w-4" />
+            Logout
+          </Link>
+        </div>
       </div>
     </header>
   );

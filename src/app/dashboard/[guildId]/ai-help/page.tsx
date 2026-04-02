@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { ChannelSelect } from "@/components/ui/discord-selects";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { Trash2Icon, PlusIcon, CheckIcon, SparklesIcon } from "lucide-react";
 
 interface AIModel {
@@ -22,35 +24,49 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
   const [config, setConfig] = useState<any>(null);
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [newChannelId, setNewChannelId] = useState("");
   const [newChannelObj, setNewChannelObj] = useState<any>(null);
 
   useEffect(() => {
-    console.log("[AI Help] Component mounted, loading config...");
     // Load AI config
     fetchApi("/ai_help")
       .then((data) => {
-        console.log("[AI Help] Config loaded:", data);
         setConfig(data || {});
       })
-      .catch((err) => toast("Failed to load AI Help Config", "error"));
+      .catch((err) => toast("Failed to load AI Help Config", "error"))
+      .finally(() => setInitialLoadComplete(true));
     
     // Load available models
     fetchApi("/ai_help/models")
       .then((data) => {
-        console.log("[AI Help] Models loaded:", data?.models);
         setAvailableModels(data?.models || []);
       })
       .catch((err) => console.error("Failed to load models", err));
   }, [toast]);
 
+  const persistConfig = useCallback(async (nextConfig: any) => {
+    await fetchApi("/ai_help", undefined, {
+      method: "PUT",
+      body: JSON.stringify(nextConfig),
+    });
+    setLastSaved(new Date());
+  }, []);
+
+  useDebouncedAutoSave({
+    value: config,
+    enabled: initialLoadComplete && config !== null,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistConfig,
+    onError: () => toast("Auto-save failed for AI Help settings", "error"),
+  });
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi("/ai_help", undefined, {
-        method: "PUT",
-        body: JSON.stringify(config),
-      });
+      await persistConfig(config);
       toast("AI Help Config Saved!");
     } catch (e) {
       toast("Failed to save AI configuration.", "error");
@@ -114,14 +130,35 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
     return currentModels.includes(modelId);
   };
 
+  const monitoredTargetCount = (guildConfig.targets || []).length;
+  const selectedModelCount = (guildConfig.models || []).length;
+  const globalModelCount = availableModels.length;
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">AI Help Assistant</h1>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save Configuration"}
-        </Button>
-      </div>
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
+      <DashboardPageHero
+        icon={SparklesIcon}
+        title="AI Help Assistant"
+        subtitle="Configure AI behavior, monitored channels, and model fallback strategy for this server."
+        stats={[
+          { label: "Guild Enabled", value: guildConfig.enabled ? "Yes" : "No" },
+          { label: "Monitored Targets", value: monitoredTargetCount },
+          { label: "Selected Models", value: selectedModelCount },
+          { label: "Available Models", value: globalModelCount },
+        ]}
+        actions={
+          <div className="flex items-center gap-3">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Configuration"}
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex flex-col gap-4 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6">
         <div className="mb-4 flex items-center gap-4">

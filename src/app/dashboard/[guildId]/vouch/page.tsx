@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { ChannelSelect } from "@/components/ui/discord-selects";
 import { DiscordMessagePreview } from "@/components/ui/discord-message";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
+import { BadgeCheckIcon } from "lucide-react";
 
 export default function VouchSystemPage({ params }: { params: Promise<{ guildId: string }> }) {
   const resolvedParams = use(params);
@@ -13,20 +16,37 @@ export default function VouchSystemPage({ params }: { params: Promise<{ guildId:
   const { toast } = useToast();
   const [config, setConfig] = useState<any>({ channel_id: null });
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/vouch`)
       .then((data) => setConfig(data || { channel_id: null }))
-      .catch(() => toast("Failed to load vouch config", "error"));
+      .catch(() => toast("Failed to load vouch config", "error"))
+      .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  const persistConfig = useCallback(async (nextConfig: any) => {
+    await fetchApi(`/guilds/${guildId}/vouch`, undefined, {
+      method: "PUT",
+      body: JSON.stringify({ channel_id: nextConfig.channel_id || null }),
+    });
+    setLastSaved(new Date());
+  }, [guildId]);
+
+  useDebouncedAutoSave({
+    value: config,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistConfig,
+    onError: () => toast("Auto-save failed for vouch settings", "error"),
+  });
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi(`/guilds/${guildId}/vouch`, undefined, {
-        method: "PUT",
-        body: JSON.stringify({ channel_id: config.channel_id || null }),
-      });
+      await persistConfig(config);
       toast("Vouch Config Saved!");
     } catch (e) {
       toast("Failed to save.", "error");
@@ -35,14 +55,33 @@ export default function VouchSystemPage({ params }: { params: Promise<{ guildId:
     }
   };
 
+  const hasChannel = Boolean(config.channel_id);
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Vouch System</h1>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save Config"}
-        </Button>
-      </div>
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
+      <DashboardPageHero
+        icon={BadgeCheckIcon}
+        title="Vouch System"
+        subtitle="Set where user testimonials are collected so successful transactions are visible and trusted."
+        stats={[
+          { label: "Vouch Channel", value: hasChannel ? "Configured" : "Missing" },
+          { label: "Post Format", value: "Embed" },
+          { label: "Moderation", value: "Manual" },
+          { label: "Status", value: hasChannel ? "Ready" : "Needs Setup" },
+        ]}
+        actions={
+          <div className="flex items-center gap-3">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Config"}
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex xl:flex-row flex-col gap-6">
         <div className="flex-1 flex flex-col gap-4 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6 h-fit">

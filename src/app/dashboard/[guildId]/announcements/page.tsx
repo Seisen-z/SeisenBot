@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
 import { Input } from "@/components/ui/input";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon, FolderIcon } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
@@ -34,7 +36,9 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const [activeDraftKey, setActiveDraftKey] = useState<string>("");
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [posting, setPosting] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptConfig, setPromptConfig] = useState<{title: string; label: string; action: 'category' | 'draft'; cat?: string}>({
@@ -49,16 +53,31 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
         const keys = Object.keys(d);
         if (keys.length > 0) setActiveDraftKey(keys[0]);
       })
-      .catch(() => toast("Failed to load announcements", "error"));
+      .catch(() => toast("Failed to load announcements", "error"))
+      .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  const persistDrafts = useCallback(async (nextDrafts: Record<string, any>) => {
+    await fetchApi(`/guilds/${guildId}/announcements`, undefined, {
+      method: "PUT",
+      body: JSON.stringify(nextDrafts),
+    });
+    setLastSaved(new Date());
+  }, [guildId]);
+
+  useDebouncedAutoSave({
+    value: drafts,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistDrafts,
+    onError: () => toast("Auto-save failed for announcements", "error"),
+  });
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi(`/guilds/${guildId}/announcements`, undefined, {
-        method: "PUT",
-        body: JSON.stringify(drafts),
-      });
+      await persistDrafts(drafts);
       toast("Drafts Saved Successfully!");
     } catch (e) {
       toast("Failed to save.", "error");
@@ -148,14 +167,35 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     return parts.length > 1 ? parts.slice(1).join("/") : key;
   };
 
+  const categoryCount = Object.keys(categorized).length;
+  const draftCount = Object.keys(drafts).length;
+  const activeCategory = activeDraftKey ? activeDraftKey.split("/")[0] : "None";
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Announcements Manager</h1>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save Drafts"}
-        </Button>
-      </div>
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
+      <DashboardPageHero
+        icon={FolderIcon}
+        title="Announcements Manager"
+        subtitle="Organize announcement drafts by category, edit rich embeds, and post instantly when ready."
+        stats={[
+          { label: "Categories", value: categoryCount },
+          { label: "Total Drafts", value: draftCount },
+          { label: "Active Category", value: activeCategory },
+          { label: "Ready To Post", value: currentDraft.channel_id ? "Yes" : "No" },
+        ]}
+        actions={
+          <div className="flex items-center gap-3">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Drafts"}
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex gap-6">
         {/* Sidebar */}

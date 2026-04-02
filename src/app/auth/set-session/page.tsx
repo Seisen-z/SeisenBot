@@ -2,12 +2,13 @@
 
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { LoaderCircleIcon, ShieldCheckIcon } from "lucide-react";
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
 function setCookie(name: string, value: string, maxAge: number) {
   const secure = location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+  document.cookie = `${name}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
 }
 
 function SetSessionInner() {
@@ -31,31 +32,20 @@ function SetSessionInner() {
   }, [searchParams, router]);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "100vh",
-        background: "#1a1b1e",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          width: 32,
-          height: 32,
-          border: "3px solid #5865F2",
-          borderTopColor: "transparent",
-          borderRadius: "50%",
-          animation: "spin 0.8s linear infinite",
-        }}
-      />
-      <p style={{ color: "#B5BAC1", fontSize: 14, fontFamily: "sans-serif" }}>
-        Logging you in…
-      </p>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div className="fixed inset-0 grid place-items-center px-4 py-10">
+      <div className="glass-card page-enter mx-auto w-full max-w-md rounded-3xl px-8 py-9 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-discord-blurple/20 text-discord-blurple">
+          <LoaderCircleIcon className="h-6 w-6 animate-spin" />
+        </div>
+
+        <h2 className="text-2xl font-bold text-white">Finalizing OAuth Session</h2>
+        <p className="mt-2 text-sm text-discord-text-muted">Syncing your Discord identity and preparing dashboard access.</p>
+
+        <div className="mt-5 flex items-center justify-center gap-2 rounded-xl border border-discord-green/35 bg-discord-green/12 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#8ef2ca]">
+          <ShieldCheckIcon className="h-3.5 w-3.5" />
+          Secure Handshake In Progress
+        </div>
+      </div>
     </div>
   );
 }
@@ -64,18 +54,11 @@ export default function SetSessionPage() {
   return (
     <Suspense
       fallback={
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "100vh",
-            background: "#1a1b1e",
-          }}
-        >
-          <p style={{ color: "#B5BAC1", fontSize: 14, fontFamily: "sans-serif" }}>
-            Loading…
-          </p>
+        <div className="fixed inset-0 grid place-items-center px-4">
+          <div className="glass-card mx-auto flex w-full max-w-sm items-center justify-center gap-3 rounded-2xl px-5 py-4 text-sm text-discord-text-muted">
+            <LoaderCircleIcon className="h-4 w-4 animate-spin text-discord-blurple" />
+            Loading authentication state...
+          </div>
         </div>
       }
     >

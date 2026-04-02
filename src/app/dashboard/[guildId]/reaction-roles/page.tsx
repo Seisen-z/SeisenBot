@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
 import { Input } from "@/components/ui/input";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon, FolderIcon, Send, ListIcon, Sparkles } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
@@ -367,30 +368,39 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
     }]
   };
 
+  const totalDrafts = Object.keys(drafts).length;
+  const totalCategories = Object.keys(categorized).length;
+  const optionCount = currentDraft.options?.length || 0;
+  const isPostReady = Boolean(currentDraft.channel_id) && optionCount > 0;
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Sparkles className="w-6 h-6 text-discord-blurple" />
-                Select Menu Roles
-            </h1>
-            <p className="text-sm text-discord-text-muted">Create interactive role-selection menus for your server members.</p>
-        </div>
-        <div className="flex gap-3 items-center">
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
+      <DashboardPageHero
+        icon={Sparkles}
+        title="Select Menu Roles"
+        subtitle="Design interactive dropdown role menus with categories, reusable drafts, and one-click posting."
+        stats={[
+          { label: "Categories", value: totalCategories },
+          { label: "Draft Menus", value: totalDrafts },
+          { label: "Options In Draft", value: optionCount },
+          { label: "Post Ready", value: isPostReady ? "Yes" : "No" },
+        ]}
+        actions={
+          <div className="flex gap-3 items-center">
             {lastSaved && !saving && (
               <span className="text-xs text-green-400">
-                ✓ Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
             <Button variant="outline" onClick={handleSave} disabled={saving}>
-                {saving ? "Saving..." : "Save Now"}
+              {saving ? "Saving..." : "Save Now"}
             </Button>
             <Button variant="discord" onClick={handlePostNow} disabled={posting}>
-                {posting ? "Posting..." : "🚀 Send to Channel"}
+              {posting ? "Posting..." : "Send to Channel"}
             </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <div className="flex gap-6 h-full min-h-[700px]">
         {/* Sidebar */}

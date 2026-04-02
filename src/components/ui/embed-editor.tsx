@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { UploadIcon } from "lucide-react";
 import { Input } from "./input";
 import { Textarea } from "./textarea";
 import { DiscordMessagePreview } from "./discord-message";
@@ -28,6 +29,131 @@ export function AdvancedEmbedEditor({
 }) {
   const [tab, setTab] = useState<"visual" | "raw" | "preview">("visual");
   const [rawText, setRawText] = useState("");
+  const [rawError, setRawError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const hasConfigKey = (key: string) => Object.prototype.hasOwnProperty.call(config, key);
+
+  const normalizeDescription = (description: unknown) => {
+    if (Array.isArray(description)) {
+      return description.join("\n");
+    }
+    return typeof description === "string" ? description : "";
+  };
+
+  const applyParsedPayload = (parsed: any) => {
+    let payload = parsed;
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed.embeds) &&
+      (parsed.title !== undefined ||
+        parsed.description !== undefined ||
+        parsed.color !== undefined ||
+        parsed.thumbnail !== undefined ||
+        parsed.footer !== undefined)
+    ) {
+      payload = {
+        content: parsed.content ?? "",
+        embeds: [parsed],
+        components: parsed.components ?? [],
+      };
+    }
+
+    if (payload?.content !== undefined) {
+      onChange("content", payload.content || "");
+    }
+
+    const em = Array.isArray(payload?.embeds) && payload.embeds.length > 0 ? payload.embeds[0] : null;
+
+    if (em) {
+      onChange("title", em.title || "");
+      onChange("description", normalizeDescription(em.description));
+
+      if (em.color !== undefined && em.color !== null) {
+        onChange("color", em.color);
+      }
+
+      const thumbnailUrl = em.thumbnail?.url ?? em.thumbnail_url ?? "";
+      onChange("thumbnail_url", thumbnailUrl);
+
+      const footerText = typeof em.footer === "string" ? em.footer : em.footer?.text || "";
+      onChange("footer", footerText);
+    }
+
+    if (Array.isArray(payload?.components)) {
+      if (hasConfigKey("components")) {
+        onChange("components", payload.components);
+      }
+
+      const componentList = payload.components.flatMap((row: any) =>
+        Array.isArray(row?.components) ? row.components : []
+      );
+
+      const selectComponent = componentList.find((component: any) => component?.type === 3);
+      if (selectComponent) {
+        if (hasConfigKey("placeholder")) {
+          onChange("placeholder", selectComponent.placeholder || "Choose options...");
+        }
+
+        if (hasConfigKey("min_values")) {
+          onChange("min_values", Number(selectComponent.min_values ?? 1));
+        }
+
+        if (hasConfigKey("max_values")) {
+          onChange("max_values", Number(selectComponent.max_values ?? 1));
+        }
+
+        if (hasConfigKey("options") && Array.isArray(selectComponent.options)) {
+          const mappedOptions = selectComponent.options.map((option: any) => ({
+            label: String(option.label || "Option"),
+            value: String(option.value || ""),
+            description: String(option.description || ""),
+            emoji:
+              typeof option.emoji === "string"
+                ? option.emoji
+                : option.emoji?.name || undefined,
+          }));
+
+          onChange("options", mappedOptions);
+        }
+      }
+
+      const linkButtons = componentList.filter(
+        (component: any) => component?.type === 2 && component?.style === 5 && component?.url
+      );
+
+      if (hasConfigKey("buttons") && linkButtons.length > 0) {
+        onChange(
+          "buttons",
+          linkButtons.slice(0, 5).map((button: any) => ({
+            label: String(button.label || "Button"),
+            url: String(button.url || ""),
+          }))
+        );
+      }
+    }
+  };
+
+  const handleTemplateFileUpload = (event: any) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const fileText = typeof reader.result === "string" ? reader.result : "";
+      handleRawChange(fileText);
+    };
+
+    reader.onerror = () => {
+      setRawError("Failed to read the selected file.");
+    };
+
+    reader.readAsText(file);
+    event.target.value = "";
+  };
 
   useEffect(() => {
     if (tab === "raw") {
@@ -46,48 +172,85 @@ export function AdvancedEmbedEditor({
           color: numericalColor,
           thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : null,
           footer: config.footer ? { text: config.footer } : null
-        }]
+        }],
+        components: config.components || undefined,
       };
+
+      if (!payload.components && hasConfigKey("options") && Array.isArray(config.options)) {
+        payload.components = [
+          {
+            type: 1,
+            components: [
+              {
+                type: 3,
+                custom_id: "imported_select",
+                placeholder: config.placeholder || "Choose options...",
+                min_values: Number(config.min_values ?? 1),
+                max_values: Number(config.max_values ?? 1),
+                options: config.options.map((option: any) => ({
+                  label: option.label,
+                  value: option.value,
+                  description: option.description,
+                  emoji: option.emoji,
+                  default: false,
+                })),
+              },
+            ],
+          },
+        ];
+      }
+
       setRawText(JSON.stringify(payload, null, 2));
+      setRawError(null);
     }
-  }, [tab, config.content, config.title, config.description, config.color, config.thumbnail_url, config.footer]);
+  }, [
+    tab,
+    config.content,
+    config.title,
+    config.description,
+    config.color,
+    config.thumbnail_url,
+    config.footer,
+    config.components,
+    config.placeholder,
+    config.min_values,
+    config.max_values,
+    config.options,
+  ]);
 
   const handleRawChange = (val: string) => {
     setRawText(val);
+
+    if (!val.trim()) {
+      setRawError(null);
+      return;
+    }
+
     try {
       const parsed = JSON.parse(val);
-      onChange("content", parsed.content || "");
-      if (parsed.embeds && parsed.embeds.length > 0) {
-        const em = parsed.embeds[0];
-        onChange("title", em.title || "");
-        onChange("description", em.description || "");
-        if (em.color) {
-            onChange("color", em.color);
-        }
-        onChange("thumbnail_url", em.thumbnail?.url || "");
-        onChange("footer", em.footer?.text || "");
-      }
-    } catch (e) {
-      // Syntax error while typing, ignore state update
+      setRawError(null);
+      applyParsedPayload(parsed);
+    } catch {
+      setRawError("Invalid JSON format. Fix the syntax and it will auto-apply.");
     }
   };
 
   return (
     <div className="flex flex-col">
       {/* Top Navigation */}
-      <div className="flex border-b border-[#1E1F22] rounded-t-xl overflow-hidden bg-[#1E1F22]">
+      <div className="flex overflow-hidden rounded-t-2xl border border-white/12 border-b-0 bg-[#0a1624]">
         {["visual", "raw", "preview"].map(t => (
           <button
             key={t}
             onClick={() => setTab(t as any)}
-            className={`flex-1 py-3 text-[13px] tracking-wide font-bold uppercase transition ${tab === t ? 'bg-[#2B2D31] text-discord-blurple border-t-2 border-discord-blurple shadow-sm' : 'bg-[#2B2D31] hover:bg-[#313338] text-discord-text-muted border-t-2 border-transparent'}`}
+            className={`flex-1 border-t-2 py-3 text-[12px] font-bold uppercase tracking-[0.14em] transition ${tab === t ? 'border-discord-blurple bg-[#102133] text-discord-blurple' : 'border-transparent bg-[#0e1c2b] text-discord-text-muted hover:bg-[#13283d] hover:text-white'}`}
           >
             {t}
           </button>
         ))}
       </div>
 
-      <div className="bg-[#2B2D31] rounded-b-xl border border-t-0 border-[#1E1F22] p-6 shadow-sm min-h-[450px]">
+      <div className="glass-card min-h-[450px] rounded-b-2xl border border-t-0 border-white/12 bg-[linear-gradient(165deg,rgba(17,31,46,0.88),rgba(8,13,20,0.94))] p-6">
         {tab === "visual" && (
           <div className="flex flex-col gap-5">
             {children}
@@ -136,12 +299,35 @@ export function AdvancedEmbedEditor({
 
         {tab === "raw" && (
           <div className="flex flex-col h-full space-y-3">
-            <div>
-              <h4 className="text-white text-md font-bold">Raw JSON Source</h4>
-              <p className="text-xs text-discord-text-muted">Paste JSON exported from Discohook, Sapphire, or Carl-bot. The visual editor will update automatically.</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-white text-md font-bold">Raw JSON Source</h4>
+                <p className="text-xs text-discord-text-muted">Paste or upload JSON exported from Discohook, Sapphire, or Carl-bot. This template applies automatically across supported modules.</p>
+              </div>
+
+              <div className="shrink-0">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,application/json,text/plain"
+                  className="hidden"
+                  onChange={handleTemplateFileUpload}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/15 bg-[#112136] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-discord-text transition hover:border-discord-blurple/40 hover:bg-[#16304b]"
+                >
+                  <UploadIcon className="h-3.5 w-3.5" />
+                  Upload JSON
+                </button>
+              </div>
             </div>
+
+            {rawError && <p className="text-xs text-discord-red">{rawError}</p>}
+
             <Textarea
-              className="flex-1 font-mono text-[13px] bg-[#1E1F22] border-[#111214] min-h-[400px] leading-relaxed text-[#DBDEE1]"
+              className="min-h-[400px] flex-1 border-white/10 bg-[#081321] font-mono text-[13px] leading-relaxed text-[#DBDEE1]"
               value={rawText}
               onChange={(e) => handleRawChange(e.target.value)}
               placeholder="{...}"
@@ -151,7 +337,7 @@ export function AdvancedEmbedEditor({
         )}
 
         {tab === "preview" && (
-          <div className="flex justify-center items-start bg-[url('https://discord.com/assets/2f9c5603f7eeb883b632.svg')] bg-[#313338] p-8 rounded border border-[#1E1F22] shadow-inner min-h-[400px]">
+          <div className="min-h-[400px] rounded-xl border border-white/12 bg-[#0b1726] p-8 shadow-inner">
             <div className="w-full max-w-[500px]">
               <DiscordMessagePreview
                 message={{

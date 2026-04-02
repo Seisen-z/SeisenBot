@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { ChannelMultiSelect } from "@/components/ui/discord-selects";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { MessageSquareIcon, PlusIcon, Trash2Icon } from "lucide-react";
 
 export default function AutoReplyPage({ params }: { params: Promise<{ guildId: string }> }) {
@@ -16,6 +18,8 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
   const [rules, setRules] = useState<any[]>([]);
   const [activeIdx, setActiveIdx] = useState<number>(-1);
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/autoreply`)
@@ -33,16 +37,31 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
         setRules(r);
         if (r.length > 0) setActiveIdx(0);
       })
-      .catch((err) => toast("Failed to load Auto Replies", "error"));
+      .catch((err) => toast("Failed to load Auto Replies", "error"))
+      .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  const persistRules = useCallback(async (nextRules: any[]) => {
+    await fetchApi(`/guilds/${guildId}/autoreply`, undefined, {
+      method: "PUT",
+      body: JSON.stringify(nextRules),
+    });
+    setLastSaved(new Date());
+  }, [guildId]);
+
+  useDebouncedAutoSave({
+    value: rules,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistRules,
+    onError: () => toast("Auto-save failed for auto replies", "error"),
+  });
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi(`/guilds/${guildId}/autoreply`, undefined, {
-        method: "PUT",
-        body: JSON.stringify(rules),
-      });
+      await persistRules(rules);
       toast("Saved Auto Replies Successfully!");
     } catch (e) {
       toast("Failed to save auto replies.", "error");
@@ -72,15 +91,34 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
   };
 
   const activeRule = rules[activeIdx];
+  const totalKeywords = rules.reduce((sum, rule) => sum + (rule.keywords?.length || 0), 0);
+  const routedRules = rules.filter((rule) => (rule.targets?.length || 0) > 0).length;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Auto Reply Configuration</h1>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
-      </div>
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
+      <DashboardPageHero
+        icon={MessageSquareIcon}
+        title="Auto Reply Configuration"
+        subtitle="Define smart keyword rules, target channels, and rich reply templates for faster server support."
+        stats={[
+          { label: "Rules", value: rules.length },
+          { label: "Keyword Tokens", value: totalKeywords },
+          { label: "Channel-Scoped Rules", value: routedRules },
+          { label: "Active Rule", value: activeRule?.name || "None" },
+        ]}
+        actions={
+          <div className="flex items-center gap-3">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex gap-6 h-[calc(100vh-220px)] min-h-[500px]">
         {/* Sidebar */}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDownIcon, CheckIcon, XIcon } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,60 @@ const CHANNEL_TYPES: Record<number, string> = {
   13: "stage",
   15: "forum",
 };
+
+function useDropdownPortal(isOpen: boolean) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    const updatePosition = () => {
+      if (!containerRef.current) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const spaceBelow = viewportHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      const openUp = spaceBelow < 220 && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(140, openUp ? spaceAbove - 8 : spaceBelow - 8);
+      const panelHeight = Math.min(320, maxHeight);
+      const proposedTop = openUp ? rect.top - panelHeight - 8 : rect.bottom + 8;
+      const top = Math.max(8, Math.min(proposedTop, viewportHeight - panelHeight - 8));
+      const width = Math.min(rect.width, viewportWidth - 16);
+      const left = Math.max(8, Math.min(rect.left, viewportWidth - width - 8));
+
+      setPanelStyle({
+        top,
+        left,
+        width,
+        maxHeight,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen]);
+
+  return { containerRef, portalReady, panelStyle };
+}
 
 interface Channel {
   id: string;
@@ -48,6 +103,9 @@ export function ChannelSelect({
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const { containerRef, portalReady, panelStyle } = useDropdownPortal(isOpen);
 
   useEffect(() => {
     if (!guildId) return;
@@ -65,26 +123,6 @@ export function ChannelSelect({
   const allowedTypes = includeCategories ? [...types, 4] : types;
   const filtered = channels.filter((c) => allowedTypes.includes(c.type));
 
-  // Group channels under their parent categories
-  const categories = channels.filter((c) => c.type === 4);
-  const grouped: { category: Channel | null; channels: Channel[] }[] = [];
-
-  // Uncategorized channels first
-  const uncategorized = filtered.filter((c) => !c.parent_id && c.type !== 4);
-  if (uncategorized.length > 0) {
-    grouped.push({ category: null, channels: uncategorized });
-  }
-
-  // Group by category
-  categories.forEach((cat) => {
-    const children = filtered.filter((c) => c.parent_id === cat.id);
-    // If includeCategories, also add the category itself as selectable
-    const categoryEntry = includeCategories ? [{ ...cat }] : [];
-    if (children.length > 0 || categoryEntry.length > 0) {
-      grouped.push({ category: cat, channels: [...categoryEntry, ...children] });
-    }
-  });
-
   const iconFor = (type: number) => {
     if (type === 0) return "# ";
     if (type === 2) return "🔊 ";
@@ -94,37 +132,100 @@ export function ChannelSelect({
     return "# ";
   };
 
+  const selectedChannel = filtered.find((c) => c.id === value);
+  const searchableChannels = filtered.filter((channel) => {
+    const channelName = channel.name.toLowerCase();
+    const query = search.toLowerCase();
+    return channelName.includes(query);
+  });
+
+  const selectChannel = (channel: Channel) => {
+    onChange(channel.id);
+    if (onChannelSelect) onChannelSelect(channel);
+    setIsOpen(false);
+    setSearch("");
+  };
+
   return (
-    <select
-      value={value || ""}
-      onChange={(e) => {
-        const selectedId = e.target.value;
-        onChange(selectedId);
-        if (onChannelSelect) {
-          const channelObj = channels.find(c => c.id === selectedId);
-          if (channelObj) onChannelSelect(channelObj);
-        }
-      }}
-      disabled={loading || !!errorMsg}
-      className={cn(
-        "flex h-10 w-full rounded-md border border-discord-darkest bg-discord-darkest px-3 py-2 text-sm text-discord-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-discord-blurple disabled:cursor-not-allowed disabled:opacity-50",
-        className
-      )}
-    >
-      <option value="">{loading ? "Loading channels..." : errorMsg ? `Error: ${errorMsg}` : placeholder}</option>
-      {grouped.map(({ category, channels: groupChans }) => (
-        <optgroup
-          key={category?.id ?? "uncategorized"}
-          label={category ? `📁 ${category.name}` : "No Category"}
-        >
-          {groupChans.map((ch) => (
-            <option key={ch.id} value={ch.id}>
-              {iconFor(ch.type)}{ch.name}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
+    <div ref={containerRef} className={cn("relative w-full", className)}>
+      <button
+        type="button"
+        onClick={() => !loading && !errorMsg && setIsOpen(!isOpen)}
+        disabled={loading || !!errorMsg}
+        className="flex h-10 w-full items-center justify-between rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text transition-colors hover:border-[#1E1F22] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="truncate text-left">
+          {loading
+            ? "Loading channels..."
+            : errorMsg
+              ? `Error: ${errorMsg}`
+              : selectedChannel
+                ? `${iconFor(selectedChannel.type)}${selectedChannel.name}`
+                : placeholder}
+        </span>
+        <ChevronDownIcon className="ml-2 h-4 w-4 shrink-0 text-[#8b90a0]" />
+      </button>
+
+      {isOpen && portalReady && panelStyle &&
+        createPortal(
+          <>
+            <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
+            <div
+              className="flex flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl"
+              style={{
+                position: "fixed",
+                top: panelStyle.top,
+                left: panelStyle.left,
+                width: panelStyle.width,
+                maxHeight: panelStyle.maxHeight,
+                zIndex: 90,
+              }}
+            >
+              <div className="border-b border-[#1E1F22] p-2">
+                <input
+                  type="text"
+                  placeholder="Search channels..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-md border border-[#1E1F22] bg-[#1E1F22] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-[#5865F2]/50 focus:outline-none"
+                />
+              </div>
+
+              <div className="custom-scrollbar flex-1 overflow-y-auto py-1.5">
+                {searchableChannels.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-sm text-[#8b90a0]">No channels found</div>
+                ) : (
+                  searchableChannels.map((channel) => {
+                    const selected = value === channel.id;
+                    return (
+                      <button
+                        type="button"
+                        key={channel.id}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-[#383A40]",
+                          selected && "bg-[#383A40]/40"
+                        )}
+                        onClick={() => selectChannel(channel)}
+                      >
+                        <div className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+                          selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
+                        )}>
+                          {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
+                        </div>
+                        <span className={cn("truncate font-medium", selected ? "text-white" : "text-[#B5BAC1]")}>
+                          {iconFor(channel.type)}{channel.name}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
+    </div>
   );
 }
 
@@ -154,6 +255,9 @@ export function RoleSelect({
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const { containerRef, portalReady, panelStyle } = useDropdownPortal(isOpen);
 
   useEffect(() => {
     if (!guildId) return;
@@ -170,23 +274,94 @@ export function RoleSelect({
   const hexColor = (color: number) =>
     color ? `#${color.toString(16).padStart(6, "0")}` : "#99AAB5";
 
+  const filteredRoles = roles.filter((role) =>
+    role.name.toLowerCase().includes(search.toLowerCase())
+  );
+  const selectedRole = roles.find((role) => role.id === value);
+
   return (
-    <select
-      value={value || ""}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={loading || !!errorMsg}
-      className={cn(
-        "flex h-10 w-full rounded-md border border-discord-darkest bg-discord-darkest px-3 py-2 text-sm text-discord-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-discord-blurple disabled:cursor-not-allowed disabled:opacity-50",
-        className
-      )}
-    >
-      <option value="">{loading ? "Loading roles..." : errorMsg ? `Error: ${errorMsg}` : placeholder}</option>
-      {roles.map((role) => (
-        <option key={role.id} value={role.id} style={{ color: hexColor(role.color) }}>
-          @{role.name}
-        </option>
-      ))}
-    </select>
+    <div ref={containerRef} className={cn("relative w-full", className)}>
+      <button
+        type="button"
+        onClick={() => !loading && !errorMsg && setIsOpen(!isOpen)}
+        disabled={loading || !!errorMsg}
+        className="flex h-10 w-full items-center justify-between rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text transition-colors hover:border-[#1E1F22] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="truncate text-left">
+          {loading
+            ? "Loading roles..."
+            : errorMsg
+              ? `Error: ${errorMsg}`
+              : selectedRole
+                ? `@${selectedRole.name}`
+                : placeholder}
+        </span>
+        <ChevronDownIcon className="ml-2 h-4 w-4 shrink-0 text-[#8b90a0]" />
+      </button>
+
+      {isOpen && portalReady && panelStyle &&
+        createPortal(
+          <>
+            <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
+            <div
+              className="flex flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl"
+              style={{
+                position: "fixed",
+                top: panelStyle.top,
+                left: panelStyle.left,
+                width: panelStyle.width,
+                maxHeight: panelStyle.maxHeight,
+                zIndex: 90,
+              }}
+            >
+              <div className="border-b border-[#1E1F22] p-2">
+                <input
+                  type="text"
+                  placeholder="Search roles..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-md border border-[#1E1F22] bg-[#1E1F22] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-[#5865F2]/50 focus:outline-none"
+                />
+              </div>
+
+              <div className="custom-scrollbar flex-1 overflow-y-auto py-1.5">
+                {filteredRoles.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-sm text-[#8b90a0]">No roles found</div>
+                ) : (
+                  filteredRoles.map((role) => {
+                    const selected = value === role.id;
+                    return (
+                      <button
+                        type="button"
+                        key={role.id}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-[#383A40]",
+                          selected && "bg-[#383A40]/40"
+                        )}
+                        onClick={() => {
+                          onChange(role.id);
+                          setIsOpen(false);
+                          setSearch("");
+                        }}
+                      >
+                        <div className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+                          selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
+                        )}>
+                          {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
+                        </div>
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: hexColor(role.color) }} />
+                        <span className={cn("truncate font-medium", selected ? "text-white" : "text-[#B5BAC1]")}>@{role.name}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
+    </div>
   );
 }
 
@@ -205,6 +380,7 @@ export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMul
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const { containerRef, portalReady, panelStyle } = useDropdownPortal(isOpen);
 
   useEffect(() => {
     if (!guildId) return;
@@ -238,7 +414,7 @@ export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMul
   }
 
   return (
-    <div className={cn("relative w-full", className)}>
+    <div ref={containerRef} className={cn("relative w-full", className)}>
       <div 
         className="min-h-[40px] w-full cursor-pointer rounded-md border border-discord-darkest bg-discord-darkest px-2 py-1.5 flex items-center justify-between shadow-sm transition-colors hover:border-[#1E1F22]"
         onClick={() => setIsOpen(!isOpen)}
@@ -264,56 +440,67 @@ export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMul
         <ChevronDownIcon className="h-4 w-4 text-[#8b90a0] shrink-0 ml-2" />
       </div>
 
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 z-50 w-full mt-2 max-h-56 overflow-hidden flex flex-col rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl">
-            <div className="p-2 border-b border-[#1E1F22]">
-              <input
-                type="text"
-                placeholder="Search roles..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-[#1E1F22] border border-[#1E1F22] rounded-md px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] focus:outline-none focus:border-[#5865F2]/50 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-            
-            <div className="overflow-y-auto custom-scrollbar flex-1 py-1.5">
-              {roles.filter(r => r.name.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                <div className="px-3 py-4 text-center text-sm text-[#8b90a0]">No roles found</div>
-              ) : (
-                roles
-                  .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
-                  .map((role) => {
-                    const selected = value.includes(role.id);
-                    return (
-                      <div
-                        key={role.id}
-                        className={cn(
-                          "flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm hover:bg-[#383A40] transition-colors",
-                          selected && "bg-[#383A40]/40"
-                        )}
-                        onClick={() => toggle(role.id)}
-                      >
-                        <div className={cn(
-                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors", 
-                          selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
-                        )}>
-                          {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
+      {isOpen && portalReady && panelStyle &&
+        createPortal(
+          <>
+            <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
+            <div
+              className="mt-2 flex max-h-56 flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl"
+              style={{
+                position: "fixed",
+                top: panelStyle.top,
+                left: panelStyle.left,
+                width: panelStyle.width,
+                maxHeight: panelStyle.maxHeight,
+                zIndex: 90,
+              }}
+            >
+              <div className="border-b border-[#1E1F22] p-2">
+                <input
+                  type="text"
+                  placeholder="Search roles..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-md border border-[#1E1F22] bg-[#1E1F22] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-[#5865F2]/50 focus:outline-none"
+                />
+              </div>
+
+              <div className="custom-scrollbar flex-1 overflow-y-auto py-1.5">
+                {roles.filter(r => r.name.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
+                  <div className="px-3 py-4 text-center text-sm text-[#8b90a0]">No roles found</div>
+                ) : (
+                  roles
+                    .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
+                    .map((role) => {
+                      const selected = value.includes(role.id);
+                      return (
+                        <div
+                          key={role.id}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-[#383A40]",
+                            selected && "bg-[#383A40]/40"
+                          )}
+                          onClick={() => toggle(role.id)}
+                        >
+                          <div className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+                            selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
+                          )}>
+                            {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
+                          </div>
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: hexColor(role.color) }} />
+                          <span className={cn("truncate font-medium", selected ? "text-white" : "text-[#B5BAC1]")}>
+                            {role.name}
+                          </span>
                         </div>
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: hexColor(role.color) }} />
-                        <span className={cn("truncate font-medium", selected ? "text-white" : "text-[#B5BAC1]")}>
-                          {role.name}
-                        </span>
-                      </div>
-                    );
-                  })
-              )}
+                      );
+                    })
+                )}
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          </>,
+          document.body
+        )}
     </div>
   );
 }
@@ -336,6 +523,7 @@ export function ChannelMultiSelect({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const { containerRef, portalReady, panelStyle } = useDropdownPortal(isOpen);
 
   useEffect(() => {
     if (!guildId) return;
@@ -378,7 +566,7 @@ export function ChannelMultiSelect({
   }
 
   return (
-    <div className={cn("relative w-full", className)}>
+    <div ref={containerRef} className={cn("relative w-full", className)}>
       <div 
         className="min-h-[40px] w-full cursor-pointer rounded-md border border-discord-darkest bg-discord-darkest px-2 py-1.5 flex flex-wrap items-center justify-between shadow-sm transition-colors hover:border-[#1E1F22]"
         onClick={() => setIsOpen(!isOpen)}
@@ -403,55 +591,66 @@ export function ChannelMultiSelect({
         <ChevronDownIcon className="h-4 w-4 text-[#8b90a0] shrink-0 ml-2" />
       </div>
 
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 z-50 w-full mt-2 max-h-56 overflow-hidden flex flex-col rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl">
-            <div className="p-2 border-b border-[#1E1F22]">
-              <input
-                type="text"
-                placeholder="Search channels..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-[#1E1F22] border border-[#1E1F22] rounded-md px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] focus:outline-none focus:border-[#5865F2]/50 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-            
-            <div className="overflow-y-auto custom-scrollbar flex-1 py-1.5">
-              {filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                <div className="px-3 py-4 text-center text-sm text-[#8b90a0]">No channels found</div>
-              ) : (
-                filtered
-                  .filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
-                  .map((channel) => {
-                    const selected = value.includes(channel.id);
-                    return (
-                      <div
-                        key={channel.id}
-                        className={cn(
-                          "flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm hover:bg-[#383A40] transition-colors",
-                          selected && "bg-[#383A40]/40"
-                        )}
-                        onClick={() => toggle(channel.id)}
-                      >
-                        <div className={cn(
-                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors", 
-                          selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
-                        )}>
-                          {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
+      {isOpen && portalReady && panelStyle &&
+        createPortal(
+          <>
+            <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
+            <div
+              className="mt-2 flex max-h-56 flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl"
+              style={{
+                position: "fixed",
+                top: panelStyle.top,
+                left: panelStyle.left,
+                width: panelStyle.width,
+                maxHeight: panelStyle.maxHeight,
+                zIndex: 90,
+              }}
+            >
+              <div className="border-b border-[#1E1F22] p-2">
+                <input
+                  type="text"
+                  placeholder="Search channels..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-md border border-[#1E1F22] bg-[#1E1F22] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-[#5865F2]/50 focus:outline-none"
+                />
+              </div>
+
+              <div className="custom-scrollbar flex-1 overflow-y-auto py-1.5">
+                {filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
+                  <div className="px-3 py-4 text-center text-sm text-[#8b90a0]">No channels found</div>
+                ) : (
+                  filtered
+                    .filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+                    .map((channel) => {
+                      const selected = value.includes(channel.id);
+                      return (
+                        <div
+                          key={channel.id}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-[#383A40]",
+                            selected && "bg-[#383A40]/40"
+                          )}
+                          onClick={() => toggle(channel.id)}
+                        >
+                          <div className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+                            selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
+                          )}>
+                            {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
+                          </div>
+                          <span className={cn("truncate font-medium", selected ? "text-white" : "text-[#B5BAC1]")}>
+                            {iconFor(channel.type)} {channel.name}
+                          </span>
                         </div>
-                        <span className={cn("truncate font-medium", selected ? "text-white" : "text-[#B5BAC1]")}>
-                          {iconFor(channel.type)} {channel.name}
-                        </span>
-                      </div>
-                    );
-                  })
-              )}
+                      );
+                    })
+                )}
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          </>,
+          document.body
+        )}
     </div>
   );
 }

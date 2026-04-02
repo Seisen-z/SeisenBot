@@ -272,6 +272,8 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
 
   const activeDraft = drafts[activeDraftKey];
   const endedCount = giveaways.filter((item) => item.ended).length;
+  const activeGiveaways = giveaways.filter((item) => !item.ended);
+  const endedGiveaways = giveaways.filter((item) => item.ended);
   const readyToLaunch = Boolean(
     activeDraft?.channel_id &&
       activeDraft?.reward_title.trim().length >= 2 &&
@@ -570,7 +572,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
           <div>
             <h2 className="text-lg font-bold text-white">Live Giveaway Indicator</h2>
             <p className="text-sm text-discord-text-muted">
-              Active giveaways update here. Members join by reacting on Discord; you can end or reroll from this panel.
+              Only active giveaways are shown here. Ended giveaways are removed from this indicator automatically.
             </p>
           </div>
 
@@ -583,20 +585,15 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
           </Button>
         </div>
 
-        {giveaways.length === 0 ? (
+        {activeGiveaways.length === 0 ? (
           <div className="rounded-lg border border-white/10 bg-[#202225]/70 px-4 py-8 text-center text-sm text-discord-text-muted">
-            No giveaways yet. Start your first giveaway from the editor above.
+            No active giveaways right now. Start one from the editor above.
           </div>
         ) : (
           <div className="space-y-3">
-            {giveaways.map((item) => {
+            {activeGiveaways.map((item) => {
               const label = statusLabel(item);
-              const isEnded = item.ended;
-              const canEnd = !isEnded;
-              const canReroll = isEnded;
               const entries = Math.max(0, Number(item.entry_count || 0));
-              const winners = Array.isArray(item.winners) ? item.winners : [];
-              const rerollWinners = Array.isArray(item.last_reroll_winners) ? item.last_reroll_winners : [];
               const messageId = item.message_id || "";
 
               return (
@@ -634,6 +631,75 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                         {item.ended_at ? ` • Ended: ${formatAbsoluteTime(item.ended_at)}` : ""}
                       </div>
 
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {item.jump_url && (
+                        <a
+                          href={item.jump_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-[#122033] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-discord-blurple/45 hover:text-white"
+                        >
+                          Open
+                        </a>
+                      )}
+
+                      <Button
+                        variant="outline"
+                        disabled={busyAction === `end:${messageId}`}
+                        onClick={() => endGiveawayNow(messageId)}
+                        className="inline-flex items-center gap-1.5"
+                      >
+                        <PlayIcon className="h-3.5 w-3.5" />
+                        {busyAction === `end:${messageId}` ? "Ending..." : "End Now"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {endedGiveaways.length > 0 && (
+        <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-white">Ended Giveaways</h2>
+            <p className="text-sm text-discord-text-muted">
+              Ended giveaways are listed here so you can reroll winners when needed.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {endedGiveaways.map((item) => {
+              const entries = Math.max(0, Number(item.entry_count || 0));
+              const winners = Array.isArray(item.winners) ? item.winners : [];
+              const rerollWinners = Array.isArray(item.last_reroll_winners) ? item.last_reroll_winners : [];
+              const messageId = item.message_id || "";
+
+              return (
+                <div key={`ended-${messageId || `${item.reward_title}-${item.ended_at}`}`} className="rounded-lg border border-white/10 bg-[#202225]/80 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-white">{item.reward_title || "Untitled Giveaway"}</p>
+                        <span className="rounded-full bg-slate-500/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-300">
+                          Ended
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#b5bac1]">
+                        <span className="flex items-center gap-1"><TrophyIcon className="h-3.5 w-3.5" /> Winners: {item.winner_count}</span>
+                        <span className="flex items-center gap-1"><UsersIcon className="h-3.5 w-3.5" /> Entries: {entries}</span>
+                        {messageId && <span>ID: {messageId}</span>}
+                      </div>
+
+                      <div className="mt-1 text-xs text-discord-text-muted">
+                        Ended: {formatAbsoluteTime(item.ended_at || item.end_at)}
+                      </div>
+
                       {winners.length > 0 && (
                         <div className="mt-2 text-xs text-emerald-300">
                           Winner(s): {winners.map((id) => `<@${id}>`).join(", ")}
@@ -661,17 +727,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
 
                       <Button
                         variant="outline"
-                        disabled={!canEnd || busyAction === `end:${messageId}`}
-                        onClick={() => endGiveawayNow(messageId)}
-                        className="inline-flex items-center gap-1.5"
-                      >
-                        <PlayIcon className="h-3.5 w-3.5" />
-                        {busyAction === `end:${messageId}` ? "Ending..." : "End Now"}
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        disabled={!canReroll || busyAction === `reroll:${messageId}`}
+                        disabled={busyAction === `reroll:${messageId}`}
                         onClick={() => rerollGiveawayNow(messageId)}
                         className="inline-flex items-center gap-1.5"
                       >
@@ -684,8 +740,8 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

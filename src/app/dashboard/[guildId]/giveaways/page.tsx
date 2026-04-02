@@ -45,6 +45,7 @@ interface GiveawayDraft {
   winner_count: number;
   duration_minutes: number;
   ping_role_id: string;
+  key_log_channel_id: string;
   emoji: string;
   key_tier: GiveawayKeyTier;
 }
@@ -59,6 +60,7 @@ interface GiveawayItem {
   winner_count: number;
   duration_minutes: number;
   ping_role_id?: string | null;
+  key_log_channel_id?: string | null;
   emoji: string;
   created_at?: string | null;
   end_at?: string | null;
@@ -100,6 +102,7 @@ const DEFAULT_DRAFT: GiveawayDraft = {
   winner_count: 1,
   duration_minutes: 60,
   ping_role_id: "",
+  key_log_channel_id: "",
   emoji: "🎉",
   key_tier: "none",
 };
@@ -120,6 +123,7 @@ function normalizeDraft(raw: any, fallbackName: string): GiveawayDraft {
     winner_count: winnerCount,
     duration_minutes: durationMinutes,
     ping_role_id: String(raw?.ping_role_id || ""),
+    key_log_channel_id: String(raw?.key_log_channel_id || ""),
     emoji,
     key_tier: keyTier,
   };
@@ -338,6 +342,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
             winner_count: Math.max(1, Math.min(25, Number(activeDraft.winner_count || 1))),
             duration_minutes: Math.max(1, Math.min(10080, Number(activeDraft.duration_minutes || 60))),
             ping_role_id: activeDraft.ping_role_id || null,
+            key_log_channel_id: activeDraft.key_log_channel_id || null,
             host_user_id: hostUserId,
             emoji: activeDraft.emoji || "🎉",
             key_tier: normalizeKeyTier(activeDraft.key_tier),
@@ -502,7 +507,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                   />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
                   <div>
                     <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-discord-text-muted">Giveaway Channel</label>
                     <ChannelSelect
@@ -520,6 +525,16 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                       value={activeDraft.ping_role_id || ""}
                       onChange={(id) => updateDraft({ ping_role_id: id })}
                       placeholder="No ping role"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-discord-text-muted">Key Log Channel (Optional)</label>
+                    <ChannelSelect
+                      guildId={guildId}
+                      value={activeDraft.key_log_channel_id || ""}
+                      onChange={(id) => updateDraft({ key_log_channel_id: id })}
+                      placeholder="No key log channel"
                     />
                   </div>
                 </div>
@@ -605,12 +620,6 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                     <span className="flex items-center gap-1.5"><UsersIcon className="h-3.5 w-3.5" /> Join with {activeDraft.emoji || "🎉"}</span>
                     <span className="flex items-center gap-1.5"><Clock3Icon className="h-3.5 w-3.5" /> Auto end</span>
                   </div>
-
-                  {normalizeKeyTier(activeDraft.key_tier) !== "none" && (
-                    <div className="mt-3 rounded-md bg-[#4a4d57] px-2.5 py-2 text-xs text-[#d9dde1]">
-                      🔑 Winner key delivery: {keyTierLabel(normalizeKeyTier(activeDraft.key_tier))} tier via DM
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

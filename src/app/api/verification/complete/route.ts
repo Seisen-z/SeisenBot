@@ -11,11 +11,26 @@ function decodeCookieToken(value: string | undefined) {
 }
 
 function resolveApiBase(request: NextRequest) {
+  const origin = request.nextUrl.origin;
   const envApi = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (envApi) {
-    return envApi.replace(/\/$/, "");
+  if (!envApi) {
+    return `${origin}/api/bot`;
   }
-  return `${request.nextUrl.origin}/api/bot`;
+
+  if (envApi.startsWith("/")) {
+    return `${origin}${envApi}`.replace(/\/$/, "");
+  }
+
+  try {
+    const parsed = new URL(envApi);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
+      return `${origin}/api/bot`;
+    }
+    return envApi.replace(/\/$/, "");
+  } catch {
+    return `${origin}/api/bot`;
+  }
 }
 
 function isDiscordSnowflake(value: string) {
@@ -56,10 +71,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Login required. Please sign in with Discord." }, { status: 401 });
   }
 
-  const discordUserRes = await fetch("https://discord.com/api/users/@me", {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  let discordUserRes: Response;
+  try {
+    discordUserRes = await fetch("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+  } catch {
+    return NextResponse.json({ message: "Could not validate with Discord right now. Please try again." }, { status: 503 });
+  }
 
   if (!discordUserRes.ok) {
     return NextResponse.json({ message: "Discord session expired. Please sign in again." }, { status: 401 });
@@ -77,17 +97,25 @@ export async function POST(request: NextRequest) {
   }
 
   const apiBase = resolveApiBase(request);
-  const triggerRes = await fetch(`${apiBase}/trigger/verify_member_web`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-    body: JSON.stringify({
-      guild_id: guildId,
-      payload: {
-        user_id: oauthUserId,
-      },
-    }),
-  });
+  let triggerRes: Response;
+  try {
+    triggerRes = await fetch(`${apiBase}/trigger/verify_member_web`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        guild_id: guildId,
+        payload: {
+          user_id: oauthUserId,
+        },
+      }),
+    });
+  } catch {
+    return NextResponse.json(
+      { message: "Verification backend is currently unavailable. Please try again in a moment." },
+      { status: 503 },
+    );
+  }
 
   if (!triggerRes.ok) {
     const detail = await readErrorMessage(triggerRes);

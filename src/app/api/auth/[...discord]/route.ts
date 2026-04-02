@@ -2,9 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || "http://localhost:3000/api/auth/discord/callback";
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 1 week
+
+function resolveRedirectUri(req: NextRequest) {
+  const raw = process.env.DISCORD_REDIRECT_URI?.trim();
+  if (raw) {
+    try {
+      const parsed = new URL(raw);
+      const hostname = parsed.hostname.toLowerCase();
+      if (hostname !== "localhost" && hostname !== "127.0.0.1" && hostname !== "0.0.0.0") {
+        return raw;
+      }
+    } catch {
+      // Ignore malformed env value and fall back to request origin.
+    }
+  }
+
+  return `${req.nextUrl.origin}/api/auth/discord/callback`;
+}
 
 function normalizeNextPath(rawPath?: string | null) {
   if (!rawPath) return "/";
@@ -47,9 +63,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
   // ─── LOGIN ────────────────────────────────────────────────────────────────
   if (action === "login") {
     const scope = encodeURIComponent("identify guilds");
+    const redirectUri = resolveRedirectUri(req);
     const nextPath = normalizeNextPath(req.nextUrl.searchParams.get("next"));
     const state = encodeOAuthState(nextPath);
-    const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${scope}&state=${encodeURIComponent(state)}`;
+    const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${encodeURIComponent(state)}`;
     return NextResponse.redirect(authUrl);
   }
 
@@ -59,6 +76,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
     const oauthError = url.searchParams.get("error");
     const code = url.searchParams.get("code");
     const nextPath = decodeOAuthState(url.searchParams.get("state"));
+    const redirectUri = resolveRedirectUri(req);
 
     if (oauthError) {
       return NextResponse.redirect(new URL(`/login?error=auth_failed&next=${encodeURIComponent(nextPath)}`, req.url));
@@ -81,7 +99,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
           client_secret: CLIENT_SECRET!,
           grant_type: "authorization_code",
           code,
-          redirect_uri: REDIRECT_URI,
+          redirect_uri: redirectUri,
         }),
       });
 

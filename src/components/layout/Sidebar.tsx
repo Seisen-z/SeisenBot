@@ -19,6 +19,7 @@ import {
   SparklesIcon,
   BellRing,
   UserCheck,
+  GiftIcon,
 } from "lucide-react";
 
 export default function Sidebar({ guildId, onNavigate }: { guildId: string; onNavigate?: () => void }) {
@@ -40,6 +41,7 @@ export default function Sidebar({ guildId, onNavigate }: { guildId: string; onNa
         { name: "Onboarding", href: `/dashboard/${guildId}/onboarding`, icon: UserCheck },
         { name: "Tickets", href: `/dashboard/${guildId}/tickets`, icon: Ticket },
         { name: "Polls", href: `/dashboard/${guildId}/polls`, icon: BarChart3 },
+        { name: "Giveaways", href: `/dashboard/${guildId}/giveaways`, icon: GiftIcon },
         { name: "Social Notifications", href: `/dashboard/${guildId}/social`, icon: BellRing },
         { name: "Roblox Monitor", href: `/dashboard/${guildId}/roblox`, icon: Gamepad2 },
         { name: "Sticky Messages", href: `/dashboard/${guildId}/sticky`, icon: Pin },

@@ -54,6 +54,12 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "boost setlog", desc: "Set channel for server boost logs" },
     { cmd: "boost test", desc: "Test the boost webhook and log system" }
   ],
+  "Giveaways": [
+    { cmd: "giveaway create", desc: "Create a new reaction-based giveaway" },
+    { cmd: "giveaway end", desc: "End an active giveaway and announce winners" },
+    { cmd: "giveaway reroll", desc: "Pick new winner(s) from giveaway entrants" },
+    { cmd: "giveaway list", desc: "List recent giveaway IDs and status" }
+  ],
   "Music Player": [
     { cmd: "music leave", desc: "Leave the voice channel and clear queue" },
     { cmd: "music loop", desc: "Set loop mode" },

@@ -505,6 +505,7 @@ function weightedPick(messages: WelcomeMessageTemplate[]): WelcomeMessageTemplat
 function MessageEditModal({
   open,
   onClose,
+  guildId,
   message,
   groups,
   dynamicImages,
@@ -512,6 +513,7 @@ function MessageEditModal({
 }: {
   open: boolean;
   onClose: () => void;
+  guildId: string;
   message: WelcomeMessageTemplate | null;
   groups: WelcomeMessageGroup[];
   dynamicImages: WelcomeDynamicImage[];
@@ -721,7 +723,7 @@ function MessageEditModal({
                 <div className="rounded-xl border border-[#223145] bg-[#0e1824] p-4">
                   <p className="mb-3 text-xs uppercase tracking-[0.12em] text-discord-text-muted">Image Attachment Preview</p>
                   {currentDynamicImage ? (
-                    <DynamicImageCanvas image={currentDynamicImage} className="mx-auto max-w-xl" />
+                    <BotRenderedDynamicImage guildId={guildId} image={currentDynamicImage} className="mx-auto max-w-xl" />
                   ) : (
                     <img
                       src={applyWelcomeTokens(message.embed_image)}
@@ -849,6 +851,7 @@ function DynamicImageCanvas({
             if (!layer.enabled) return null;
 
             const isSelected = editable && selectedLayerId === layer.id;
+            const clampedRadius = Math.max(0, Math.min(layer.radius || 0, Math.floor(Math.min(layer.width, layer.height) / 2)));
             const style: CSSProperties = {
               position: "absolute",
               left: `${layer.x}px`,
@@ -856,7 +859,7 @@ function DynamicImageCanvas({
               width: `${layer.width}px`,
               height: `${layer.height}px`,
               opacity: Math.max(0, Math.min(100, layer.opacity)) / 100,
-              borderRadius: `${layer.radius}px`,
+              borderRadius: `${clampedRadius}px`,
               userSelect: "none",
               cursor: editable ? "grab" : "default",
               outline: isSelected ? "2px solid rgba(45, 196, 183, 0.9)" : undefined,
@@ -884,13 +887,19 @@ function DynamicImageCanvas({
               const previewName = (PREVIEW_TOKENS["${userglobalnickname}"] || PREVIEW_TOKENS["${username}"] || "U").trim();
               const previewInitial = previewName.slice(0, 1).toUpperCase() || "U";
               const hasPreviewAvatar = PREVIEW_AVATAR_URL.startsWith("http");
+              const avatarLayer = layer as WelcomeDynamicImageLayer & {
+                border_width?: number;
+                border_color?: string;
+              };
+              const avatarBorderWidth = clampNumber(avatarLayer.border_width, 3, 0, 32);
+              const avatarBorderColor = String(avatarLayer.border_color || "#0A111B");
               return (
                 <div
                   key={layer.id}
                   style={{
                     ...style,
                     borderRadius: "999px",
-                    border: "3px solid #0a111b",
+                    border: `${avatarBorderWidth}px solid ${avatarBorderColor}`,
                     background: "linear-gradient(135deg, #6d7cff, #4e61f6)",
                     display: "flex",
                     alignItems: "center",
@@ -913,26 +922,28 @@ function DynamicImageCanvas({
 
             if (layer.type === "logo") {
               const logoUrl = applyWelcomeTokens(layer.image_url || "");
+              const hasLogoUrl = logoUrl.startsWith("http");
+
               return (
                 <div
                   key={layer.id}
                   style={{
                     ...style,
                     overflow: "hidden",
-                    border: "1px solid rgba(255,255,255,0.18)",
+                    border: "1px solid rgba(255,255,255,0.22)",
                     background: "rgba(11,20,32,0.72)",
                   }}
                   {...interactiveProps}
                 >
-                  {logoUrl.startsWith("http") ? (
+                  {hasLogoUrl ? (
                     <img
                       src={logoUrl}
                       alt={layer.name || "Logo"}
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xs font-semibold uppercase tracking-wide text-discord-text-muted">
-                      Logo
+                    <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase tracking-wide text-discord-text-muted/80">
+                      Empty Logo
                     </div>
                   )}
                 </div>
@@ -946,8 +957,9 @@ function DynamicImageCanvas({
                   ...style,
                   color: layer.color || "#FFFFFF",
                   fontSize: `${Math.max(8, layer.font_size)}px`,
-                  lineHeight: 1.15,
-                  fontWeight: layer.font_weight === "bold" ? 800 : 500,
+                  lineHeight: 1.16,
+                  fontWeight: layer.font_weight === "bold" ? 700 : 400,
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
                   textAlign: layer.text_align || "left",
                   display: "flex",
                   justifyContent:
@@ -965,7 +977,6 @@ function DynamicImageCanvas({
                   whiteSpace: "pre-wrap",
                   overflow: "hidden",
                   boxSizing: "border-box",
-                  padding: "2px 4px",
                 }}
                 {...interactiveProps}
               >
@@ -978,12 +989,107 @@ function DynamicImageCanvas({
     );
   }
 
+function BotRenderedDynamicImage({
+  guildId,
+  image,
+  className,
+  onClick,
+}: {
+  guildId: string;
+  image: WelcomeDynamicImage | null;
+  className?: string;
+  onClick?: () => void;
+}) {
+  const [previewSrc, setPreviewSrc] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const imageSignature = useMemo(() => JSON.stringify(image || {}), [image]);
+
+  useEffect(() => {
+    if (!image) {
+      setPreviewSrc("");
+      setFailed(false);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setFailed(false);
+
+      try {
+        const simulateUserIdRaw = getCookieValue("user_id");
+        const simulateUserId = /^\d{17,20}$/.test(simulateUserIdRaw) ? simulateUserIdRaw : "";
+        const result = await fetchApi("/trigger/render_welcome_dynamic_image", undefined, {
+          method: "POST",
+          body: JSON.stringify({
+            guild_id: guildId,
+            payload: {
+              dynamic_image_id: image.id,
+              ...(simulateUserId ? { simulate_user_id: simulateUserId } : {}),
+            },
+          }),
+        });
+
+        const base64 = String(result?.image_base64 || "").trim();
+        const mimeType = String(result?.mime_type || "image/png").trim() || "image/png";
+
+        if (!cancelled) {
+          if (base64) {
+            setPreviewSrc(`data:${mimeType};base64,${base64}`);
+            setFailed(false);
+          } else {
+            setPreviewSrc("");
+            setFailed(true);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setPreviewSrc("");
+          setFailed(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [guildId, image?.id, imageSignature]);
+
+  if (!image) return null;
+
+  return (
+    <div className={className}>
+      {previewSrc ? (
+        <img
+          src={previewSrc}
+          alt={`${image.name || "Dynamic image"} (bot render)`}
+          className={`h-auto max-w-full rounded-xl border border-white/12 ${onClick ? "cursor-pointer" : ""}`}
+          onClick={onClick}
+        />
+      ) : (
+        <DynamicImageCanvas image={image} onClick={onClick} className={onClick ? "cursor-pointer" : undefined} />
+      )}
+      {loading && <p className="mt-2 text-xs text-discord-text-muted">Rendering exact bot preview...</p>}
+      {failed && <p className="mt-2 text-xs text-amber-300">Bot preview unavailable. Showing local editor preview.</p>}
+    </div>
+  );
+}
+
 function DynamicImageEditorModal({
+    guildId,
     open,
     onClose,
     image,
     onUpdate,
   }: {
+    guildId: string;
     open: boolean;
     onClose: () => void;
     image: WelcomeDynamicImage | null;
@@ -1080,6 +1186,14 @@ function DynamicImageEditorModal({
                 />
               </div>
             </div>
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-discord-text-muted">Canvas Background</label>
+              <Input
+                value={image.background_color}
+                onChange={(event) => onUpdate({ ...image, background_color: event.target.value })}
+                placeholder="#0E1824 or transparent"
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-between px-4 pt-4">
@@ -1120,31 +1234,32 @@ function DynamicImageEditorModal({
             {image.layers.map((layer) => {
               const selected = selectedLayer?.id === layer.id;
               return (
-                <button
+                <div
                   key={layer.id}
-                  type="button"
-                  onClick={() => setSelectedLayerId(layer.id)}
                   className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left ${
                     selected
                       ? "border-discord-blurple bg-[#16304b]"
                       : "border-[#26384d] bg-[#152334] hover:border-[#375170]"
                   }`}
                 >
-                  <div>
-                    <div className="text-sm font-semibold text-white">{layer.name}</div>
-                    <div className="text-xs text-discord-text-muted">{layer.type} · {layer.z_position}</div>
-                  </div>
                   <button
                     type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
+                    onClick={() => setSelectedLayerId(layer.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="text-sm font-semibold text-white">{layer.name}</div>
+                    <div className="text-xs text-discord-text-muted">{layer.type} · {layer.z_position}</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       removeLayer(layer.id);
                     }}
                     className="rounded p-1 text-discord-text-muted transition hover:bg-red-500/20 hover:text-red-300"
                   >
                     <Trash2Icon className="h-4 w-4" />
                   </button>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -1166,16 +1281,24 @@ function DynamicImageEditorModal({
           </div>
 
           <div className="grid flex-1 grid-cols-1 gap-5 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="rounded-xl border border-[#263a50] bg-[#0e1824] p-4">
-              <DynamicImageCanvas
-                image={image}
-                className="mx-auto max-w-[820px]"
-                editable
-                selectedLayerId={selectedLayer?.id || null}
-                onSelectLayer={setSelectedLayerId}
-                onLayerMove={moveLayer}
-              />
-              <p className="mt-3 text-xs text-discord-text-muted">Tip: Click a layer and drag it directly on the canvas to reposition.</p>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-[#263a50] bg-[#0e1824] p-4">
+                <DynamicImageCanvas
+                  image={image}
+                  className="mx-auto max-w-[820px]"
+                  editable
+                  selectedLayerId={selectedLayer?.id || null}
+                  onSelectLayer={setSelectedLayerId}
+                  onLayerMove={moveLayer}
+                />
+                <p className="mt-3 text-xs text-discord-text-muted">Tip: Click a layer and drag it directly on the canvas to reposition.</p>
+              </div>
+
+              <div className="rounded-xl border border-[#263a50] bg-[#0e1824] p-4">
+                <p className="mb-2 text-xs uppercase tracking-[0.12em] text-discord-text-muted">Exact Runtime Preview</p>
+                <BotRenderedDynamicImage guildId={guildId} image={image} className="mx-auto max-w-[820px]" />
+                <p className="mt-3 text-xs text-discord-text-muted">This preview is generated by the bot renderer used for real welcome messages.</p>
+              </div>
             </div>
 
             <div className="rounded-xl border border-[#263a50] bg-[#111c2b] p-4">
@@ -2033,7 +2156,12 @@ export function WelcomeConfigBuilder({
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {dynamicImages.map((image) => (
               <div key={image.id} className="rounded-xl border border-[#2b425a] bg-[#142336] p-3">
-                <DynamicImageCanvas image={image} className="mb-3" onClick={() => setEditingImageId(image.id)} />
+                <BotRenderedDynamicImage
+                  guildId={guildId}
+                  image={image}
+                  className="mb-3"
+                  onClick={() => setEditingImageId(image.id)}
+                />
                 <p className="mb-2 text-xs text-discord-text-muted">Click image to open designer</p>
 
                 <div className="flex items-center justify-between">
@@ -2158,7 +2286,7 @@ export function WelcomeConfigBuilder({
                   {dynamic && (
                     <div className="mt-3 rounded-xl border border-[#253a50] bg-[#0e1824] p-3">
                       <p className="mb-2 text-xs uppercase tracking-[0.12em] text-discord-text-muted">Attached Dynamic Image</p>
-                      <DynamicImageCanvas image={dynamic} className="max-w-xl" />
+                      <BotRenderedDynamicImage guildId={guildId} image={dynamic} className="max-w-xl" />
                     </div>
                   )}
                 </div>
@@ -2175,6 +2303,7 @@ export function WelcomeConfigBuilder({
       <MessageEditModal
         open={Boolean(editingMessage)}
         onClose={() => setEditingMessageId(null)}
+        guildId={guildId}
         message={editingMessage}
         groups={groups}
         dynamicImages={dynamicImages}
@@ -2182,6 +2311,7 @@ export function WelcomeConfigBuilder({
       />
 
       <DynamicImageEditorModal
+        guildId={guildId}
         open={Boolean(editingImage)}
         onClose={() => setEditingImageId(null)}
         image={editingImage}

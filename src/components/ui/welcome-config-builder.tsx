@@ -937,8 +937,8 @@ function DynamicImageCanvas({
                   style={{
                     ...style,
                     overflow: "hidden",
-                    border: "1px solid rgba(255,255,255,0.22)",
-                    background: "rgba(11,20,32,0.72)",
+                    border: hasLogoUrl ? "none" : "1px dashed rgba(255,255,255,0.22)",
+                    background: "transparent",
                   }}
                   {...interactiveProps}
                 >

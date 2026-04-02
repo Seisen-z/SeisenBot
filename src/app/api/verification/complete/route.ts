@@ -128,8 +128,10 @@ export async function POST(request: NextRequest) {
   }
 
   const data = await triggerRes.json().catch(() => ({}));
+  const redirectUrl = String(data?.discord_redirect_url || `https://discord.com/channels/${guildId}`);
   return NextResponse.json({
     status: "success",
     message: String(data?.message || "You are now verified. Return to Discord."),
+    redirect_url: redirectUrl,
   });
 }

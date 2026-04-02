@@ -142,6 +142,18 @@ function ensureArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function getCookieValue(name: string): string {
+  if (typeof document === "undefined") return "";
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+  if (!match) return "";
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
 export function createWelcomeGroup(name = "Group 1", channelId = ""): WelcomeMessageGroup {
   return {
     id: randomId("grp"),
@@ -1640,6 +1652,8 @@ export function WelcomeConfigBuilder({
     }
 
     const messageIds = Array.from(pickedByGroup.values()).map((message) => message.id).filter(Boolean);
+    const simulateUserIdRaw = getCookieValue("user_id");
+    const simulateUserId = /^\d{17,20}$/.test(simulateUserIdRaw) ? simulateUserIdRaw : "";
 
     if (messageIds.length === 0) {
       toast("No enabled messages found for the selected groups.", "error");
@@ -1655,6 +1669,7 @@ export function WelcomeConfigBuilder({
           payload: {
             group_ids: targetGroupIds,
             message_ids: messageIds,
+            ...(simulateUserId ? { simulate_user_id: simulateUserId } : {}),
           },
         }),
       });

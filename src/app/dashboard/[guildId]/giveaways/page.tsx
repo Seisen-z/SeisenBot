@@ -409,6 +409,31 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
     }
   };
 
+  const deleteGiveawayNow = async (messageId?: string | null) => {
+    if (!messageId) return;
+
+    const actionKey = `delete:${messageId}`;
+    setBusyAction(actionKey);
+    try {
+      await fetchApi("/trigger/delete_giveaway", undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          guild_id: guildId,
+          payload: {
+            message_id: messageId,
+            deleted_by_user_id: currentUserId || undefined,
+          },
+        }),
+      });
+      toast("Ended giveaway deleted.");
+      await loadGiveaways(true);
+    } catch (err: any) {
+      toast(`Failed to delete giveaway: ${err.message}`, "error");
+    } finally {
+      setBusyAction("");
+    }
+  };
+
   return (
     <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
       <DashboardPageHero
@@ -730,7 +755,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
           <div className="mb-4">
             <h2 className="text-lg font-bold text-white">Ended Giveaways</h2>
             <p className="text-sm text-discord-text-muted">
-              Ended giveaways are listed here so you can reroll winners when needed.
+              Ended giveaways are listed here so you can reroll winners or delete completed entries.
             </p>
           </div>
 
@@ -807,6 +832,16 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                       >
                         <RefreshCcwIcon className="h-3.5 w-3.5" />
                         {busyAction === `reroll:${messageId}` ? "Rerolling..." : "Reroll"}
+                      </Button>
+
+                      <Button
+                        variant="destructive"
+                        disabled={busyAction === `delete:${messageId}`}
+                        onClick={() => deleteGiveawayNow(messageId)}
+                        className="inline-flex items-center gap-1.5"
+                      >
+                        <Trash2Icon className="h-3.5 w-3.5" />
+                        {busyAction === `delete:${messageId}` ? "Deleting..." : "Delete"}
                       </Button>
                     </div>
                   </div>

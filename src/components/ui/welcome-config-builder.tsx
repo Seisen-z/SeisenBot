@@ -1631,11 +1631,13 @@ function AttachDynamicImageModal({
             <DynamicImageCanvas image={image} className="mx-auto max-w-[220px]" />
           </div>
 
-          <h3 className="mb-3 text-4xl font-bold tracking-tight text-white">Select a message</h3>
+          <h3 className="mb-2 text-2xl font-bold tracking-tight text-white">Select a message</h3>
+          <p className="mb-3 text-xs text-discord-text-muted">Green messages are already using this dynamic image.</p>
 
           <div className="space-y-2">
             {messages.map((message, index) => {
               const groupName = groups.find((group) => group.id === message.group_id)?.name || "Group";
+              const isAttached = message.dynamic_image_id === image.id;
               return (
                 <button
                   key={message.id}
@@ -1644,13 +1646,17 @@ function AttachDynamicImageModal({
                     onAttach(message.id);
                     onClose();
                   }}
-                  className="flex w-full items-center justify-between rounded-lg border border-[#1f5f2a] bg-[#25722f] px-4 py-3 text-left text-white transition hover:bg-[#2c8738]"
+                  className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition ${
+                    isAttached
+                      ? "border-[#1f5f2a] bg-[#25722f] text-white hover:bg-[#2c8738]"
+                      : "border-[#2b425a] bg-[#142336] text-discord-text hover:bg-[#1a2d44]"
+                  }`}
                 >
                   <div>
-                    <p className="text-2xl font-semibold">{message.name || `Message ${index + 1}`}</p>
-                    <p className="text-xs text-white/75">{groupName}</p>
+                    <p className="text-lg font-semibold">{message.name || `Message ${index + 1}`}</p>
+                    <p className={`text-xs ${isAttached ? "text-white/75" : "text-discord-text-muted"}`}>{groupName}</p>
                   </div>
-                  <span className="text-2xl leading-none">›</span>
+                  <span className={`text-xl leading-none ${isAttached ? "text-white" : "text-discord-text-muted"}`}>›</span>
                 </button>
               );
             })}

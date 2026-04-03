@@ -121,7 +121,7 @@ export default function FunCommandsPage({ params }: { params: Promise<{ guildId:
           hello_greetings: []
         });
       })
-      .catch((err) => toast({ title: "Failed to load Fun Commands", variant: "destructive" }))
+      .catch((err) => toast("Failed to load Fun Commands", "error"))
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
 
@@ -139,16 +139,16 @@ export default function FunCommandsPage({ params }: { params: Promise<{ guildId:
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
-    onError: () => toast({ title: "Auto-save failed for fun commands", variant: "destructive" }),
+    onError: () => toast("Auto-save failed for fun commands", "error"),
   });
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await persistConfig(config);
-      toast({ title: "Saved Fun Commands Successfully!" });
+      toast("Saved Fun Commands Successfully!");
     } catch (e) {
-      toast({ title: "Failed to save fun commands.", variant: "destructive" });
+      toast("Failed to save fun commands.", "error");
     } finally {
       setSaving(false);
     }

@@ -41,13 +41,13 @@ export default function Header({
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-          <Link
+          <a
             href="/api/auth/discord/logout"
             className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#122033] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-discord-red/40 hover:bg-discord-red/20 hover:text-white"
           >
             <LogOutIcon className="h-4 w-4" />
             Logout
-          </Link>
+          </a>
         </div>
       </div>
     </header>

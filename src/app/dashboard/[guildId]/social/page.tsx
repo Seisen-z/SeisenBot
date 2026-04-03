@@ -101,6 +101,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [testingSource, setTestingSource] = useState(false);
+  const [postingTest, setPostingTest] = useState(false);
   const [lastTestResult, setLastTestResult] = useState<SocialTestResult | null>(null);
 
   const [health, setHealth] = useState<SocialHealth | null>(null);
@@ -257,6 +258,75 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
     }
   };
 
+  const handleTestPostToChannel = async () => {
+    if (!activeMonitor || activeIdx < 0) {
+      toast("Select a source to test first.", "error");
+      return;
+    }
+
+    if (!(activeMonitor.channel_id || "").trim()) {
+      toast("Select a Post Channel before sending a test post.", "error");
+      return;
+    }
+
+    setPostingTest(true);
+
+    try {
+      const result = await fetchApi("/trigger/social_test_post", undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          guild_id: guildId,
+          payload: {
+            name: activeMonitor.name || null,
+            platform: activeMonitor.platform,
+            source: activeMonitor.source || "",
+            feed_url: activeMonitor.feed_url || null,
+            channel_id: activeMonitor.channel_id || null,
+            role_id: activeMonitor.role_id || null,
+            enabled: Boolean(activeMonitor.enabled),
+          },
+        }),
+      }) as {
+        status?: string;
+        message?: string;
+        resolved_feed_url?: string;
+        latest_entry_id?: string;
+      };
+
+      const nowIso = new Date().toISOString();
+      setMonitors((prev) => {
+        if (activeIdx < 0 || activeIdx >= prev.length) return prev;
+        const next = [...prev];
+        next[activeIdx] = {
+          ...next[activeIdx],
+          feed_url: result?.resolved_feed_url || next[activeIdx].feed_url || "",
+          last_entry_id: result?.latest_entry_id || next[activeIdx].last_entry_id || null,
+          last_checked_at: nowIso,
+          last_posted_at: nowIso,
+          last_error: null,
+        };
+        return next;
+      });
+
+      toast(result?.message || "Social test post sent.");
+    } catch (error) {
+      const message = toDisplayError(error);
+      setMonitors((prev) => {
+        if (activeIdx < 0 || activeIdx >= prev.length) return prev;
+        const next = [...prev];
+        next[activeIdx] = {
+          ...next[activeIdx],
+          last_checked_at: new Date().toISOString(),
+          last_error: message,
+        };
+        return next;
+      });
+      toast(`Test post failed: ${message}`, "error");
+    } finally {
+      setPostingTest(false);
+    }
+  };
+
   const addMonitor = () => {
     setMonitors((prev) => [...prev, { ...DEFAULT_MONITOR }]);
     setActiveIdx(monitors.length);
@@ -350,6 +420,18 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
               }
             >
               {testingSource ? "Testing..." : "Test Source"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleTestPostToChannel}
+              disabled={
+                postingTest
+                || !activeMonitor
+                || !(activeMonitor.channel_id || "").trim()
+                || (!activeMonitor.source.trim() && !(activeMonitor.feed_url || "").trim())
+              }
+            >
+              {postingTest ? "Posting..." : "Test Post"}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Monitors"}

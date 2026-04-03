@@ -119,7 +119,14 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "riddle", desc: "Get a riddle to solve" }
   ],
   "General / Miscellaneous": [
-    { cmd: "help", desc: "Show all available commands" }
+    { cmd: "help", desc: "Show all available commands" },
+    { cmd: "ping", desc: "Check bot latency and response time" },
+    { cmd: "hello", desc: "Get a friendly greeting from the bot" },
+    { cmd: "say", desc: "Make the bot say something" },
+    { cmd: "roll", desc: "Roll dice (e.g., 1d6, 2d20)" },
+    { cmd: "userinfo", desc: "Display information about a user" },
+    { cmd: "serverinfo", desc: "Display information about this server" },
+    { cmd: "avatar", desc: "Display a user's avatar" }
   ],
 };
 

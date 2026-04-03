@@ -174,7 +174,7 @@ export default function FunCommandsPage({ params }: { params: Promise<{ guildId:
       <DashboardPageHero
         icon={SparklesIcon}
         title="Fun Commands"
-        description="Customize responses for fun interaction commands across your server"
+        subtitle="Customize responses for fun interaction commands across your server"
       />
 
       <div className="glass-card rounded-2xl border border-white/10 bg-discord-dark/60 p-6">

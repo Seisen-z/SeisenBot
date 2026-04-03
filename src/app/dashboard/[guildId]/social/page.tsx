@@ -79,7 +79,7 @@ function normalizeMonitor(raw: any): SocialMonitor {
     platform,
     source: String(raw?.source || ""),
     name: raw?.name ? String(raw.name) : "",
-    feed_url: raw?.feed_url ? String(raw.feed_url) : "",
+    feed_url: platform === "youtube" ? "" : raw?.feed_url ? String(raw.feed_url) : "",
     channel_id: raw?.channel_id ? String(raw.channel_id) : "",
     role_id: raw?.role_id ? String(raw.role_id) : "",
     enabled: Boolean(raw?.enabled ?? true),
@@ -158,7 +158,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
           name: monitor.name || null,
           platform: monitor.platform,
           source: monitor.source || "",
-          feed_url: monitor.feed_url || null,
+          feed_url: monitor.platform === "youtube" ? null : monitor.feed_url || null,
           channel_id: monitor.channel_id || null,
           role_id: monitor.role_id || null,
           enabled: Boolean(monitor.enabled),
@@ -217,7 +217,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
           name: activeMonitor.name || null,
           platform: activeMonitor.platform,
           source: activeMonitor.source || "",
-          feed_url: activeMonitor.feed_url || null,
+          feed_url: activeMonitor.platform === "youtube" ? null : activeMonitor.feed_url || null,
           channel_id: activeMonitor.channel_id || null,
           role_id: activeMonitor.role_id || null,
           enabled: Boolean(activeMonitor.enabled),
@@ -280,7 +280,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
             name: activeMonitor.name || null,
             platform: activeMonitor.platform,
             source: activeMonitor.source || "",
-            feed_url: activeMonitor.feed_url || null,
+            feed_url: activeMonitor.platform === "youtube" ? null : activeMonitor.feed_url || null,
             channel_id: activeMonitor.channel_id || null,
             role_id: activeMonitor.role_id || null,
             enabled: Boolean(activeMonitor.enabled),
@@ -370,10 +370,20 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
 
   const sourcePlaceholder =
     activeMonitor?.platform === "youtube"
-      ? "YouTube channel URL, @handle, UC... channel id, or feed URL"
+      ? "YouTube channel URL, @handle, or UC... channel id"
       : activeMonitor?.platform === "tiktok"
         ? "TikTok @username or feed URL (RSSHub, etc.)"
         : "RSS/Atom feed URL";
+
+  const hasResolvableInput = useMemo(() => {
+    if (!activeMonitor) return false;
+    const sourceValue = activeMonitor.source.trim();
+    const feedValue = (activeMonitor.feed_url || "").trim();
+    if (activeMonitor.platform === "youtube") {
+      return Boolean(sourceValue);
+    }
+    return Boolean(sourceValue || feedValue);
+  }, [activeMonitor]);
 
   const formatDate = (value: string | null | undefined) => {
     if (!value) return "Never";
@@ -416,7 +426,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
               disabled={
                 testingSource
                 || !activeMonitor
-                || (!activeMonitor.source.trim() && !(activeMonitor.feed_url || "").trim())
+                || !hasResolvableInput
               }
             >
               {testingSource ? "Testing..." : "Test Source"}
@@ -428,7 +438,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                 postingTest
                 || !activeMonitor
                 || !(activeMonitor.channel_id || "").trim()
-                || (!activeMonitor.source.trim() && !(activeMonitor.feed_url || "").trim())
+                || !hasResolvableInput
               }
             >
               {postingTest ? "Posting..." : "Test Post"}
@@ -534,7 +544,13 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                     <label className="mb-2 block text-sm font-semibold text-discord-text-muted">Platform</label>
                     <select
                       value={activeMonitor.platform}
-                      onChange={(e) => updateMonitor("platform", e.target.value as SocialPlatform)}
+                      onChange={(e) => {
+                        const nextPlatform = e.target.value as SocialPlatform;
+                        updateMonitor("platform", nextPlatform);
+                        if (nextPlatform === "youtube") {
+                          updateMonitor("feed_url", "");
+                        }
+                      }}
                       className="flex h-10 w-full rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text transition-colors hover:border-[#1E1F22] focus:outline-none focus:ring-2 focus:ring-discord-blurple"
                     >
                       <option value="youtube">YouTube</option>
@@ -552,14 +568,20 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                     />
                   </div>
 
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-semibold text-discord-text-muted">Feed URL Override (Optional)</label>
-                    <Input
-                      value={activeMonitor.feed_url || ""}
-                      onChange={(e) => updateMonitor("feed_url", e.target.value)}
-                      placeholder="Leave blank to auto-resolve from Source"
-                    />
-                  </div>
+                  {activeMonitor.platform !== "youtube" ? (
+                    <div className="md:col-span-2">
+                      <label className="mb-2 block text-sm font-semibold text-discord-text-muted">Feed URL Override (Optional)</label>
+                      <Input
+                        value={activeMonitor.feed_url || ""}
+                        onChange={(e) => updateMonitor("feed_url", e.target.value)}
+                        placeholder="Leave blank to auto-resolve from Source"
+                      />
+                    </div>
+                  ) : (
+                    <p className="md:col-span-2 text-xs text-discord-text-muted">
+                      Feed URL Override is disabled for YouTube. Use Source only.
+                    </p>
+                  )}
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-discord-text-muted">Post Channel</label>
@@ -583,7 +605,12 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                 </div>
 
                 <div className="rounded-xl border border-[#1E1F22] bg-[#202225]/80 p-4 text-xs text-discord-text-muted space-y-2">
-                  <div><span className="text-white font-semibold">Resolved Feed:</span> {activeMonitor.feed_url || "Not resolved yet"}</div>
+                  <div>
+                    <span className="text-white font-semibold">
+                      {activeMonitor.platform === "youtube" ? "Tracking URL:" : "Resolved Feed:"}
+                    </span>{" "}
+                    {activeMonitor.feed_url || "Not resolved yet"}
+                  </div>
                   <div><span className="text-white font-semibold">Last Entry ID:</span> {activeMonitor.last_entry_id || "None"}</div>
                   <div><span className="text-white font-semibold">Last Checked:</span> {formatDate(activeMonitor.last_checked_at)}</div>
                   <div><span className="text-white font-semibold">Last Posted:</span> {formatDate(activeMonitor.last_posted_at)}</div>

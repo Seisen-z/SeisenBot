@@ -28,34 +28,40 @@ export default function ClientLayout({
       const hasCookie = /(^| )session_token=([^;]+)/.test(document.cookie);
       const fromSession = sessionStorage.getItem('seisenAuth') === '1';
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Auth check:', { hasCookie, fromSession, cookies: document.cookie });
-      }
+      // Debug logging
+      console.log('🔍 Auth Debug Info:');
+      console.log('  - Has session_token cookie:', hasCookie);
+      console.log('  - Session storage auth:', fromSession);
+      console.log('  - All cookies:', document.cookie);
+      console.log('  - Current pathname:', pathname);
 
       if (fromSession && hasCookie) {
+        console.log('✅ Auth: Valid session found');
         setIsAuthenticated(true);
         setAuthChecked(true);
         return;
       }
 
       if (fromSession && !hasCookie) {
-        console.log('Session storage indicates auth but no cookie found, clearing session');
+        console.log('⚠️ Auth: Session storage indicates auth but no cookie found, clearing session');
         sessionStorage.removeItem('seisenAuth');
       }
 
       if (hasCookie) {
+        console.log('✅ Auth: Cookie found, setting session');
         sessionStorage.setItem('seisenAuth', '1');
         setIsAuthenticated(true);
       } else {
+        console.log('❌ Auth: No authentication found');
         setIsAuthenticated(false);
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
+      console.error('❌ Auth check failed:', error);
       setIsAuthenticated(false);
     } finally {
       setAuthChecked(true);
     }
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (!authChecked || isPublicPath) return;

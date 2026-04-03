@@ -51,6 +51,7 @@ export async function fetchApi(endpoint: string, jwt?: string, init?: RequestIni
   const res = await fetch(`${API_BASE}${normalizeEndpoint(endpoint)}`, {
     ...init,
     headers,
+    credentials: 'include', // Ensure cookies are sent with requests
   });
 
   const contentType = (res.headers.get('content-type') || '').toLowerCase();

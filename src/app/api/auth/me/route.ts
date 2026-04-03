@@ -15,10 +15,12 @@ export async function GET() {
   const token = decodeCookieToken(cookieStore.get("session_token")?.value);
 
   if (!token) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    console.log("[/api/auth/me] No session token found in cookies");
+    return NextResponse.json({ message: "Unauthorized - No session token" }, { status: 401 });
   }
 
   try {
+    console.log("[/api/auth/me] Making Discord API request");
     const response = await fetch("https://discord.com/api/users/@me", {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -27,18 +29,22 @@ export async function GET() {
     });
 
     if (!response.ok) {
+      console.log(`[/api/auth/me] Discord API failed with status: ${response.status}`);
       const status = response.status === 401 ? 401 : 502;
-      return NextResponse.json({ message: "Failed to fetch Discord user" }, { status });
+      const errorMsg = response.status === 401 ? "Discord token expired" : "Failed to fetch Discord user";
+      return NextResponse.json({ message: errorMsg }, { status });
     }
 
     const data = await response.json();
+    console.log(`[/api/auth/me] Successfully fetched user: ${data.username}`);
     return NextResponse.json({
       id: String(data?.id || ""),
       username: String(data?.username || ""),
       global_name: String(data?.global_name || ""),
       avatar: String(data?.avatar || ""),
     });
-  } catch {
+  } catch (error) {
+    console.error("[/api/auth/me] Error:", error);
     return NextResponse.json({ message: "Discord user lookup unavailable" }, { status: 503 });
   }
 }

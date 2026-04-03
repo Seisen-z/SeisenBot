@@ -28,6 +28,10 @@ export default function ClientLayout({
       const hasCookie = /(^| )session_token=([^;]+)/.test(document.cookie);
       const fromSession = sessionStorage.getItem('seisenAuth') === '1';
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Auth check:', { hasCookie, fromSession, cookies: document.cookie });
+      }
+
       if (fromSession && hasCookie) {
         setIsAuthenticated(true);
         setAuthChecked(true);
@@ -35,6 +39,7 @@ export default function ClientLayout({
       }
 
       if (fromSession && !hasCookie) {
+        console.log('Session storage indicates auth but no cookie found, clearing session');
         sessionStorage.removeItem('seisenAuth');
       }
 
@@ -44,6 +49,9 @@ export default function ClientLayout({
       } else {
         setIsAuthenticated(false);
       }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      setIsAuthenticated(false);
     } finally {
       setAuthChecked(true);
     }

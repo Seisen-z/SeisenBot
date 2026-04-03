@@ -123,18 +123,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
       }
 
       const response = NextResponse.redirect(new URL(nextPath, req.url));
-      response.cookies.set("session_token", tokenData.access_token, {
+      const isProduction = req.nextUrl.hostname !== "localhost" && req.nextUrl.hostname !== "127.0.0.1";
+      const cookieOptions = {
         maxAge: COOKIE_MAX_AGE,
         path: "/",
-        sameSite: "lax",
-        secure: req.nextUrl.protocol === "https:",
-      });
-      response.cookies.set("user_id", String(userData.id), {
-        maxAge: COOKIE_MAX_AGE,
-        path: "/",
-        sameSite: "lax",
-        secure: req.nextUrl.protocol === "https:",
-      });
+        sameSite: "lax" as const,
+        secure: isProduction,
+        httpOnly: false, // must be readable by document.cookie in ClientLayout
+      };
+
+      response.cookies.set("session_token", tokenData.access_token, cookieOptions);
+      response.cookies.set("user_id", String(userData.id), cookieOptions);
 
       return response;
     } catch (err) {
@@ -148,8 +147,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
   // ─── LOGOUT ───────────────────────────────────────────────────────────────
   if (action === "logout") {
     const response = NextResponse.redirect(new URL("/login", req.url));
-    response.cookies.set("session_token", "", { maxAge: 0, path: "/" });
-    response.cookies.set("user_id", "", { maxAge: 0, path: "/" });
+    const isProduction = req.nextUrl.hostname !== "localhost" && req.nextUrl.hostname !== "127.0.0.1";
+    const cookieOptions = {
+      maxAge: 0,
+      path: "/",
+      sameSite: "lax" as const,
+      secure: isProduction,
+      httpOnly: false,
+    };
+    
+    response.cookies.set("session_token", "", cookieOptions);
+    response.cookies.set("user_id", "", cookieOptions);
     return response;
   }
 

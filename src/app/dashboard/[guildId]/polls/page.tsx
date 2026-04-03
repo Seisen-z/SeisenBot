@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { ChannelSelect } from "@/components/ui/discord-selects";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
-import { BarChart3Icon, Clock3Icon, PlusIcon, Trash2Icon, VoteIcon } from "lucide-react";
+import { BarChart3Icon, Clock3Icon, PlayIcon, PlusIcon, RefreshCcwIcon, Trash2Icon, VoteIcon } from "lucide-react";
 
 interface PollDraft {
   name: string;
@@ -18,6 +18,32 @@ interface PollDraft {
   duration_hours: number;
   multiple: boolean;
   options: string[];
+}
+
+interface PollItem {
+  guild_id?: string | null;
+  channel_id?: string | null;
+  message_id?: string | null;
+  created_by?: string | null;
+  question: string;
+  options: string[];
+  duration_hours: number;
+  multiple: boolean;
+  created_at?: string | null;
+  end_at?: string | null;
+  ended: boolean;
+  ended_at?: string | null;
+  ended_by?: string | null;
+  ended_reason?: string | null;
+  jump_url?: string | null;
+  is_active?: boolean;
+  is_pending_end?: boolean;
+}
+
+interface PollStatusResponse {
+  active_count: number;
+  total_count: number;
+  items: PollItem[];
 }
 
 const DEFAULT_DRAFT: PollDraft = {
@@ -46,6 +72,37 @@ function normalizeDraft(raw: any): PollDraft {
   };
 }
 
+function formatAbsoluteTime(value?: string | null): string {
+  if (!value) return "Unknown";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Unknown";
+  return parsed.toLocaleString();
+}
+
+function formatRemaining(value?: string | null): string {
+  if (!value) return "Unknown";
+  const end = new Date(value).getTime();
+  if (!Number.isFinite(end)) return "Unknown";
+
+  const diff = end - Date.now();
+  if (diff <= 0) return "Ended";
+
+  const totalSeconds = Math.floor(diff / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function pollStatusLabel(item: PollItem): "Active" | "Pending End" | "Ended" {
+  if (item.ended) return "Ended";
+  if (item.is_pending_end) return "Pending End";
+  return "Active";
+}
+
 export default function PollsPage({ params }: { params: Promise<{ guildId: string }> }) {
   const resolvedParams = use(params);
   const guildId = resolvedParams.guildId;
@@ -57,6 +114,24 @@ export default function PollsPage({ params }: { params: Promise<{ guildId: strin
   const [posting, setPosting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [polls, setPolls] = useState<PollItem[]>([]);
+  const [activePollCount, setActivePollCount] = useState(0);
+  const [busyAction, setBusyAction] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return await res.json();
+      })
+      .then((data) => {
+        if (data?.id) setCurrentUserId(String(data.id));
+      })
+      .catch(() => {
+        // Dashboard poll triggers still work without explicit user id.
+      });
+  }, []);
 
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/polls`)
@@ -87,6 +162,28 @@ export default function PollsPage({ params }: { params: Promise<{ guildId: strin
     setLastSaved(new Date());
   }, [guildId]);
 
+  const loadPollStatus = useCallback(async (silent = false) => {
+    try {
+      const data = (await fetchApi(`/guilds/${guildId}/polls/status`)) as PollStatusResponse;
+      const list = Array.isArray(data?.items) ? data.items : [];
+      setPolls(list);
+      setActivePollCount(Number(data?.active_count || 0));
+    } catch {
+      if (!silent) {
+        toast("Failed to load poll status", "error");
+      }
+    }
+  }, [guildId, toast]);
+
+  useEffect(() => {
+    loadPollStatus(true);
+    const timer = window.setInterval(() => {
+      loadPollStatus(true);
+    }, 20000);
+
+    return () => window.clearInterval(timer);
+  }, [loadPollStatus]);
+
   useDebouncedAutoSave({
     value: drafts,
     enabled: initialLoadComplete,
@@ -111,6 +208,8 @@ export default function PollsPage({ params }: { params: Promise<{ guildId: strin
   const activeDraft = drafts[activeDraftKey];
   const cleanedOptions = (activeDraft?.options || []).map((opt) => opt.trim()).filter(Boolean).slice(0, 10);
   const canPost = Boolean(activeDraft?.channel_id && activeDraft?.question.trim().length >= 5 && cleanedOptions.length >= 2);
+  const endedPollCount = polls.filter((item) => item.ended).length;
+  const activePolls = polls.filter((item) => !item.ended);
 
   const updateDraft = (patch: Partial<PollDraft>) => {
     if (!activeDraftKey) return;
@@ -208,14 +307,42 @@ export default function PollsPage({ params }: { params: Promise<{ guildId: strin
             options,
             duration_hours: activeDraft.duration_hours || 24,
             multiple: Boolean(activeDraft.multiple),
+            created_by_user_id: currentUserId || undefined,
           },
         }),
       });
       toast("Poll posted! Members will see live results right after voting.");
+      await loadPollStatus(true);
     } catch (err: any) {
       toast(`Failed to post poll: ${err.message}`, "error");
     } finally {
       setPosting(false);
+    }
+  };
+
+  const endPollNow = async (messageId?: string | null, channelId?: string | null) => {
+    if (!messageId) return;
+
+    const actionKey = `end:${messageId}`;
+    setBusyAction(actionKey);
+    try {
+      await fetchApi("/trigger/end_poll", undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          guild_id: guildId,
+          payload: {
+            message_id: messageId,
+            channel_id: channelId || undefined,
+            ended_by_user_id: currentUserId || undefined,
+          },
+        }),
+      });
+      toast("Poll ended successfully.");
+      await loadPollStatus(true);
+    } catch (err: any) {
+      toast(`Failed to end poll: ${err.message}`, "error");
+    } finally {
+      setBusyAction("");
     }
   };
 
@@ -227,8 +354,8 @@ export default function PollsPage({ params }: { params: Promise<{ guildId: strin
         subtitle="Build Discord-native polls with clean visuals, live vote updates, and hidden results until members vote."
         stats={[
           { label: "Drafts", value: Object.keys(drafts).length },
-          { label: "Options", value: cleanedOptions.length },
-          { label: "Duration", value: `${activeDraft?.duration_hours || 24}h` },
+          { label: "Active", value: activePollCount },
+          { label: "Ended", value: endedPollCount },
           { label: "Ready", value: canPost ? "Yes" : "No" },
         ]}
         actions={
@@ -402,6 +529,98 @@ export default function PollsPage({ params }: { params: Promise<{ guildId: strin
             </div>
           )}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-white">Live Poll Indicator</h2>
+            <p className="text-sm text-discord-text-muted">
+              Active polls appear here with a manual end control.
+            </p>
+          </div>
+
+          <Button
+            variant="outline"
+            onClick={() => loadPollStatus(false)}
+            className="inline-flex items-center gap-2"
+          >
+            <RefreshCcwIcon className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
+
+        {activePolls.length === 0 ? (
+          <div className="rounded-lg border border-white/10 bg-[#202225]/70 px-4 py-8 text-center text-sm text-discord-text-muted">
+            No active polls right now. Post one from the editor above.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activePolls.map((item) => {
+              const label = pollStatusLabel(item);
+              const messageId = item.message_id || "";
+              const channelId = item.channel_id || undefined;
+              const optionCount = Array.isArray(item.options) ? item.options.length : 0;
+
+              return (
+                <div key={messageId || `${item.question}-${item.end_at}`} className="rounded-lg border border-white/10 bg-[#202225]/80 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-white">{item.question || "Untitled Poll"}</p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${
+                            label === "Active"
+                              ? "bg-emerald-500/20 text-emerald-300"
+                              : label === "Pending End"
+                                ? "bg-amber-500/20 text-amber-300"
+                                : "bg-slate-500/25 text-slate-300"
+                          }`}
+                        >
+                          {label}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#b5bac1]">
+                        <span className="flex items-center gap-1"><VoteIcon className="h-3.5 w-3.5" /> Options: {optionCount}</span>
+                        <span>{item.multiple ? "Multiple answers enabled" : "Single answer"}</span>
+                        <span className="flex items-center gap-1"><Clock3Icon className="h-3.5 w-3.5" /> Ends: {formatRemaining(item.end_at)}</span>
+                        {messageId && <span>ID: {messageId}</span>}
+                      </div>
+
+                      <div className="mt-1 text-xs text-discord-text-muted">
+                        End time: {formatAbsoluteTime(item.end_at)}
+                        {item.ended_at ? ` • Ended: ${formatAbsoluteTime(item.ended_at)}` : ""}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {item.jump_url && (
+                        <a
+                          href={item.jump_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-[#122033] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-discord-blurple/45 hover:text-white"
+                        >
+                          Open
+                        </a>
+                      )}
+
+                      <Button
+                        variant="outline"
+                        disabled={busyAction === `end:${messageId}` || !messageId}
+                        onClick={() => endPollNow(messageId, channelId)}
+                        className="inline-flex items-center gap-1.5"
+                      >
+                        <PlayIcon className="h-3.5 w-3.5" />
+                        {busyAction === `end:${messageId}` ? "Ending..." : "End Now"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -106,6 +106,18 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "vouch", desc: "Create a new vouch for this server" },
     { cmd: "vouch_setup", desc: "Set the channel where vouches post" }
   ],
+  "Fun & Community Commands": [
+    { cmd: "8ball", desc: "Ask the magic 8-ball a question" },
+    { cmd: "coinflip", desc: "Flip a coin (heads or tails)" },
+    { cmd: "dice", desc: "Roll a dice (1-6)" },
+    { cmd: "joke", desc: "Get a random joke" },
+    { cmd: "meme", desc: "Get a random meme" },
+    { cmd: "quote", desc: "Get an inspirational quote" },
+    { cmd: "roast", desc: "Get playfully roasted by the bot" },
+    { cmd: "compliment", desc: "Receive a nice compliment" },
+    { cmd: "fact", desc: "Learn a random fun fact" },
+    { cmd: "riddle", desc: "Get a riddle to solve" }
+  ],
   "General / Miscellaneous": [
     { cmd: "help", desc: "Show all available commands" }
   ],

@@ -28,7 +28,10 @@ import {
 
 export default function Sidebar({ guildId, onNavigate }: { guildId: string; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+    "Automation": true,
+    "Operations": true
+  });
 
   const toggleGroup = (groupLabel: string) => {
     setCollapsedGroups(prev => ({ ...prev, [groupLabel]: !prev[groupLabel] }));

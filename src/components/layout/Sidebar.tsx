@@ -29,8 +29,8 @@ import {
 export default function Sidebar({ guildId, onNavigate }: { guildId: string; onNavigate?: () => void }) {
   const pathname = usePathname();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
-    "Automation": true,
-    "Operations": true
+    "Automation": false,
+    "Operations": false
   });
 
   const toggleGroup = (groupLabel: string) => {
@@ -54,6 +54,7 @@ export default function Sidebar({ guildId, onNavigate }: { guildId: string; onNa
         { name: "Tickets", href: `/dashboard/${guildId}/tickets`, icon: Ticket },
         { name: "Polls", href: `/dashboard/${guildId}/polls`, icon: BarChart3 },
         { name: "Giveaways", href: `/dashboard/${guildId}/giveaways`, icon: GiftIcon },
+        { name: "Fun Commands", href: `/dashboard/${guildId}/fun-commands`, icon: SparklesIcon },
         { name: "Member Counter", href: `/dashboard/${guildId}/member-counter`, icon: UsersIcon },
         { name: "Social Notifications", href: `/dashboard/${guildId}/social`, icon: BellRing },
         { name: "Roblox Monitor", href: `/dashboard/${guildId}/roblox`, icon: Gamepad2 },

@@ -83,7 +83,7 @@ export default async function HomePage() {
   }
 
   try {
-    const resBotGuilds = await fetch(`${SERVER_API_BASE}/bot/guilds`, {
+    const resBotGuilds = await fetch(`${SERVER_API_BASE.replace(/\/api$/, '')}/api/bot/guilds`, {
       next: { revalidate: 60 },
     });
 

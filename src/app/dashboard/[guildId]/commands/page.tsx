@@ -58,7 +58,7 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "giveaway create", desc: "Create a new reaction-based giveaway" },
     { cmd: "giveaway delete", desc: "Delete an ended giveaway" },
     { cmd: "giveaway end", desc: "End an active giveaway and announce winners" },
-    { cmd: "giveaway reroll", desc: "Pick new winner(s) from giveaway entrants" },
+    { cmd: "giveaway reroll", desc: "Pick new winner(s) from giveaway entrants (optional winner amount)" },
     { cmd: "giveaway list", desc: "List recent giveaway IDs and status" }
   ],
   "Music Player": [

@@ -176,6 +176,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
   const [giveaways, setGiveaways] = useState<GiveawayItem[]>([]);
   const [activeCount, setActiveCount] = useState(0);
   const [busyAction, setBusyAction] = useState("");
+  const [rerollCounts, setRerollCounts] = useState<Record<string, number>>({});
   const [currentUserId, setCurrentUserId] = useState("");
 
   useEffect(() => {
@@ -384,7 +385,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
     }
   };
 
-  const rerollGiveawayNow = async (messageId?: string | null) => {
+  const rerollGiveawayNow = async (messageId?: string | null, rerollWinnerCount?: number) => {
     if (!messageId) return;
 
     const actionKey = `reroll:${messageId}`;
@@ -397,6 +398,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
           payload: {
             message_id: messageId,
             rerolled_by_user_id: currentUserId || undefined,
+            reroll_winner_count: rerollWinnerCount || undefined,
           },
         }),
       });
@@ -769,6 +771,11 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
               const keyDelivery = item.key_delivery && typeof item.key_delivery === "object" ? item.key_delivery : null;
               const deliveredCount = Math.max(0, Number(keyDelivery?.delivered_count || 0));
               const failedCount = Math.max(0, Number(keyDelivery?.failed_count || 0));
+              const maxRerollWinners = Math.max(1, Math.min(25, Number(item.winner_count || 1)));
+              const selectedRerollCount = Math.max(
+                1,
+                Math.min(maxRerollWinners, Number(rerollCounts[messageId] || maxRerollWinners)),
+              );
 
               return (
                 <div key={`ended-${messageId || `${item.reward_title}-${item.ended_at}`}`} className="rounded-lg border border-white/10 bg-[#202225]/80 p-4">
@@ -824,10 +831,26 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                         </a>
                       )}
 
+                      <select
+                        value={selectedRerollCount}
+                        onChange={(e) => {
+                          const next = Math.max(1, Math.min(maxRerollWinners, Number(e.target.value) || maxRerollWinners));
+                          if (!messageId) return;
+                          setRerollCounts((prev) => ({ ...prev, [messageId]: next }));
+                        }}
+                        className="h-9 rounded-lg border border-white/10 bg-[#122033] px-3 text-xs font-semibold text-discord-text outline-none transition focus:border-discord-blurple/45"
+                      >
+                        {Array.from({ length: maxRerollWinners }, (_, idx) => idx + 1).map((count) => (
+                          <option key={`${messageId}-reroll-count-${count}`} value={count}>
+                            Reroll {count}
+                          </option>
+                        ))}
+                      </select>
+
                       <Button
                         variant="outline"
                         disabled={busyAction === `reroll:${messageId}`}
-                        onClick={() => rerollGiveawayNow(messageId)}
+                        onClick={() => rerollGiveawayNow(messageId, selectedRerollCount)}
                         className="inline-flex items-center gap-1.5"
                       >
                         <RefreshCcwIcon className="h-3.5 w-3.5" />

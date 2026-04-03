@@ -61,6 +61,13 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "giveaway reroll", desc: "Pick new winner(s) from giveaway entrants (optional winner amount)" },
     { cmd: "giveaway list", desc: "List recent giveaway IDs and status" }
   ],
+  "Member Counter": [
+    { cmd: "membercounter create", desc: "Create a realtime member counter channel" },
+    { cmd: "membercounter set", desc: "Use an existing channel for member count updates" },
+    { cmd: "membercounter sync", desc: "Force-update the member counter now" },
+    { cmd: "membercounter disable", desc: "Disable member counter updates" },
+    { cmd: "membercounter status", desc: "Show current member counter configuration" }
+  ],
   "Music Player": [
     { cmd: "music leave", desc: "Leave the voice channel and clear queue" },
     { cmd: "music loop", desc: "Set loop mode" },

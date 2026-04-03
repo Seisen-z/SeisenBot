@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchApi } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/toast";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { 

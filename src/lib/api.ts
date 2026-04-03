@@ -33,7 +33,7 @@ function summarizeBody(text: string): string {
   if (!normalized) return "";
 
   if (looksLikeReactFlightPayload(normalized)) {
-    return "Received a Next.js page payload instead of API JSON. Check NEXT_PUBLIC_API_URL and /api/bot rewrite configuration.";
+    return "Received a Next.js page payload instead of API JSON. Check NEXT_PUBLIC_API_URL and /api/bot proxy route configuration.";
   }
 
   return normalized.slice(0, 320);

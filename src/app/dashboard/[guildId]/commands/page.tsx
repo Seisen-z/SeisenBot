@@ -16,8 +16,10 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "banlist", desc: "List all banned users in the server" },
     { cmd: "clear", desc: "Clear a specific number of messages" },
     { cmd: "kick", desc: "Kick a member from the server" },
-    { cmd: "purge", desc: "Purge messages in the channel" },
-    { cmd: "unban", desc: "Unban a user from the server by their ID" }
+    { cmd: "purge", desc: "Bulk delete messages in a channel (up to 1000)" },
+    { cmd: "unban", desc: "Unban a user from the server by their ID" },
+    { cmd: "invite", desc: "Get a permanent invite link for this server" },
+    { cmd: "invitelist", desc: "List all active invites in the server" }
   ],
   "Access Control": [
     { cmd: "access list", desc: "List role access for locked commands" },
@@ -58,27 +60,27 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "giveaway create", desc: "Create a new reaction-based giveaway" },
     { cmd: "giveaway delete", desc: "Delete an ended giveaway" },
     { cmd: "giveaway end", desc: "End an active giveaway and announce winners" },
-    { cmd: "giveaway reroll", desc: "Pick new winner(s) from giveaway entrants (optional winner amount)" },
+    { cmd: "giveaway reroll", desc: "Pick new winner(s) from giveaway entrants" },
     { cmd: "giveaway list", desc: "List recent giveaway IDs and status" }
   ],
   "Member Counter": [
     { cmd: "membercounter create", desc: "Create a realtime member counter channel" },
-    { cmd: "membercounter set", desc: "Use an existing channel for member count updates" },
-    { cmd: "membercounter sync", desc: "Force-update the member counter now" },
-    { cmd: "membercounter disable", desc: "Disable member counter updates" },
+    { cmd: "membercounter configure", desc: "Configure an existing channel as member counter" },
+    { cmd: "membercounter remove", desc: "Remove the member counter for this server" },
     { cmd: "membercounter status", desc: "Show current member counter configuration" }
   ],
-  "Music Player": [
-    { cmd: "music leave", desc: "Leave the voice channel and clear queue" },
-    { cmd: "music loop", desc: "Set loop mode" },
-    { cmd: "music now", desc: "Show the currently playing track" },
-    { cmd: "music pause", desc: "Pause the current track" },
-    { cmd: "music play", desc: "Play music and join your channel" },
-    { cmd: "music queue", desc: "Show the current music queue" },
-    { cmd: "music resume", desc: "Resume paused playback" },
-    { cmd: "music shuffle", desc: "Shuffle the queued tracks" },
-    { cmd: "music skip", desc: "Skip the current track" },
-    { cmd: "music stop", desc: "Stop playback and clear the queue" }
+  "Polls": [
+    { cmd: "poll create", desc: "Start a native Discord poll with live results" },
+    { cmd: "poll end", desc: "Manually end a native Discord poll" }
+  ],
+  "Reaction Roles": [
+    { cmd: "reaction_roles create", desc: "Create a new reaction role message" },
+    { cmd: "reaction_roles add_role", desc: "Add a role option to an existing reaction role message" },
+    { cmd: "reaction_roles remove_role", desc: "Remove a role option from a reaction role message" },
+    { cmd: "reaction_roles list", desc: "List all reaction role messages in this server" }
+  ],
+  "Select Menu Roles": [
+    { cmd: "select_menu_roles create", desc: "Create a new select menu role message" }
   ],
   "Roblox Integration": [
     { cmd: "roblox list", desc: "List active monitored Roblox games" },
@@ -105,17 +107,7 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "vouch_setup", desc: "Set the channel where vouches post" }
   ],
   "General / Miscellaneous": [
-    { cmd: "avatar", desc: "Show a user's avatar" },
-    { cmd: "hello", desc: "Get a greeting from the bot" },
-    { cmd: "help", desc: "Show all available commands" },
-    { cmd: "invite", desc: "Get a permanent invite link" },
-    { cmd: "invitelist", desc: "List all active invites" },
-    { cmd: "ping", desc: "Check bot latency" },
-    { cmd: "poll create", desc: "Create a new poll" },
-    { cmd: "roll", desc: "Roll a dice" },
-    { cmd: "say", desc: "Make the bot say something" },
-    { cmd: "serverinfo", desc: "Display info about the server" },
-    { cmd: "userinfo", desc: "Display info about a user" }
+    { cmd: "help", desc: "Show all available commands" }
   ],
 };
 

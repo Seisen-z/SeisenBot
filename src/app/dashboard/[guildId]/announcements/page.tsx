@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
-import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon, FolderIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon, FolderIcon, EditIcon } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
 // Draft key format: "Category/DraftName" — uncategorized uses "General/DraftName"
@@ -41,7 +41,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const [promptOpen, setPromptOpen] = useState(false);
-  const [promptConfig, setPromptConfig] = useState<{title: string; label: string; action: 'category' | 'draft'; cat?: string}>({
+  const [promptConfig, setPromptConfig] = useState<{title: string; label: string; action: 'category' | 'draft' | 'rename'; cat?: string; draftKey?: string}>({
     title: "", label: "", action: "category"
   });
 
@@ -128,6 +128,12 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     setPromptOpen(true);
   };
 
+  const renameDraft = (key: string) => {
+    const currentName = draftLabel(key);
+    setPromptConfig({ title: "Rename Draft", label: "Draft Name", action: "rename", draftKey: key });
+    setPromptOpen(true);
+  };
+
   const handlePromptConfirm = (value: string) => {
     if (promptConfig.action === "category") {
       const key = `${value}/${value} Draft 1`;
@@ -143,6 +149,25 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
       } else {
         setDrafts(prev => ({ ...prev, [key]: { title: "", description: "", channel_id: "", ping_role_id: "" } }));
         setActiveDraftKey(key);
+      }
+    } else if (promptConfig.action === "rename" && promptConfig.draftKey) {
+      const oldKey = promptConfig.draftKey;
+      const category = oldKey.split("/")[0];
+      const newKey = `${category}/${value}`;
+      
+      if (newKey === oldKey) {
+        // No change needed
+      } else if (drafts[newKey]) {
+        toast("A draft with that name already exists.", "error");
+        return;
+      } else {
+        // Rename the draft
+        const updated = { ...drafts };
+        updated[newKey] = updated[oldKey];
+        delete updated[oldKey];
+        setDrafts(updated);
+        setActiveDraftKey(newKey);
+        toast("Draft renamed successfully!");
       }
     }
     setPromptOpen(false);
@@ -254,6 +279,13 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                         {draftLabel(key)}
                       </button>
                       <button
+                        onClick={() => renameDraft(key)}
+                        className="opacity-0 group-hover/item:opacity-100 ml-1 text-yellow-400 hover:text-yellow-300 shrink-0 p-0.5 rounded"
+                        title="Rename draft"
+                      >
+                        <EditIcon className="w-3 h-3" />
+                      </button>
+                      <button
                         onClick={() => deleteDraft(key)}
                         className="opacity-0 group-hover/item:opacity-100 ml-1 text-red-400 hover:text-red-300 shrink-0 p-0.5 rounded"
                         title="Delete draft"
@@ -339,6 +371,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
         open={promptOpen}
         title={promptConfig.title}
         label={promptConfig.label}
+        defaultValue={promptConfig.action === "rename" && promptConfig.draftKey ? draftLabel(promptConfig.draftKey) : ""}
         onConfirm={handlePromptConfirm}
         onCancel={() => setPromptOpen(false)}
       />

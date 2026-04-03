@@ -124,13 +124,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
 
       const response = NextResponse.redirect(new URL(nextPath, req.url));
       const isProduction = req.nextUrl.hostname !== "localhost" && req.nextUrl.hostname !== "127.0.0.1";
+      
+      // Explicit cookie configuration for better reliability
       const cookieOptions = {
         maxAge: COOKIE_MAX_AGE,
         path: "/",
-        sameSite: "lax" as const,
-        secure: isProduction,
+        sameSite: "none" as const, // Changed to 'none' for better cross-origin support
+        secure: true, // Always secure in production
         httpOnly: false, // must be readable by document.cookie in ClientLayout
       };
+
+      console.log(`[OAuth Callback] Setting cookies for ${req.nextUrl.hostname}`, {
+        isProduction,
+        cookieOptions,
+        tokenLength: tokenData.access_token?.length,
+        userId: userData.id,
+        nextPath
+      });
 
       response.cookies.set("session_token", tokenData.access_token, cookieOptions);
       response.cookies.set("user_id", String(userData.id), cookieOptions);
@@ -147,12 +157,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
   // ─── LOGOUT ───────────────────────────────────────────────────────────────
   if (action === "logout") {
     const response = NextResponse.redirect(new URL("/login", req.url));
-    const isProduction = req.nextUrl.hostname !== "localhost" && req.nextUrl.hostname !== "127.0.0.1";
     const cookieOptions = {
       maxAge: 0,
       path: "/",
-      sameSite: "lax" as const,
-      secure: isProduction,
+      sameSite: "none" as const,
+      secure: true,
       httpOnly: false,
     };
     

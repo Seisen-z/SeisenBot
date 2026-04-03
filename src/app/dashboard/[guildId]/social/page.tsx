@@ -40,6 +40,20 @@ interface SocialHealth {
   last_error: string | null;
 }
 
+interface SocialTestResult {
+  status: string;
+  checked_at: string;
+  resolved_feed_url: string;
+  latest_entry?: {
+    id?: string | null;
+    title?: string | null;
+    author?: string | null;
+    link?: string | null;
+    thumbnail?: string | null;
+    published_at?: string | null;
+  };
+}
+
 const DEFAULT_MONITOR: SocialMonitor = {
   name: "",
   platform: "youtube",
@@ -86,6 +100,8 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [testingSource, setTestingSource] = useState(false);
+  const [lastTestResult, setLastTestResult] = useState<SocialTestResult | null>(null);
 
   const [health, setHealth] = useState<SocialHealth | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
@@ -129,6 +145,10 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
     };
   }, [guildId, loadHealth, toast]);
 
+  useEffect(() => {
+    setLastTestResult(null);
+  }, [activeIdx]);
+
   const persistMonitors = useCallback(async (nextMonitors: SocialMonitor[]) => {
     await fetchApi(`/guilds/${guildId}/social`, undefined, {
       method: "PUT",
@@ -170,6 +190,70 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
       toast("Failed to save social monitors.", "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toDisplayError = (error: unknown) => {
+    if (error instanceof Error && error.message) {
+      return error.message.replace(/^API Error\s+\d+:\s*/i, "").trim() || "Unknown error.";
+    }
+    return "Unknown error.";
+  };
+
+  const handleTestSource = async () => {
+    if (!activeMonitor || activeIdx < 0) {
+      toast("Select a source to test first.", "error");
+      return;
+    }
+
+    setTestingSource(true);
+    setLastTestResult(null);
+
+    try {
+      const result = (await fetchApi(`/guilds/${guildId}/social/test`, undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          name: activeMonitor.name || null,
+          platform: activeMonitor.platform,
+          source: activeMonitor.source || "",
+          feed_url: activeMonitor.feed_url || null,
+          channel_id: activeMonitor.channel_id || null,
+          role_id: activeMonitor.role_id || null,
+          enabled: Boolean(activeMonitor.enabled),
+        }),
+      })) as SocialTestResult;
+
+      const nowIso = new Date().toISOString();
+      setLastTestResult(result);
+      setMonitors((prev) => {
+        if (activeIdx < 0 || activeIdx >= prev.length) return prev;
+        const next = [...prev];
+        next[activeIdx] = {
+          ...next[activeIdx],
+          feed_url: result.resolved_feed_url || next[activeIdx].feed_url || "",
+          last_entry_id: result.latest_entry?.id || next[activeIdx].last_entry_id || null,
+          last_checked_at: result.checked_at || nowIso,
+          last_error: null,
+        };
+        return next;
+      });
+
+      toast("Social feed test passed.");
+    } catch (error) {
+      const message = toDisplayError(error);
+      setMonitors((prev) => {
+        if (activeIdx < 0 || activeIdx >= prev.length) return prev;
+        const next = [...prev];
+        next[activeIdx] = {
+          ...next[activeIdx],
+          last_checked_at: new Date().toISOString(),
+          last_error: message,
+        };
+        return next;
+      });
+      toast(`Social feed test failed: ${message}`, "error");
+    } finally {
+      setTestingSource(false);
     }
   };
 
@@ -256,6 +340,17 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                 Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
+            <Button
+              variant="outline"
+              onClick={handleTestSource}
+              disabled={
+                testingSource
+                || !activeMonitor
+                || (!activeMonitor.source.trim() && !(activeMonitor.feed_url || "").trim())
+              }
+            >
+              {testingSource ? "Testing..." : "Test Source"}
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Monitors"}
             </Button>
@@ -413,6 +508,27 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                   <div className={activeMonitor.last_error ? "text-rose-300" : ""}>
                     <span className="text-white font-semibold">Last Error:</span> {activeMonitor.last_error || "None"}
                   </div>
+                  {lastTestResult && (
+                    <>
+                      <div><span className="text-white font-semibold">Last Test:</span> {formatDate(lastTestResult.checked_at)}</div>
+                      <div><span className="text-white font-semibold">Latest Title:</span> {lastTestResult.latest_entry?.title || "Unknown"}</div>
+                      <div>
+                        <span className="text-white font-semibold">Latest Link:</span>{" "}
+                        {lastTestResult.latest_entry?.link
+                          ? (
+                            <a
+                              href={lastTestResult.latest_entry.link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-discord-blurple hover:underline"
+                            >
+                              Open latest post
+                            </a>
+                          )
+                          : "N/A"}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex justify-end mt-auto pt-2">

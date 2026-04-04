@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API_TIMEOUT_MS = Number(process.env.BOT_API_TIMEOUT_MS || "15000");
 const VERIFY_API_TIMEOUT_MS = Number(process.env.BOT_API_VERIFY_TIMEOUT_MS || "90000");
+const DEFAULT_BOT_API_BASE = "http://127.0.0.1:8000";
 
 function resolveRequestTimeoutMs(path: string[] | undefined) {
   const safePath = Array.isArray(path) ? path : [];
@@ -15,22 +16,79 @@ function resolveRequestTimeoutMs(path: string[] | undefined) {
   return API_TIMEOUT_MS;
 }
 
-function resolveBotApiBase() {
-  const configured = (process.env.BOT_API_URL || process.env.API_PROXY_TARGET || "").trim();
-
-  if (configured) {
-    return configured.replace(/\/+$/, "");
-  }
-
-  // Keep a deterministic local fallback for development if env vars are missing.
-  return "http://127.0.0.1:8000";
+function normalizeBase(base: string): string {
+  return String(base || "").trim().replace(/\/+$/, "");
 }
 
-function buildTargetUrl(request: NextRequest, path: string[] | undefined) {
-  const base = resolveBotApiBase();
+function parseCandidateBases(rawValue: string | undefined): string[] {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return [];
+
+  return raw
+    .split(/[\s,]+/)
+    .map((entry) => normalizeBase(entry))
+    .filter(Boolean);
+}
+
+function expandBaseVariants(base: string): string[] {
+  const cleaned = normalizeBase(base);
+  if (!cleaned) return [];
+
+  if (/^https?:\/\//i.test(cleaned)) {
+    const variants = [cleaned];
+
+    try {
+      const parsed = new URL(cleaned);
+      const host = parsed.hostname.toLowerCase();
+      if (host !== "127.0.0.1" && host !== "localhost") {
+        const alternateProtocol = parsed.protocol === "https:" ? "http:" : "https:";
+        variants.push(normalizeBase(`${alternateProtocol}//${parsed.host}${parsed.pathname}`));
+      }
+    } catch {
+      // Keep original variant only when URL parsing fails.
+    }
+
+    return variants;
+  }
+
+  const hostWithPort = cleaned.replace(/^\/+/, "");
+  if (!hostWithPort) return [];
+  return [normalizeBase(`https://${hostWithPort}`), normalizeBase(`http://${hostWithPort}`)];
+}
+
+function uniqueBases(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const value of values) {
+    const cleaned = normalizeBase(value);
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(cleaned);
+  }
+
+  return out;
+}
+
+function resolveBotApiBases(): string[] {
+  const configured = [
+    ...parseCandidateBases(process.env.BOT_API_URL),
+    ...parseCandidateBases(process.env.API_PROXY_TARGET),
+  ];
+
+  const baseCandidates = configured.length > 0 ? configured : [DEFAULT_BOT_API_BASE];
+  const expanded = baseCandidates.flatMap((base) => expandBaseVariants(base));
+  const deduped = uniqueBases(expanded);
+
+  return deduped.length > 0 ? deduped : [DEFAULT_BOT_API_BASE];
+}
+
+function buildTargetUrl(base: string, request: NextRequest, path: string[] | undefined) {
   const suffix = (path || []).map((segment) => encodeURIComponent(segment)).join("/");
   const apiPath = suffix ? `/api/${suffix}` : "/api";
-  return `${base}${apiPath}${request.nextUrl.search}`;
+  return `${normalizeBase(base)}${apiPath}${request.nextUrl.search}`;
 }
 
 function buildForwardHeaders(request: NextRequest) {
@@ -48,48 +106,56 @@ function buildForwardHeaders(request: NextRequest) {
 }
 
 async function proxyToBotApi(request: NextRequest, path: string[] | undefined) {
-  const targetUrl = buildTargetUrl(request, path);
   const timeoutMs = resolveRequestTimeoutMs(path);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const targetBases = resolveBotApiBases();
+  const body = ["GET", "HEAD"].includes(request.method)
+    ? undefined
+    : await request.arrayBuffer();
+  const errors: Array<{ target: string; detail: string }> = [];
 
-  try {
-    const body = ["GET", "HEAD"].includes(request.method)
-      ? undefined
-      : await request.arrayBuffer();
+  for (const base of targetBases) {
+    const targetUrl = buildTargetUrl(base, request, path);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    const upstream = await fetch(targetUrl, {
-      method: request.method,
-      headers: buildForwardHeaders(request),
-      body,
-      redirect: "follow",
-      cache: "no-store",
-      signal: controller.signal,
-    });
+    try {
+      const upstream = await fetch(targetUrl, {
+        method: request.method,
+        headers: buildForwardHeaders(request),
+        body,
+        redirect: "follow",
+        cache: "no-store",
+        signal: controller.signal,
+      });
 
-    const responseHeaders = new Headers(upstream.headers);
-    responseHeaders.delete("content-encoding");
-    responseHeaders.delete("transfer-encoding");
+      const responseHeaders = new Headers(upstream.headers);
+      responseHeaders.delete("content-encoding");
+      responseHeaders.delete("transfer-encoding");
 
-    return new NextResponse(upstream.body, {
-      status: upstream.status,
-      headers: responseHeaders,
-    });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : "Unknown proxy error";
-    return NextResponse.json(
-      {
-        error: "BOT_API_UNAVAILABLE",
-        message: "Bot API is currently unreachable.",
-        detail,
-        target: resolveBotApiBase(),
-        timeout_ms: timeoutMs,
-      },
-      { status: 503 },
-    );
-  } finally {
-    clearTimeout(timeout);
+      return new NextResponse(upstream.body, {
+        status: upstream.status,
+        headers: responseHeaders,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Unknown proxy error";
+      errors.push({ target: base, detail });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
+
+  const primaryError = errors[0];
+  return NextResponse.json(
+    {
+      error: "BOT_API_UNAVAILABLE",
+      message: "Bot API is currently unreachable.",
+      detail: primaryError?.detail || "Unknown proxy error",
+      target: primaryError?.target || targetBases[0] || DEFAULT_BOT_API_BASE,
+      timeout_ms: timeoutMs,
+      attempted_targets: targetBases,
+    },
+    { status: 503 },
+  );
 }
 
 type RouteContext = { params: Promise<{ path?: string[] }> };

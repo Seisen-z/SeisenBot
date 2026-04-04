@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_TIMEOUT_MS = Number(process.env.BOT_API_TIMEOUT_MS || "15000");
+const VERIFY_API_TIMEOUT_MS = Number(process.env.BOT_API_VERIFY_TIMEOUT_MS || "90000");
+
+function resolveRequestTimeoutMs(path: string[] | undefined) {
+  const safePath = Array.isArray(path) ? path : [];
+  const triggerIndex = safePath.findIndex((segment) => segment === "trigger");
+  const action = triggerIndex >= 0 ? safePath[triggerIndex + 1] : "";
+
+  if (action === "verify_member_web") {
+    return VERIFY_API_TIMEOUT_MS;
+  }
+
+  return API_TIMEOUT_MS;
+}
 
 function resolveBotApiBase() {
   const configured = (process.env.BOT_API_URL || process.env.API_PROXY_TARGET || "").trim();
@@ -36,8 +49,9 @@ function buildForwardHeaders(request: NextRequest) {
 
 async function proxyToBotApi(request: NextRequest, path: string[] | undefined) {
   const targetUrl = buildTargetUrl(request, path);
+  const timeoutMs = resolveRequestTimeoutMs(path);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const body = ["GET", "HEAD"].includes(request.method)
@@ -69,6 +83,7 @@ async function proxyToBotApi(request: NextRequest, path: string[] | undefined) {
         message: "Bot API is currently unreachable.",
         detail,
         target: resolveBotApiBase(),
+        timeout_ms: timeoutMs,
       },
       { status: 503 },
     );

@@ -46,30 +46,52 @@ export default function VerifyGuildPage() {
     }
 
     const verify = async () => {
-      try {
-        const res = await fetch("/api/verification/complete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ guildId }),
-        });
+      const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(String(data?.message || `Verification failed (${res.status})`));
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const res = await fetch("/api/verification/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ guildId }),
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const apiMessage = String(data?.message || `Verification failed (${res.status})`);
+            const isRetryable =
+              res.status === 503 ||
+              /aborted|unavailable|timed out|timeout/i.test(apiMessage);
+
+            if (isRetryable && attempt === 0) {
+              setMessage("Finishing verification in Discord. Retrying...");
+              await sleep(1200);
+              continue;
+            }
+
+            throw new Error(apiMessage);
+          }
+
+          const nextUrl = String(data?.redirect_url || "").trim();
+          if (nextUrl.startsWith("https://discord.com/channels/")) {
+            setRedirectUrl(nextUrl);
+          } else if (isDiscordSnowflake(guildId)) {
+            setRedirectUrl(`https://discord.com/channels/${guildId}`);
+          }
+
+          setState("success");
+          setMessage("Verification complete. Opening your Discord server...");
+          return;
+        } catch (err) {
+          if (attempt === 0) {
+            setMessage("Finishing verification in Discord. Retrying...");
+            await sleep(1200);
+            continue;
+          }
+
+          setState("error");
+          setMessage(err instanceof Error ? err.message : "Verification failed. Please try again.");
         }
-
-        const nextUrl = String(data?.redirect_url || "").trim();
-        if (nextUrl.startsWith("https://discord.com/channels/")) {
-          setRedirectUrl(nextUrl);
-        } else if (isDiscordSnowflake(guildId)) {
-          setRedirectUrl(`https://discord.com/channels/${guildId}`);
-        }
-
-        setState("success");
-        setMessage("Verification complete. Opening your Discord server...");
-      } catch (err) {
-        setState("error");
-        setMessage(err instanceof Error ? err.message : "Verification failed. Please try again.");
       }
     };
 

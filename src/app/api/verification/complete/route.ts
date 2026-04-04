@@ -42,7 +42,13 @@ async function readErrorMessage(response: Response) {
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       const data = await response.json();
-      return data?.detail || data?.message || data?.error || JSON.stringify(data);
+      if (String(data?.error || "") === "BOT_API_UNAVAILABLE") {
+        const detailText = String(data?.detail || "").toLowerCase();
+        if (detailText.includes("aborted")) {
+          return "Verification is still finishing in Discord. Please wait a few seconds and try again.";
+        }
+      }
+      return data?.message || data?.detail || data?.error || JSON.stringify(data);
     }
     return (await response.text()).trim();
   } catch {

@@ -166,15 +166,16 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     }
     setPosting(true);
     try {
+      const announcementPayload = {
+        ...currentDraft,
+        ping_role_id: currentDraft.ping_role_id || null,
+      };
+
       await fetchApi('/trigger/announcement', undefined, {
         method: "POST",
         body: JSON.stringify({
           guild_id: guildId,
-          payload: {
-            channel_id: currentDraft.channel_id,
-            ping_role_id: currentDraft.ping_role_id || null,
-            ...currentDraft
-          }
+          payload: announcementPayload,
         })
       });
       toast("Announcement Posted Successfully!");

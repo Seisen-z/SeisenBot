@@ -15,6 +15,63 @@ import { PromptModal } from "@/components/ui/prompt-modal";
 // Draft key format: "Category/DraftName" — uncategorized uses "General/DraftName"
 const DEFAULT_CATEGORY = "General";
 
+type AnnouncementDraft = {
+  title: string;
+  description: string;
+  thumbnail_url: string;
+  footer: string;
+  channel_id: string;
+  ping_role_id: string;
+  [key: string]: any;
+};
+
+const createEmptyDraft = (): AnnouncementDraft => ({
+  title: "",
+  description: "",
+  thumbnail_url: "",
+  footer: "",
+  channel_id: "",
+  ping_role_id: "",
+});
+
+function normalizeDraft(input: any): AnnouncementDraft {
+  const nestedContent =
+    input &&
+    typeof input === "object" &&
+    !Array.isArray(input) &&
+    input.content &&
+    typeof input.content === "object" &&
+    !Array.isArray(input.content)
+      ? input.content
+      : input;
+
+  const source =
+    nestedContent && typeof nestedContent === "object" && !Array.isArray(nestedContent)
+      ? nestedContent
+      : {};
+
+  return {
+    ...createEmptyDraft(),
+    ...source,
+    title: typeof source.title === "string" ? source.title : "",
+    description: typeof source.description === "string" ? source.description : "",
+    thumbnail_url: typeof source.thumbnail_url === "string" ? source.thumbnail_url : "",
+    footer: typeof source.footer === "string" ? source.footer : "",
+    channel_id: typeof source.channel_id === "string" ? source.channel_id : "",
+    ping_role_id: typeof source.ping_role_id === "string" ? source.ping_role_id : "",
+  };
+}
+
+function normalizeDraftMap(rawDrafts: Record<string, any>): Record<string, AnnouncementDraft> {
+  const normalized: Record<string, AnnouncementDraft> = {};
+
+  for (const [key, value] of Object.entries(rawDrafts || {})) {
+    normalized[key] = normalizeDraft(value);
+  }
+
+  return normalized;
+}
+
 function parseDrafts(drafts: Record<string, any>) {
   // Returns { [category]: [draftKey, ...] }
   const map: Record<string, string[]> = {};
@@ -32,7 +89,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const guildId = resolvedParams.guildId;
   const { toast } = useToast();
 
-  const [drafts, setDrafts] = useState<Record<string, any>>({});
+  const [drafts, setDrafts] = useState<Record<string, AnnouncementDraft>>({});
   const [activeDraftKey, setActiveDraftKey] = useState<string>("");
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
@@ -48,19 +105,20 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/announcements`)
       .then((data) => {
-        const d = data || {};
-        setDrafts(d);
-        const keys = Object.keys(d);
+        const normalizedDrafts = normalizeDraftMap(data || {});
+        setDrafts(normalizedDrafts);
+        const keys = Object.keys(normalizedDrafts);
         if (keys.length > 0) setActiveDraftKey(keys[0]);
       })
       .catch(() => toast("Failed to load announcements", "error"))
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
 
-  const persistDrafts = useCallback(async (nextDrafts: Record<string, any>) => {
+  const persistDrafts = useCallback(async (nextDrafts: Record<string, AnnouncementDraft>) => {
+    const payload = normalizeDraftMap(nextDrafts);
     await fetchApi(`/guilds/${guildId}/announcements`, undefined, {
       method: "PUT",
-      body: JSON.stringify(nextDrafts),
+      body: JSON.stringify(payload),
     });
     setLastSaved(new Date());
   }, [guildId]);
@@ -86,10 +144,19 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     }
   };
 
-  const currentDraft = drafts[activeDraftKey] || { title: "", description: "", thumbnail_url: "", footer: "", channel_id: "", ping_role_id: "" };
+  const currentDraft = drafts[activeDraftKey] || createEmptyDraft();
 
   const updateDraft = (key: string, val: any) => {
-    setDrafts(prev => ({ ...prev, [activeDraftKey]: { ...prev[activeDraftKey], [key]: val } }));
+    setDrafts((prev) => {
+      if (!activeDraftKey) return prev;
+      return {
+        ...prev,
+        [activeDraftKey]: {
+          ...(prev[activeDraftKey] || createEmptyDraft()),
+          [key]: val,
+        },
+      };
+    });
   };
 
   const handlePostNow = async () => {
@@ -138,7 +205,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     if (promptConfig.action === "category") {
       const key = `${value}/${value} Draft 1`;
       if (!drafts[key]) {
-        setDrafts(prev => ({ ...prev, [key]: { title: "", description: "", channel_id: "", ping_role_id: "" } }));
+        setDrafts(prev => ({ ...prev, [key]: createEmptyDraft() }));
         setActiveDraftKey(key);
       }
     } else if (promptConfig.action === "draft" && promptConfig.cat) {
@@ -147,7 +214,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
       if (drafts[key]) {
         toast("A draft with that name already exists.", "error");
       } else {
-        setDrafts(prev => ({ ...prev, [key]: { title: "", description: "", channel_id: "", ping_role_id: "" } }));
+        setDrafts(prev => ({ ...prev, [key]: createEmptyDraft() }));
         setActiveDraftKey(key);
       }
     } else if (promptConfig.action === "rename" && promptConfig.draftKey) {

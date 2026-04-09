@@ -124,23 +124,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
 
       const response = NextResponse.redirect(new URL(nextPath, req.url));
       const isSecureContext = req.nextUrl.protocol === "https:";
-      
-      // Use first-party cookie settings for stable dashboard navigation.
+
       const cookieOptions = {
         maxAge: COOKIE_MAX_AGE,
         path: "/",
         sameSite: "lax" as const,
         secure: isSecureContext,
-        httpOnly: false, // must be readable by document.cookie in ClientLayout
+        httpOnly: true,
       };
 
-      console.log(`[OAuth Callback] Setting cookies for ${req.nextUrl.hostname}`, {
-        isSecureContext,
-        cookieOptions,
-        tokenLength: tokenData.access_token?.length,
-        userId: userData.id,
-        nextPath
-      });
+      if (process.env.NODE_ENV === "development") {
+        console.info("[OAuth Callback] Session cookies set", {
+          host: req.nextUrl.hostname,
+          isSecureContext,
+          userId: userData.id,
+          nextPath,
+        });
+      }
 
       response.cookies.set("session_token", tokenData.access_token, cookieOptions);
       response.cookies.set("user_id", String(userData.id), cookieOptions);
@@ -163,7 +163,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
       path: "/",
       sameSite: "lax" as const,
       secure: isSecureContext,
-      httpOnly: false,
+      httpOnly: true,
     };
     
     response.cookies.set("session_token", "", cookieOptions);

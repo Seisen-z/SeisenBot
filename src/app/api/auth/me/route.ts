@@ -15,12 +15,10 @@ export async function GET() {
   const token = decodeCookieToken(cookieStore.get("session_token")?.value);
 
   if (!token) {
-    console.log("[/api/auth/me] No session token found in cookies");
     return NextResponse.json({ message: "Unauthorized - No session token" }, { status: 401 });
   }
 
   try {
-    console.log("[/api/auth/me] Making Discord API request");
     const response = await fetch("https://discord.com/api/users/@me", {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -36,7 +34,6 @@ export async function GET() {
     }
 
     const data = await response.json();
-    console.log(`[/api/auth/me] Successfully fetched user: ${data.username}`);
     return NextResponse.json({
       id: String(data?.id || ""),
       username: String(data?.username || ""),

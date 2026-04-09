@@ -107,7 +107,10 @@ export async function POST(request: NextRequest) {
   try {
     triggerRes = await fetch(`${apiBase}/trigger/verify_member_web`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       cache: "no-store",
       body: JSON.stringify({
         guild_id: guildId,

@@ -42,7 +42,7 @@ export default async function LoginPage({
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {[
-              ["Secure OAuth", "Discord-based sign-in with short-lived tokens."],
+              ["Secure OAuth", "Discord sign-in with httpOnly session cookies."],
               ["Guild Smart Routing", "Manage only the servers where you have control."],
               ["Always-On Modules", "AI, tickets, announcements, and automations in one place."],
             ].map(([title, desc]) => (

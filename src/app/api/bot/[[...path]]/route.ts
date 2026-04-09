@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
 export const preferredRegion = ["fra1"];
@@ -100,7 +101,16 @@ function buildTargetUrl(base: string, request: NextRequest, path: string[] | und
   return `${normalizeBase(base)}${apiPath}${request.nextUrl.search}`;
 }
 
-function buildForwardHeaders(request: NextRequest) {
+function decodeCookieToken(value: string | undefined) {
+  if (!value) return undefined;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function buildForwardHeaders(request: NextRequest, sessionToken?: string) {
   const headers = new Headers();
 
   for (const [key, value] of request.headers.entries()) {
@@ -109,6 +119,10 @@ function buildForwardHeaders(request: NextRequest) {
       continue;
     }
     headers.set(key, value);
+  }
+
+  if (sessionToken) {
+    headers.set("Authorization", `Bearer ${sessionToken}`);
   }
 
   return headers;
@@ -122,6 +136,10 @@ async function proxyToBotApi(request: NextRequest, path: string[] | undefined) {
     : await request.arrayBuffer();
   const errors: Array<{ target: string; detail: string }> = [];
 
+  const cookieStore = await cookies();
+  const sessionFromCookie = decodeCookieToken(cookieStore.get("session_token")?.value);
+  const forwardHeaders = buildForwardHeaders(request, sessionFromCookie);
+
   for (const base of targetBases) {
     const targetUrl = buildTargetUrl(base, request, path);
     const controller = new AbortController();
@@ -130,7 +148,7 @@ async function proxyToBotApi(request: NextRequest, path: string[] | undefined) {
     try {
       const upstream = await fetch(targetUrl, {
         method: request.method,
-        headers: buildForwardHeaders(request),
+        headers: forwardHeaders,
         body,
         redirect: "follow",
         cache: "no-store",

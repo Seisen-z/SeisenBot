@@ -4,13 +4,6 @@ import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LoaderCircleIcon, ShieldCheckIcon } from "lucide-react";
 
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-
-function setCookie(name: string, value: string, maxAge: number) {
-  const secure = location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `${name}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
-}
-
 function SetSessionInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -19,16 +12,33 @@ function SetSessionInner() {
     const token = searchParams.get("t");
     const userId = searchParams.get("u");
 
-    if (token && userId) {
-      setCookie("session_token", token, COOKIE_MAX_AGE);
-      setCookie("user_id", userId, COOKIE_MAX_AGE);
-      // Store in sessionStorage so ClientLayout auth check works
-      // reliably on client-side navigations without re-parsing cookies.
-      sessionStorage.setItem('seisenAuth', '1');
-      router.replace("/");
-    } else {
+    if (!token || !userId) {
       router.replace("/login?error=no_session");
+      return;
     }
+
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/establish-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ token, user_id: userId }),
+        });
+        if (!res.ok) {
+          router.replace("/login?error=no_session");
+          return;
+        }
+        try {
+          sessionStorage.setItem("seisenAuth", "1");
+        } catch {
+          /* ignore */
+        }
+        router.replace("/");
+      } catch {
+        router.replace("/login?error=no_session");
+      }
+    })();
   }, [searchParams, router]);
 
   return (

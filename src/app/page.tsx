@@ -15,6 +15,9 @@ const SERVER_API_BASE = process.env.API_PROXY_TARGET
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 
+/** Moderation-oriented bot invite (no Administrator / 8): Manage Server, roles, channels, kick, ban, moderate, messages, nicknames, core messaging permissions. */
+const MOD_BOT_PERMISSIONS = "1099914670390";
+
 function decodeCookieToken(value: string | undefined) {
   if (!value) return undefined;
   try {
@@ -29,7 +32,7 @@ function getInviteUrl(guildId: string) {
 
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
-    permissions: "8",
+    permissions: MOD_BOT_PERMISSIONS,
     scope: "bot applications.commands",
     guild_id: guildId,
     disable_guild_select: "true",
@@ -84,6 +87,7 @@ export default async function HomePage() {
 
   try {
     const resBotGuilds = await fetch(`${SERVER_API_BASE.replace(/\/api$/, '')}/api/bot/guilds`, {
+      headers: { Authorization: `Bearer ${token}` },
       next: { revalidate: 60 },
     });
 

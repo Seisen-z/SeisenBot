@@ -24,6 +24,7 @@ import {
   UsersIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ShieldAlert,
 } from "lucide-react";
 
 export default function Sidebar({ guildId, onNavigate }: { guildId: string; onNavigate?: () => void }) {
@@ -41,6 +42,7 @@ export default function Sidebar({ guildId, onNavigate }: { guildId: string; onNa
     {
       label: "Automation",
       items: [
+        { name: "Auto Moderation", href: `/dashboard/${guildId}/automod`, icon: ShieldAlert },
         { name: "Auto Reply", href: `/dashboard/${guildId}/autoreply`, icon: MessageSquareReply },
         { name: "AI Help", href: `/dashboard/${guildId}/ai-help`, icon: Bot },
         { name: "Announcements", href: `/dashboard/${guildId}/announcements`, icon: Megaphone },

@@ -112,7 +112,7 @@ export default function ClientLayout({
 
           <aside
             className={cn(
-              'fixed inset-y-0 left-0 z-40 w-[18rem] transform transition-transform duration-300 lg:static lg:z-10 lg:w-[18rem] lg:translate-x-0',
+              'fixed inset-y-0 left-0 z-40 w-[18rem] transform transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:z-10 lg:w-[18rem] lg:translate-x-0',
               sidebarOpen ? 'translate-x-0' : '-translate-x-full'
             )}
           >

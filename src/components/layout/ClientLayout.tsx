@@ -95,7 +95,7 @@ export default function ClientLayout({
   }
 
   return (
-    <div className="relative flex min-h-screen w-full overflow-hidden">
+    <div className="relative flex h-screen w-full overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,196,183,0.08),_transparent_55%)]" />
 
       {guildId && (
@@ -121,7 +121,7 @@ export default function ClientLayout({
         </>
       )}
 
-      <div className="relative z-10 flex min-h-screen w-full flex-col overflow-hidden">
+      <div className="relative z-10 flex h-full w-full flex-col overflow-hidden">
         <Header
           showMenuButton={Boolean(guildId)}
           onOpenSidebar={() => setSidebarOpen(true)}

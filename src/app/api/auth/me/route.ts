@@ -10,6 +10,18 @@ function decodeCookieToken(value: string | undefined) {
   }
 }
 
+function clearSessionCookies(response: NextResponse) {
+  const cookieOptions = {
+    maxAge: 0,
+    path: "/",
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+  };
+  response.cookies.set("session_token", "", cookieOptions);
+  response.cookies.set("user_id", "", cookieOptions);
+}
+
 export async function GET() {
   const cookieStore = await cookies();
   const token = decodeCookieToken(cookieStore.get("session_token")?.value);
@@ -30,7 +42,11 @@ export async function GET() {
       console.log(`[/api/auth/me] Discord API failed with status: ${response.status}`);
       const status = response.status === 401 ? 401 : 502;
       const errorMsg = response.status === 401 ? "Discord token expired" : "Failed to fetch Discord user";
-      return NextResponse.json({ message: errorMsg }, { status });
+      const errorResponse = NextResponse.json({ message: errorMsg }, { status });
+      if (response.status === 401) {
+        clearSessionCookies(errorResponse);
+      }
+      return errorResponse;
     }
 
     const data = await response.json();

@@ -110,6 +110,18 @@ function decodeCookieToken(value: string | undefined) {
   }
 }
 
+function clearSessionCookies(response: NextResponse, secure: boolean) {
+  const cookieOptions = {
+    maxAge: 0,
+    path: "/",
+    sameSite: "lax" as const,
+    secure,
+    httpOnly: true,
+  };
+  response.cookies.set("session_token", "", cookieOptions);
+  response.cookies.set("user_id", "", cookieOptions);
+}
+
 function buildForwardHeaders(request: NextRequest, sessionToken?: string) {
   const headers = new Headers();
 
@@ -159,10 +171,14 @@ async function proxyToBotApi(request: NextRequest, path: string[] | undefined) {
       responseHeaders.delete("content-encoding");
       responseHeaders.delete("transfer-encoding");
 
-      return new NextResponse(upstream.body, {
+      const response = new NextResponse(upstream.body, {
         status: upstream.status,
         headers: responseHeaders,
       });
+      if (upstream.status === 401) {
+        clearSessionCookies(response, request.nextUrl.protocol === "https:");
+      }
+      return response;
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Unknown proxy error";
       errors.push({ target: base, detail });

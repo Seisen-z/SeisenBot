@@ -11,6 +11,8 @@ function SetSessionInner() {
   useEffect(() => {
     const token = searchParams.get("t");
     const userId = searchParams.get("u");
+    const nextPath = searchParams.get("next");
+    const redirectPath = typeof nextPath === "string" && nextPath.startsWith("/") ? nextPath : "/";
 
     if (!token || !userId) {
       router.replace("/login?error=no_session");
@@ -34,7 +36,7 @@ function SetSessionInner() {
         } catch {
           /* ignore */
         }
-        router.replace("/");
+        router.replace(redirectPath);
       } catch {
         router.replace("/login?error=no_session");
       }

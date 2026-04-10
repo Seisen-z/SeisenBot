@@ -122,30 +122,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
         throw new Error("Discord user id missing from OAuth response");
       }
 
-      const response = NextResponse.redirect(new URL(nextPath, req.url));
-      const isSecureContext = req.nextUrl.protocol === "https:";
+      const handoffUrl = new URL("/auth/set-session", req.url);
+      handoffUrl.searchParams.set("t", tokenData.access_token);
+      handoffUrl.searchParams.set("u", String(userData.id));
 
-      const cookieOptions = {
-        maxAge: COOKIE_MAX_AGE,
-        path: "/",
-        sameSite: "lax" as const,
-        secure: isSecureContext,
-        httpOnly: true,
-      };
+      if (nextPath && nextPath !== "/") {
+        handoffUrl.searchParams.set("next", nextPath);
+      }
 
       if (process.env.NODE_ENV === "development") {
-        console.info("[OAuth Callback] Session cookies set", {
+        console.info("[OAuth Callback] Redirecting to session handoff", {
           host: req.nextUrl.hostname,
-          isSecureContext,
           userId: userData.id,
           nextPath,
         });
       }
 
-      response.cookies.set("session_token", tokenData.access_token, cookieOptions);
-      response.cookies.set("user_id", String(userData.id), cookieOptions);
-
-      return response;
+      return NextResponse.redirect(handoffUrl);
     } catch (err) {
       if (process.env.NODE_ENV === "development") {
         console.info("Auth callback error", err);

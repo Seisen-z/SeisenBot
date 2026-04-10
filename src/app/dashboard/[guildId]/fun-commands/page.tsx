@@ -195,11 +195,11 @@ export default function FunCommandsPage({ params }: { params: Promise<{ guildId:
                   onClick={() => setActiveCategory(category.key)}
                   className={`group flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-all ${
                     isActive
-                      ? "bg-discord-blurple/20 text-white shadow-lg shadow-discord-blurple/20"
+                      ? "bg-white/12 text-white shadow-lg shadow-black/40"
                       : "text-discord-text-muted hover:bg-white/5 hover:text-white"
                   }`}
                 >
-                  <Icon className={`h-5 w-5 ${isActive ? "text-discord-blurple" : "text-discord-text-muted group-hover:text-discord-blurple"}`} />
+                  <Icon className={`h-5 w-5 ${isActive ? "text-white" : "text-discord-text-muted group-hover:text-white"}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{category.label}</p>
                     <p className="text-xs text-discord-text-muted">{count} responses</p>
@@ -227,7 +227,7 @@ export default function FunCommandsPage({ params }: { params: Promise<{ guildId:
                     <Button
                       onClick={handleSave}
                       disabled={saving}
-                      className="bg-discord-blurple hover:bg-discord-blurple/90"
+                      className="bg-[#a3a7b0] hover:bg-[#8f939c]"
                     >
                       {saving ? "Saving..." : "Save Now"}
                     </Button>
@@ -241,8 +241,8 @@ export default function FunCommandsPage({ params }: { params: Promise<{ guildId:
                   className="min-h-[400px] font-mono text-sm"
                 />
 
-                <div className="flex items-center gap-2 rounded-xl bg-discord-blurple/10 px-4 py-3 text-sm text-discord-text-muted border border-discord-blurple/20">
-                  <SparklesIcon className="h-4 w-4 text-discord-blurple" />
+                <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-discord-text-muted">
+                  <SparklesIcon className="h-4 w-4 text-white" />
                   <p>
                     <strong className="text-white">{activeData.length}</strong> custom responses configured
                     {activeData.length > 0 && " · One response per line"}

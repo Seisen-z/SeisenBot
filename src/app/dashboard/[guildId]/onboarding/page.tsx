@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState, use } from "react";
+import { useCallback, useEffect, useMemo, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchApi } from "@/lib/api";
+import { toDashboardErrorState, type DashboardErrorState } from "@/lib/dashboard-errors";
 import { useToast } from "@/components/ui/toast";
 import { ChannelSelect, RoleMultiSelect, RoleSelect } from "@/components/ui/discord-selects";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { DashboardErrorBanner } from "@/components/ui/dashboard-error-banner";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import {
@@ -77,7 +79,7 @@ const DEFAULT_CONFIG: OnboardingConfig = {
   panel_content: "",
   panel_embed_title: "Verification Required",
   panel_embed_description: "Click the button below to verify and unlock full server access.",
-  panel_embed_color: "#5865F2",
+  panel_embed_color: "#A3A7B0",
   panel_embed_thumbnail: "",
   panel_embed_image: "",
   panel_embed_footer: "Verification System",
@@ -87,7 +89,7 @@ const DEFAULT_CONFIG: OnboardingConfig = {
   welcome_content: "",
   welcome_embed_title: "Welcome ${userglobalnickname}!",
   welcome_embed_description: "to ${guildname}\n\nYou are member #${guildmembercount}.",
-  welcome_embed_color: "#5865F2",
+  welcome_embed_color: "#A3A7B0",
   welcome_embed_thumbnail: "",
   welcome_embed_image: "",
   welcome_embed_footer: "Enjoy your stay",
@@ -110,7 +112,7 @@ const DEFAULT_CONFIG: OnboardingConfig = {
       content: "",
       embed_title: "Welcome ${userglobalnickname}!",
       embed_description: "to ${guildname}\n\nYou are member #${guildmembercount}.",
-      embed_color: "#5865F2",
+      embed_color: "#A3A7B0",
       embed_thumbnail: "",
       embed_image: "",
       embed_footer: "Enjoy your stay",
@@ -188,14 +190,62 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
   const [saving, setSaving] = useState(false);
   const [postingPanel, setPostingPanel] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [loadError, setLoadError] = useState<DashboardErrorState | null>(null);
+  const [lastPersistedConfig, setLastPersistedConfig] = useState<OnboardingConfig>(DEFAULT_CONFIG);
+  const [saveSummary, setSaveSummary] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
+  const validateBeforeSave = useCallback((nextConfig: OnboardingConfig): string | null => {
+    const urlFields = [
+      nextConfig.panel_embed_thumbnail,
+      nextConfig.panel_embed_image,
+      nextConfig.welcome_embed_thumbnail,
+      nextConfig.welcome_embed_image,
+    ];
+    const badUrl = urlFields.find((value) => {
+      const text = String(value || "").trim();
+      return text.length > 0 && !/^https?:\/\//i.test(text);
+    });
+    if (badUrl) {
+      return "Embed image/thumbnail URLs must start with http:// or https://";
+    }
+
+    const colorFields = [nextConfig.panel_embed_color, nextConfig.welcome_embed_color];
+    const badColor = colorFields.find((value) => {
+      const text = String(value || "").trim();
+      if (!text) return true;
+      if (/^\d+$/.test(text)) return false;
+      return !/^#[0-9a-fA-F]{6}$/.test(text);
+    });
+    if (badColor) {
+      return "Embed colors must be #RRGGBB or a decimal color value.";
+    }
+
+    return null;
+  }, []);
+
+  const loadConfig = useCallback(() => {
+    setLoadError(null);
+    setInitialLoadComplete(false);
     fetchApi(`/guilds/${guildId}/onboarding`)
-      .then((data) => setConfig(normalizeConfig(data || {})))
-      .catch(() => toast("Failed to load onboarding settings", "error"))
+      .then((data) => {
+        const normalized = normalizeConfig(data || {});
+        setConfig(normalized);
+        setLastPersistedConfig(normalized);
+        setLastLoadedAt(new Date());
+        setSaveSummary(null);
+      })
+      .catch((err) => {
+        setLoadError(toDashboardErrorState(err, "Failed to load onboarding settings."));
+        toast("Failed to load onboarding settings", "error");
+      })
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
 
   const persistConfig = useCallback(async (nextConfig: OnboardingConfig) => {
     const sanitizedWelcomeGroups = (nextConfig.welcome_message_groups || []).map((group) => ({
@@ -215,7 +265,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
       content: String(message.content || ""),
       embed_title: String(message.embed_title || ""),
       embed_description: String(message.embed_description || ""),
-      embed_color: String(message.embed_color || "#5865F2"),
+      embed_color: String(message.embed_color || "#A3A7B0"),
       embed_thumbnail: String(message.embed_thumbnail || ""),
       embed_image: String(message.embed_image || ""),
       embed_footer: String(message.embed_footer || ""),
@@ -227,7 +277,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
       name: String(image.name || "Dynamic Image"),
       width: Math.max(128, Number(image.width || 500)),
       height: Math.max(128, Number(image.height || 350)),
-      background_color: String(image.background_color || "#0E1824"),
+      background_color: String(image.background_color || "#121317"),
       layers: (image.layers || []).map((layer) => ({
         id: String(layer.id || ""),
         name: String(layer.name || "Layer"),
@@ -272,7 +322,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
         welcome_content: firstMessage?.content || nextConfig.welcome_content || "",
         welcome_embed_title: firstMessage?.embed_title || nextConfig.welcome_embed_title || "",
         welcome_embed_description: firstMessage?.embed_description || nextConfig.welcome_embed_description || "",
-        welcome_embed_color: firstMessage?.embed_color || nextConfig.welcome_embed_color || "#5865F2",
+        welcome_embed_color: firstMessage?.embed_color || nextConfig.welcome_embed_color || "#A3A7B0",
         welcome_embed_thumbnail: (firstMessage?.embed_thumbnail || nextConfig.welcome_embed_thumbnail || "") || null,
         welcome_embed_image: (firstMessage?.embed_image || nextConfig.welcome_embed_image || "") || null,
         welcome_embed_footer: firstMessage?.embed_footer || nextConfig.welcome_embed_footer || "",
@@ -283,7 +333,14 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
       }),
     });
     setLastSaved(new Date());
+    setLastPersistedConfig(nextConfig);
+    setSaveSummary({ type: "success", text: "Settings saved successfully." });
   }, [guildId]);
+
+  const hasUnsavedChanges = useMemo(
+    () => JSON.stringify(config) !== JSON.stringify(lastPersistedConfig),
+    [config, lastPersistedConfig]
+  );
 
   useDebouncedAutoSave({
     value: config,
@@ -291,15 +348,35 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
-    onError: () => toast("Auto-save failed for onboarding settings", "error"),
+    onError: () => {
+      setSaveSummary({ type: "error", text: "Auto-save failed. Please retry." });
+      toast("Auto-save failed for onboarding settings", "error");
+    },
   });
 
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [hasUnsavedChanges]);
+
   const handleSave = async () => {
+    const validationError = validateBeforeSave(config);
+    if (validationError) {
+      setSaveSummary({ type: "error", text: validationError });
+      toast(validationError, "error");
+      return;
+    }
     setSaving(true);
     try {
       await persistConfig(config);
       toast("Onboarding settings saved!");
     } catch {
+      setSaveSummary({ type: "error", text: "Failed to save onboarding settings." });
       toast("Failed to save onboarding settings.", "error");
     } finally {
       setSaving(false);
@@ -308,7 +385,14 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
 
   const handlePostVerificationPanel = async () => {
     if (!config.verification_channel_id) {
+      setSaveSummary({ type: "error", text: "Verification channel is required before posting panel." });
       toast("Select a verification channel first.", "error");
+      return;
+    }
+    const validationError = validateBeforeSave(config);
+    if (validationError) {
+      setSaveSummary({ type: "error", text: validationError });
+      toast(validationError, "error");
       return;
     }
 
@@ -328,7 +412,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
             panel_embed_title: config.panel_embed_title || "Verification Required",
             panel_embed_description:
               config.panel_embed_description || "Click the button below to verify and unlock full server access.",
-            panel_embed_color: config.panel_embed_color || "#5865F2",
+            panel_embed_color: config.panel_embed_color || "#A3A7B0",
             panel_embed_thumbnail: config.panel_embed_thumbnail || null,
             panel_embed_image: config.panel_embed_image || null,
             panel_embed_footer: config.panel_embed_footer || null,
@@ -339,8 +423,13 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
       toast("Verification panel trigger sent! It should appear in your configured verification channel.");
 
       const latest = await fetchApi(`/guilds/${guildId}/onboarding`);
-      setConfig(normalizeConfig(latest || {}));
+      const normalized = normalizeConfig(latest || {});
+      setConfig(normalized);
+      setLastPersistedConfig(normalized);
+      setLastLoadedAt(new Date());
+      setSaveSummary({ type: "success", text: "Panel posted and settings refreshed." });
     } catch (err: any) {
+      setSaveSummary({ type: "error", text: `Failed to post verification panel: ${err.message}` });
       toast(`Failed to post verification panel: ${err.message}`, "error");
     } finally {
       setPostingPanel(false);
@@ -370,21 +459,50 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
                 Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
+            {lastLoadedAt && (
+              <span className="text-xs text-discord-text-muted">
+                Loaded {new Date().getTime() - lastLoadedAt.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
+            {saveSummary && (
+              <span className={`text-xs ${saveSummary.type === "error" ? "text-red-300" : "text-green-300"}`}>
+                {saveSummary.text}
+              </span>
+            )}
+            {hasUnsavedChanges && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setConfig(lastPersistedConfig);
+                  setSaveSummary({ type: "success", text: "Reverted to last saved settings." });
+                }}
+              >
+                Reset to Last Saved
+              </Button>
+            )}
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Settings"}
             </Button>
           </div>
         }
       />
+      {loadError && (
+        <DashboardErrorBanner
+          message={loadError.message}
+          onRetry={loadConfig}
+          actionLabel={loadError.needsRelogin ? "Login" : undefined}
+          actionHref={loadError.needsRelogin ? "/login" : undefined}
+        />
+      )}
 
-      <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6">
+      <div className="rounded-xl border border-[#1E1F22] bg-[#1f2024] p-6">
         <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="flex items-center gap-2 text-sm text-discord-text-muted">
             <input
               type="checkbox"
               checked={config.enabled}
               onChange={(e) => updateConfig("enabled", e.target.checked)}
-              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
             />
             Enable Onboarding System
           </label>
@@ -394,7 +512,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
               type="checkbox"
               checked={config.verification_enabled}
               onChange={(e) => updateConfig("verification_enabled", e.target.checked)}
-              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
             />
             Enable Verification Gate
           </label>
@@ -436,7 +554,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
               type="checkbox"
               checked={config.lock_until_verified}
               onChange={(e) => updateConfig("lock_until_verified", e.target.checked)}
-              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
             />
             Lock channel visibility until verified
           </label>
@@ -446,7 +564,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
               type="checkbox"
               checked={config.dm_on_join}
               onChange={(e) => updateConfig("dm_on_join", e.target.checked)}
-              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
             />
             DM users on join with verification instructions
           </label>
@@ -530,7 +648,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
         onDynamicImagesChange={(value) => updateConfig("welcome_dynamic_images", value)}
       />
 
-      <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6 space-y-4">
+      <div className="rounded-xl border border-[#1E1F22] bg-[#1f2024] p-6 space-y-4">
         <h2 className="text-lg font-bold text-white">Join Guard (Anti-Alt Basics)</h2>
         <p className="text-sm text-discord-text-muted">
           This can block very new accounts and users with default avatars. VPN/IP checks are not available through Discord bot APIs.
@@ -542,7 +660,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
               type="checkbox"
               checked={config.join_guard_enabled}
               onChange={(e) => updateConfig("join_guard_enabled", e.target.checked)}
-              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
             />
             Enable Join Guard
           </label>
@@ -552,7 +670,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
               type="checkbox"
               checked={config.block_default_avatar}
               onChange={(e) => updateConfig("block_default_avatar", e.target.checked)}
-              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+              className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
             />
             Block accounts without a custom avatar
           </label>
@@ -574,7 +692,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
             <select
               value={config.join_guard_action}
               onChange={(e) => updateConfig("join_guard_action", e.target.value as "kick" | "ban")}
-              className="flex h-10 w-full rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text"
+              className="flex h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text"
             >
               <option value="kick">Kick</option>
               <option value="ban">Ban</option>

@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchApi } from "@/lib/api";
+import { toDashboardErrorState, type DashboardErrorState } from "@/lib/dashboard-errors";
 import { useToast } from "@/components/ui/toast";
 import { ChannelSelect, RoleMultiSelect, ChannelMultiSelect } from "@/components/ui/discord-selects";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { DashboardErrorBanner } from "@/components/ui/dashboard-error-banner";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { ShieldAlertIcon, PlusIcon, XIcon, FlaskConical, CheckCircle2, XCircle } from "lucide-react";
 
@@ -192,19 +194,33 @@ export default function AutoModPage({ params }: { params: Promise<{ guildId: str
   const [config, setConfig] = useState<AutoModConfig>(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [loadError, setLoadError] = useState<DashboardErrorState | null>(null);
 
   // Test config state
   const [testText, setTestText] = useState("");
   const [testResult, setTestResult] = useState<null | { triggered: boolean; reason: string; action?: string; url?: string }>(null);
   const [testing, setTesting] = useState(false);
 
-  useEffect(() => {
+  const loadConfig = useCallback(() => {
+    setLoadError(null);
+    setInitialLoadComplete(false);
     fetchApi(`/guilds/${guildId}/automod`)
-      .then((data) => setConfig(normalizeConfig(data || {})))
-      .catch(() => toast("Failed to load Auto-Mod settings", "error"))
+      .then((data) => {
+        setConfig(normalizeConfig(data || {}));
+        setLastLoadedAt(new Date());
+      })
+      .catch((err) => {
+        setLoadError(toDashboardErrorState(err, "Failed to load Auto-Mod settings."));
+        toast("Failed to load Auto-Mod settings", "error");
+      })
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
 
   const persistConfig = useCallback(
     async (next: AutoModConfig) => {
@@ -289,12 +305,25 @@ export default function AutoModPage({ params }: { params: Promise<{ guildId: str
                 Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
+            {lastLoadedAt && (
+              <span className="text-xs text-discord-text-muted">
+                Loaded {new Date().getTime() - lastLoadedAt.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Settings"}
             </Button>
           </div>
         }
       />
+      {loadError && (
+        <DashboardErrorBanner
+          message={loadError.message}
+          onRetry={loadConfig}
+          actionLabel={loadError.needsRelogin ? "Login" : undefined}
+          actionHref={loadError.needsRelogin ? "/login" : undefined}
+        />
+      )}
 
       {/* ── General Settings ── */}
       <Section title="General Settings">

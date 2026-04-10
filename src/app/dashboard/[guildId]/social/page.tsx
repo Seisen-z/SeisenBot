@@ -460,7 +460,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
             <span className="text-xs font-bold text-discord-text-muted uppercase tracking-wider">Sources</span>
             <button
               onClick={addMonitor}
-              className="flex items-center gap-1 text-xs text-discord-text-muted hover:text-white bg-[#1E1F22] hover:bg-discord-blurple rounded-md px-2 py-1 transition"
+              className="flex items-center gap-1 rounded-md bg-[#1E1F22] px-2 py-1 text-xs text-discord-text-muted transition hover:bg-white/15 hover:text-white"
             >
               <PlusIcon className="w-3 h-3" /> Add
             </button>
@@ -481,7 +481,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                 key={`${monitor.platform}-${idx}`}
                 onClick={() => setActiveIdx(idx)}
                 className={`flex items-center justify-between gap-2 text-left px-3 py-2 rounded-md transition-colors ${
-                  isActive ? "bg-discord-blurple text-white font-medium shadow-sm" : "text-discord-text hover:bg-[#383A40]"
+                  isActive ? "bg-white/14 text-white font-medium shadow-sm" : "text-discord-text hover:bg-[#383A40]"
                 }`}
               >
                 <div className="flex flex-col min-w-0">
@@ -512,7 +512,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                       type="checkbox"
                       checked={activeMonitor.enabled}
                       onChange={(e) => updateMonitor("enabled", e.target.checked)}
-                      className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple focus:ring-2 focus:ring-discord-blurple"
+                      className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white focus:ring-2 focus:ring-white/35"
                     />
                     Enabled
                   </label>
@@ -533,7 +533,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                     <select
                       value={activeMonitor.platform}
                       onChange={(e) => updateMonitor("platform", e.target.value as SocialPlatform)}
-                      className="flex h-10 w-full rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text transition-colors hover:border-[#1E1F22] focus:outline-none focus:ring-2 focus:ring-discord-blurple"
+                      className="flex h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text transition-colors hover:border-[#1E1F22] focus:outline-none focus:ring-2 focus:ring-white/35"
                     >
                       <option value="youtube">YouTube</option>
                       <option value="tiktok">TikTok</option>
@@ -594,7 +594,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
                               href={lastTestResult.latest_entry.link}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-discord-blurple hover:underline"
+                              className="text-white hover:underline"
                             >
                               Open latest post
                             </a>

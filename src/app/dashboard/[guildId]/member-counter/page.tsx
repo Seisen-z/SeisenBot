@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChannelSelect } from "@/components/ui/discord-selects";
 import { fetchApi } from "@/lib/api";
+import { toDashboardErrorState, type DashboardErrorState } from "@/lib/dashboard-errors";
 import { useToast } from "@/components/ui/toast";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { DashboardErrorBanner } from "@/components/ui/dashboard-error-banner";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { RefreshCcwIcon, UsersIcon } from "lucide-react";
 
@@ -76,7 +78,9 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
   const [creating, setCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
   const [currentUserId, setCurrentUserId] = useState("");
+  const [loadError, setLoadError] = useState<DashboardErrorState | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -92,12 +96,24 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
       });
   }, []);
 
-  useEffect(() => {
+  const loadConfig = useCallback(() => {
+    setLoadError(null);
+    setInitialLoadComplete(false);
     fetchApi(`/guilds/${guildId}/member_counter`)
-      .then((data) => setConfig(normalizeCounterConfig(data)))
-      .catch(() => toast("Failed to load member counter config", "error"))
+      .then((data) => {
+        setConfig(normalizeCounterConfig(data));
+        setLastLoadedAt(new Date());
+      })
+      .catch((err) => {
+        setLoadError(toDashboardErrorState(err, "Failed to load member counter config."));
+        toast("Failed to load member counter config", "error");
+      })
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
 
   const persistConfig = useCallback(async (nextConfig: MemberCounterConfig) => {
     await fetchApi(`/guilds/${guildId}/member_counter`, undefined, {
@@ -219,6 +235,11 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
                 Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
+            {lastLoadedAt && (
+              <span className="text-xs text-discord-text-muted">
+                Loaded {new Date().getTime() - lastLoadedAt.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
             <Button variant="outline" onClick={syncCounterNow} disabled={syncing || !config.channel_id} className="inline-flex items-center gap-2">
               <RefreshCcwIcon className="h-4 w-4" />
               {syncing ? "Syncing..." : "Sync Now"}
@@ -232,11 +253,19 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
           </div>
         }
       />
+      {loadError && (
+        <DashboardErrorBanner
+          message={loadError.message}
+          onRetry={loadConfig}
+          actionLabel={loadError.needsRelogin ? "Login" : undefined}
+          actionHref={loadError.needsRelogin ? "/login" : undefined}
+        />
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6">
+        <div className="rounded-xl border border-[#1E1F22] bg-[#1f2024] p-6">
           <div className="space-y-5">
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#202225]/80 p-3">
+            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#1a1b1f]/80 p-3">
               <div>
                 <p className="text-sm font-semibold text-white">Enable Realtime Counter</p>
                 <p className="text-xs text-discord-text-muted">Updates on joins/leaves and periodic sync loop.</p>
@@ -244,7 +273,7 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
               <label className="inline-flex cursor-pointer items-center">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-white/20 bg-[#111827] text-discord-blurple"
+                  className="h-4 w-4 rounded border-white/20 bg-[#111114] text-white"
                   checked={config.enabled}
                   onChange={(e) => updateConfig({ enabled: e.target.checked })}
                 />
@@ -268,7 +297,7 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
                 <select
                   value={config.channel_type}
                   onChange={(e) => updateConfig({ channel_type: e.target.value === "text" ? "text" : "voice" })}
-                  className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm text-discord-text outline-none transition focus:border-discord-blurple"
+                  className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1a1b1f] px-3 text-sm text-discord-text outline-none transition focus:border-white/30"
                 >
                   <option value="voice">Voice</option>
                   <option value="text">Text</option>
@@ -297,7 +326,7 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#202225]/80 p-3">
+            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#1a1b1f]/80 p-3">
               <div>
                 <p className="text-sm font-semibold text-white">Include Bots</p>
                 <p className="text-xs text-discord-text-muted">When enabled, bot accounts are included in the count.</p>
@@ -305,7 +334,7 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
               <label className="inline-flex cursor-pointer items-center">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-white/20 bg-[#111827] text-discord-blurple"
+                  className="h-4 w-4 rounded border-white/20 bg-[#111114] text-white"
                   checked={config.include_bots}
                   onChange={(e) => updateConfig({ include_bots: e.target.checked })}
                 />

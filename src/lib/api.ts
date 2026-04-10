@@ -48,11 +48,17 @@ export async function fetchApi(endpoint: string, jwt?: string, init?: RequestIni
     headers.set('Authorization', `Bearer ${jwt}`);
   }
 
-  const res = await fetch(`${API_BASE}${normalizeEndpoint(endpoint)}`, {
-    ...init,
-    headers,
-    credentials: 'include', // Ensure cookies are sent with requests
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${normalizeEndpoint(endpoint)}`, {
+      ...init,
+      headers,
+      credentials: 'include', // Ensure cookies are sent with requests
+    });
+  } catch (err) {
+    const reason = err instanceof Error && err.message ? err.message : 'Network request failed';
+    throw new Error(`API Network Error: ${reason}`);
+  }
 
   const contentType = (res.headers.get('content-type') || '').toLowerCase();
   const isJsonResponse = contentType.includes('application/json');

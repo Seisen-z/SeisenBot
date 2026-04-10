@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchApi } from "@/lib/api";
+import { toDashboardErrorState, type DashboardErrorState } from "@/lib/dashboard-errors";
 import { useToast } from "@/components/ui/toast";
 import { ChannelMultiSelect } from "@/components/ui/discord-selects";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { DashboardErrorBanner } from "@/components/ui/dashboard-error-banner";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { MessageSquareIcon, PlusIcon, Trash2Icon } from "lucide-react";
 
@@ -19,9 +21,13 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
   const [activeIdx, setActiveIdx] = useState<number>(-1);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [loadError, setLoadError] = useState<DashboardErrorState | null>(null);
 
-  useEffect(() => {
+  const loadRules = useCallback(() => {
+    setLoadError(null);
+    setInitialLoadComplete(false);
     fetchApi(`/guilds/${guildId}/autoreply`)
       .then((data) => {
         let r = data || [];
@@ -36,10 +42,18 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
         });
         setRules(r);
         if (r.length > 0) setActiveIdx(0);
+        setLastLoadedAt(new Date());
       })
-      .catch((err) => toast("Failed to load Auto Replies", "error"))
+      .catch((err) => {
+        setLoadError(toDashboardErrorState(err, "Failed to load Auto Replies."));
+        toast("Failed to load Auto Replies", "error");
+      })
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
+
+  useEffect(() => {
+    loadRules();
+  }, [loadRules]);
 
   const persistRules = useCallback(async (nextRules: any[]) => {
     await fetchApi(`/guilds/${guildId}/autoreply`, undefined, {
@@ -113,12 +127,25 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                 Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
+            {lastLoadedAt && (
+              <span className="text-xs text-discord-text-muted">
+                Loaded {new Date().getTime() - lastLoadedAt.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         }
       />
+      {loadError && (
+        <DashboardErrorBanner
+          message={loadError.message}
+          onRetry={loadRules}
+          actionLabel={loadError.needsRelogin ? "Login" : undefined}
+          actionHref={loadError.needsRelogin ? "/login" : undefined}
+        />
+      )}
 
       <div className="flex gap-6 h-[calc(100vh-220px)] min-h-[500px]">
         {/* Sidebar */}

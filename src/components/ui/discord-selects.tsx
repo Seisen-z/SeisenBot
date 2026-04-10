@@ -152,7 +152,7 @@ export function ChannelSelect({
         type="button"
         onClick={() => !loading && !errorMsg && setIsOpen(!isOpen)}
         disabled={loading || !!errorMsg}
-        className="flex h-10 w-full items-center justify-between rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text transition-colors hover:border-[#1E1F22] disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-10 w-full items-center justify-between rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text transition-colors hover:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="truncate text-left">
           {loading
@@ -171,7 +171,7 @@ export function ChannelSelect({
           <>
             <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
             <div
-              className="flex flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl"
+              className="flex flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#1f2024] shadow-2xl"
               style={{
                 position: "fixed",
                 top: panelStyle.top,
@@ -187,7 +187,7 @@ export function ChannelSelect({
                   placeholder="Search channels..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-md border border-[#1E1F22] bg-[#1E1F22] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-[#5865F2]/50 focus:outline-none"
+                  className="w-full rounded-md border border-[#2a2b31] bg-[#141417] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-white/35 focus:outline-none"
                 />
               </div>
 
@@ -209,7 +209,7 @@ export function ChannelSelect({
                       >
                         <div className={cn(
                           "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
-                          selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
+                          selected ? "border-[#a3a7b0] bg-[#a3a7b0]" : "border-[#404249] bg-transparent"
                         )}>
                           {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
                         </div>
@@ -285,7 +285,7 @@ export function RoleSelect({
         type="button"
         onClick={() => !loading && !errorMsg && setIsOpen(!isOpen)}
         disabled={loading || !!errorMsg}
-        className="flex h-10 w-full items-center justify-between rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text transition-colors hover:border-[#1E1F22] disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-10 w-full items-center justify-between rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text transition-colors hover:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="truncate text-left">
           {loading
@@ -304,7 +304,7 @@ export function RoleSelect({
           <>
             <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
             <div
-              className="flex flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl"
+              className="flex flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#1f2024] shadow-2xl"
               style={{
                 position: "fixed",
                 top: panelStyle.top,
@@ -320,7 +320,7 @@ export function RoleSelect({
                   placeholder="Search roles..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-md border border-[#1E1F22] bg-[#1E1F22] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-[#5865F2]/50 focus:outline-none"
+                  className="w-full rounded-md border border-[#2a2b31] bg-[#141417] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-white/35 focus:outline-none"
                 />
               </div>
 
@@ -346,7 +346,7 @@ export function RoleSelect({
                       >
                         <div className={cn(
                           "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
-                          selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
+                          selected ? "border-[#a3a7b0] bg-[#a3a7b0]" : "border-[#404249] bg-transparent"
                         )}>
                           {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
                         </div>
@@ -416,7 +416,7 @@ export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMul
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
       <div 
-        className="min-h-[40px] w-full cursor-pointer rounded-md border border-discord-darkest bg-discord-darkest px-2 py-1.5 flex items-center justify-between shadow-sm transition-colors hover:border-[#1E1F22]"
+        className="min-h-[40px] w-full cursor-pointer rounded-md border border-discord-darkest bg-discord-darkest px-2 py-1.5 flex items-center justify-between shadow-sm transition-colors hover:border-white/20"
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex flex-wrap gap-1.5 flex-1 items-center">
@@ -461,7 +461,7 @@ export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMul
                   placeholder="Search roles..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-md border border-[#1E1F22] bg-[#1E1F22] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-[#5865F2]/50 focus:outline-none"
+                  className="w-full rounded-md border border-[#2a2b31] bg-[#141417] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-white/35 focus:outline-none"
                 />
               </div>
 
@@ -484,7 +484,7 @@ export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMul
                         >
                           <div className={cn(
                             "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
-                            selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
+                            selected ? "border-[#a3a7b0] bg-[#a3a7b0]" : "border-[#404249] bg-transparent"
                           )}>
                             {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
                           </div>
@@ -568,7 +568,7 @@ export function ChannelMultiSelect({
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
       <div 
-        className="min-h-[40px] w-full cursor-pointer rounded-md border border-discord-darkest bg-discord-darkest px-2 py-1.5 flex flex-wrap items-center justify-between shadow-sm transition-colors hover:border-[#1E1F22]"
+        className="min-h-[40px] w-full cursor-pointer rounded-md border border-discord-darkest bg-discord-darkest px-2 py-1.5 flex flex-wrap items-center justify-between shadow-sm transition-colors hover:border-white/20"
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex flex-wrap gap-1.5 flex-1 items-center">
@@ -612,7 +612,7 @@ export function ChannelMultiSelect({
                   placeholder="Search channels..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-md border border-[#1E1F22] bg-[#1E1F22] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-[#5865F2]/50 focus:outline-none"
+                  className="w-full rounded-md border border-[#2a2b31] bg-[#141417] px-3 py-1.5 text-sm text-white placeholder-[#8b90a0] transition-colors focus:border-white/35 focus:outline-none"
                 />
               </div>
 
@@ -635,7 +635,7 @@ export function ChannelMultiSelect({
                         >
                           <div className={cn(
                             "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
-                            selected ? "border-[#5865F2] bg-[#5865F2]" : "border-[#404249] bg-transparent"
+                            selected ? "border-[#a3a7b0] bg-[#a3a7b0]" : "border-[#404249] bg-transparent"
                           )}>
                             {selected && <CheckIcon className="h-3 w-3 text-white" strokeWidth={3} />}
                           </div>

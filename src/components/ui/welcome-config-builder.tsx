@@ -227,7 +227,7 @@ export function createWelcomeMessage(groupId: string, name = "Message 1"): Welco
     content: "",
     embed_title: "Welcome ${userglobalnickname}!",
     embed_description: "to ${guildname}\n\nYou are member #${guildmembercount}.",
-    embed_color: "#5865F2",
+    embed_color: "#A3A7B0",
     embed_thumbnail: "",
     embed_image: "",
     embed_footer: "Enjoy your stay",
@@ -302,7 +302,7 @@ export function createWelcomeDynamicImage(name = "Dynamic Image 1"): WelcomeDyna
     name,
     width: 500,
     height: 350,
-    background_color: "#0E1824",
+    background_color: "#121317",
     layers: [
       {
         ...createWelcomeDynamicLayer("block", "Card"),
@@ -327,7 +327,7 @@ export function createWelcomeDynamicImage(name = "Dynamic Image 1"): WelcomeDyna
         x: 106,
         y: 266,
         font_size: 20,
-        color: "#D8DFEA",
+        color: "#D4D4D8",
       },
     ],
   };
@@ -473,7 +473,7 @@ export function normalizeWelcomeDynamicImages(raw: unknown): WelcomeDynamicImage
       name: toStringValue(entry.name, `Dynamic Image ${index + 1}`),
       width: clampNumber(entry.width, 500, 128, 4000),
       height: clampNumber(entry.height, 350, 128, 4000),
-      background_color: toStringValue(entry.background_color, "#0E1824"),
+      background_color: toStringValue(entry.background_color, "#121317"),
       layers,
     });
   }
@@ -535,8 +535,8 @@ function MessageEditModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-      <div className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[#334861] bg-[#131f2f] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#28394f] px-5 py-4">
+      <div className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[#2a2b31] bg-[#15161b] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#2a2b31] px-5 py-4">
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-discord-text-muted">Welcome Message Editor</p>
             <h3 className="text-lg font-bold text-white">{message.name}</h3>
@@ -550,7 +550,7 @@ function MessageEditModal({
           </button>
         </div>
 
-        <div className="flex border-b border-[#28394f] bg-[#101a27] px-5">
+        <div className="flex border-b border-[#2a2b31] bg-[#15161b] px-5">
           {[
             { id: "edit", label: "Edit" },
             { id: "preview", label: "Preview" },
@@ -563,8 +563,8 @@ function MessageEditModal({
                 onClick={() => setTab(item.id as "edit" | "preview")}
                 className={`min-w-[150px] border-b-2 px-4 py-3 text-sm font-semibold transition ${
                   active
-                    ? "border-discord-blurple bg-[#17283b] text-white"
-                    : "border-transparent text-discord-text-muted hover:bg-[#162436] hover:text-white"
+                    ? "border-white/35 bg-[#1f2026] text-white"
+                    : "border-transparent text-discord-text-muted hover:bg-[#1c1d24] hover:text-white"
                 }`}
               >
                 {item.label}
@@ -586,7 +586,7 @@ function MessageEditModal({
                   <select
                     value={message.group_id}
                     onChange={(event) => onFieldChange("group_id", event.target.value)}
-                    className="flex h-10 w-full rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text"
+                    className="flex h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text"
                   >
                     {groups.map((group) => (
                       <option key={group.id} value={group.id}>
@@ -610,7 +610,7 @@ function MessageEditModal({
                   <select
                     value={message.message_mode}
                     onChange={(event) => onFieldChange("message_mode", event.target.value === "normal" ? "normal" : "embed")}
-                    className="flex h-10 w-full rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text"
+                    className="flex h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text"
                   >
                     <option value="normal">Normal Message</option>
                     <option value="embed">Embed Message</option>
@@ -621,7 +621,7 @@ function MessageEditModal({
                     type="checkbox"
                     checked={message.enabled}
                     onChange={(event) => onFieldChange("enabled", event.target.checked)}
-                    className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+                    className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
                   />
                   Enable message
                 </label>
@@ -677,13 +677,13 @@ function MessageEditModal({
                     </div>
 
                     {usesAttachmentMode && (
-                      <div className="rounded-lg border border-[#1f5f2a] bg-[#1f3a25] p-3 text-xs text-green-300">
+                      <div className="rounded-lg border border-white/20 bg-white/10 p-3 text-xs text-white/90">
                         This message has a dynamic image attached. It will be sent as a normal message image attachment (no embed card).
                       </div>
                     )}
 
                     {!usesAttachmentMode && message.message_mode === "normal" && (
-                      <div className="rounded-lg border border-[#24517a] bg-[#183551] p-3 text-xs text-[#b7d9ff]">
+                      <div className="rounded-lg border border-white/20 bg-white/10 p-3 text-xs text-white/90">
                         This message is set to Normal mode. Content is sent as a regular message without an embed card.
                       </div>
                     )}
@@ -695,7 +695,7 @@ function MessageEditModal({
             </div>
           ) : (
             <div className="space-y-5">
-              <div className="rounded-xl border border-[#223145] bg-[#0e1824] p-6">
+              <div className="rounded-xl border border-[#2a2b31] bg-[#121317] p-6">
                 <DiscordMessagePreview
                   message={{
                     content: applyWelcomeTokens(message.content),
@@ -722,7 +722,7 @@ function MessageEditModal({
               </div>
 
               {(currentDynamicImage || (!usesEmbedMode && message.embed_image)) && (
-                <div className="rounded-xl border border-[#223145] bg-[#0e1824] p-4">
+                <div className="rounded-xl border border-[#2a2b31] bg-[#121317] p-4">
                   <p className="mb-3 text-xs uppercase tracking-[0.12em] text-discord-text-muted">Image Attachment Preview</p>
                   {currentDynamicImage ? (
                     <BotRenderedDynamicImage
@@ -794,7 +794,7 @@ function DynamicImageCanvas({
 
     const scale = Math.max(0.01, frameWidth / Math.max(1, image.width));
     const scaledHeight = Math.max(1, image.height * scale);
-    const canvasBackground = String(image.background_color || "#0E1824").trim() || "#0E1824";
+    const canvasBackground = String(image.background_color || "#121317").trim() || "#121317";
 
     const sortedLayers = [...image.layers].sort((a, b) => {
       const rank = (layer: WelcomeDynamicImageLayer) => (layer.z_position === "back" ? 0 : 1);
@@ -869,7 +869,7 @@ function DynamicImageCanvas({
               borderRadius: `${clampedRadius}px`,
               userSelect: "none",
               cursor: editable ? "grab" : "default",
-              outline: isSelected ? "2px solid rgba(45, 196, 183, 0.9)" : undefined,
+              outline: isSelected ? "2px solid rgba(210, 210, 210, 0.8)" : undefined,
               outlineOffset: isSelected ? "1px" : undefined,
             };
 
@@ -907,7 +907,7 @@ function DynamicImageCanvas({
                     ...style,
                     borderRadius: "999px",
                     border: `${avatarBorderWidth}px solid ${avatarBorderColor}`,
-                    background: "linear-gradient(135deg, #6d7cff, #4e61f6)",
+                    background: "linear-gradient(135deg, #9ea2ab, #6f737c)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1164,9 +1164,9 @@ function DynamicImageEditorModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-      <div className="flex h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-[#334861] bg-[#131f2f] shadow-2xl">
-        <div className="flex w-[320px] flex-col border-r border-[#2a3b52] bg-[#101b2a]">
-          <div className="border-b border-[#2a3b52] px-4 py-4">
+      <div className="flex h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-[#2a2b31] bg-[#15161b] shadow-2xl">
+        <div className="flex w-[320px] flex-col border-r border-[#2a2b31] bg-[#14151a]">
+          <div className="border-b border-[#2a2b31] px-4 py-4">
             <p className="text-xs uppercase tracking-[0.12em] text-discord-text-muted">Dynamic Image</p>
             <h3 className="text-lg font-bold text-white">{image.name}</h3>
           </div>
@@ -1250,8 +1250,8 @@ function DynamicImageEditorModal({
                   key={layer.id}
                   className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left ${
                     selected
-                      ? "border-discord-blurple bg-[#16304b]"
-                      : "border-[#26384d] bg-[#152334] hover:border-[#375170]"
+                      ? "border-white/35 bg-[#1f2026]"
+                      : "border-[#2a2b31] bg-[#1a1b21] hover:border-white/25"
                   }`}
                 >
                   <button
@@ -1278,7 +1278,7 @@ function DynamicImageEditorModal({
         </div>
 
         <div className="flex flex-1 flex-col">
-          <div className="flex items-center justify-between border-b border-[#2a3b52] px-5 py-4">
+          <div className="flex items-center justify-between border-b border-[#2a2b31] px-5 py-4">
             <div>
               <p className="text-xs uppercase tracking-[0.12em] text-discord-text-muted">Live Canvas</p>
               <h4 className="text-lg font-bold text-white">Dynamic Image Designer</h4>
@@ -1294,7 +1294,7 @@ function DynamicImageEditorModal({
 
           <div className="grid flex-1 grid-cols-1 gap-5 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="space-y-4">
-              <div className="rounded-xl border border-[#263a50] bg-[#0e1824] p-4">
+              <div className="rounded-xl border border-[#2a2b31] bg-[#121317] p-4">
                 <DynamicImageCanvas
                   image={image}
                   className="mx-auto max-w-[820px]"
@@ -1306,7 +1306,7 @@ function DynamicImageEditorModal({
                 <p className="mt-3 text-xs text-discord-text-muted">Tip: Click a layer and drag it directly on the canvas to reposition.</p>
               </div>
 
-              <div className="rounded-xl border border-[#263a50] bg-[#0e1824] p-4">
+              <div className="rounded-xl border border-[#2a2b31] bg-[#121317] p-4">
                 <p className="mb-2 text-xs uppercase tracking-[0.12em] text-discord-text-muted">Exact Runtime Preview</p>
                 <BotRenderedDynamicImage
                   guildId={guildId}
@@ -1318,7 +1318,7 @@ function DynamicImageEditorModal({
               </div>
             </div>
 
-            <div className="rounded-xl border border-[#263a50] bg-[#111c2b] p-4">
+            <div className="rounded-xl border border-[#2a2b31] bg-[#14151a] p-4">
               {!selectedLayer && <p className="text-sm text-discord-text-muted">Select a layer to edit its properties.</p>}
 
               {selectedLayer && (
@@ -1336,7 +1336,7 @@ function DynamicImageEditorModal({
                       type="checkbox"
                       checked={selectedLayer.enabled}
                       onChange={(event) => updateLayer(selectedLayer.id, { enabled: event.target.checked })}
-                      className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+                      className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
                     />
                     Layer enabled
                   </label>
@@ -1346,7 +1346,7 @@ function DynamicImageEditorModal({
                     <select
                       value={selectedLayer.z_position}
                       onChange={(event) => updateLayer(selectedLayer.id, { z_position: event.target.value === "back" ? "back" : "front" })}
-                      className="flex h-10 w-full rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text"
+                      className="flex h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text"
                     >
                       <option value="back">Back</option>
                       <option value="front">Front</option>
@@ -1371,7 +1371,7 @@ function DynamicImageEditorModal({
                           onChange={(event) =>
                             updateLayer(selectedLayer.id, { font_weight: event.target.checked ? "bold" : "normal" })
                           }
-                          className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+                          className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
                         />
                         Bold text
                       </label>
@@ -1389,7 +1389,7 @@ function DynamicImageEditorModal({
                                     : "left",
                               })
                             }
-                            className="flex h-10 w-full rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text"
+                            className="flex h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text"
                           >
                             <option value="left">Left</option>
                             <option value="center">Center</option>
@@ -1408,7 +1408,7 @@ function DynamicImageEditorModal({
                                     : "top",
                               })
                             }
-                            className="flex h-10 w-full rounded-xl border border-white/14 bg-[#0c1825]/92 px-3 py-2 text-sm text-discord-text"
+                            className="flex h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 py-2 text-sm text-discord-text"
                           >
                             <option value="top">Top</option>
                             <option value="middle">Middle</option>
@@ -1542,8 +1542,8 @@ function SimulationModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-[#334861] bg-[#162334] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#2a3b52] px-6 py-4">
+      <div className="w-full max-w-xl rounded-2xl border border-[#2a2b31] bg-[#15161b] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#2a2b31] px-6 py-4">
           <h3 className="text-2xl font-bold text-white">Simulate Join</h3>
           <button
             type="button"
@@ -1556,11 +1556,11 @@ function SimulationModal({
 
         <div className="space-y-3 px-6 py-5">
           <p className="text-sm text-discord-text-muted">Select which randomized groups should be included in this simulation.</p>
-          <div className="max-h-[260px] space-y-2 overflow-y-auto rounded-lg border border-[#2d4259] bg-[#111c2a] p-3">
+          <div className="max-h-[260px] space-y-2 overflow-y-auto rounded-lg border border-[#2a2b31] bg-[#14151a] p-3">
             {groups.map((group) => {
               const checked = selectedGroupIds.includes(group.id);
               return (
-                <label key={group.id} className="flex items-center justify-between rounded-md border border-[#293b52] bg-[#1a2b3f] px-3 py-2 text-sm text-discord-text">
+                <label key={group.id} className="flex items-center justify-between rounded-md border border-[#2a2b31] bg-[#1a1b21] px-3 py-2 text-sm text-discord-text">
                   <span>{group.name}</span>
                   <input
                     type="checkbox"
@@ -1572,7 +1572,7 @@ function SimulationModal({
                         onSelectedGroupIdsChange(selectedGroupIds.filter((id) => id !== group.id));
                       }
                     }}
-                    className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+                    className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
                   />
                 </label>
               );
@@ -1580,13 +1580,13 @@ function SimulationModal({
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-[#2a3b52] px-6 py-4">
+        <div className="flex justify-end border-t border-[#2a2b31] px-6 py-4">
           <Button
             onClick={() => {
               onSimulate();
               onClose();
             }}
-            className="bg-[#2081de] text-white hover:bg-[#1a71c4]"
+            className="bg-[#8f939c] text-white hover:bg-[#7f838c]"
           >
             Simulate all
           </Button>
@@ -1615,7 +1615,7 @@ function AttachDynamicImageModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-3xl rounded-2xl border border-[#334861] bg-[#1a2738] shadow-2xl">
+      <div className="w-full max-w-3xl rounded-2xl border border-[#2a2b31] bg-[#15161b] shadow-2xl">
         <div className="flex items-center justify-end px-4 py-3">
           <button
             type="button"
@@ -1627,7 +1627,7 @@ function AttachDynamicImageModal({
         </div>
 
         <div className="px-6 pb-6">
-          <div className="mb-6 rounded-xl border border-[#2b425a] bg-[#122133] p-3">
+          <div className="mb-6 rounded-xl border border-[#2a2b31] bg-[#121317] p-3">
             <DynamicImageCanvas image={image} className="mx-auto max-w-[220px]" />
           </div>
 
@@ -1648,8 +1648,8 @@ function AttachDynamicImageModal({
                   }}
                   className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition ${
                     isAttached
-                      ? "border-[#1f5f2a] bg-[#25722f] text-white hover:bg-[#2c8738]"
-                      : "border-[#2b425a] bg-[#142336] text-discord-text hover:bg-[#1a2d44]"
+                      ? "border-white/30 bg-white/15 text-white hover:bg-white/20"
+                      : "border-[#2a2b31] bg-[#1a1b21] text-discord-text hover:bg-[#24262d]"
                   }`}
                 >
                   <div>
@@ -1664,7 +1664,7 @@ function AttachDynamicImageModal({
             })}
 
             {messages.length === 0 && (
-              <div className="rounded-lg border border-dashed border-[#3a5168] bg-[#142335] p-5 text-center text-sm text-discord-text-muted">
+              <div className="rounded-lg border border-dashed border-[#3a3b42] bg-[#1a1b21] p-5 text-center text-sm text-discord-text-muted">
                 Create a message first, then attach this dynamic image.
               </div>
             )}
@@ -1974,27 +1974,27 @@ export function WelcomeConfigBuilder({
   };
 
   return (
-    <div className="rounded-2xl border border-[#1E1F22] bg-[#2B2D31] p-5">
+    <div className="rounded-2xl border border-[#1E1F22] bg-[#1f2024] p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-white">Welcome Messages</h2>
           <p className="text-sm text-discord-text-muted">Build randomized join messages, dynamic images, and simulation exactly from one place.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setSimulationOpen(true)} className="bg-[#1c6fbd] text-white hover:bg-[#1a62a5]">
+          <Button onClick={() => setSimulationOpen(true)} className="bg-[#8f939c] text-white hover:bg-[#7f838c]">
             <PlayIcon className="mr-1 h-4 w-4" />
             Simulate Join
           </Button>
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-[#233246] bg-[#1a2738] p-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-[#2a2b31] bg-[#1a1b21] p-4 md:grid-cols-2 lg:grid-cols-4">
         <label className="flex items-center gap-2 text-sm text-discord-text-muted">
           <input
             type="checkbox"
             checked={welcomeEnabled}
             onChange={(event) => onWelcomeEnabledChange(event.target.checked)}
-            className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+            className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
           />
           Enable welcome messages
         </label>
@@ -2004,7 +2004,7 @@ export function WelcomeConfigBuilder({
             type="checkbox"
             checked={sendWelcomeOnJoin}
             onChange={(event) => onSendOnJoinChange(event.target.checked)}
-            className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+            className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
           />
           Send on join
         </label>
@@ -2014,7 +2014,7 @@ export function WelcomeConfigBuilder({
             type="checkbox"
             checked={sendWelcomeOnVerify}
             onChange={(event) => onSendOnVerifyChange(event.target.checked)}
-            className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-discord-blurple"
+            className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
           />
           Send after verify
         </label>
@@ -2030,7 +2030,7 @@ export function WelcomeConfigBuilder({
         </div>
       </div>
 
-      <div className="mb-4 flex overflow-hidden rounded-xl border border-[#24374d] bg-[#101b29]">
+      <div className="mb-4 flex overflow-hidden rounded-xl border border-[#2a2b31] bg-[#14151a]">
         {[
           { id: "messages", label: "Messages" },
           { id: "dynamic", label: "Dynamic images" },
@@ -2044,8 +2044,8 @@ export function WelcomeConfigBuilder({
               onClick={() => setTab(item.id as WelcomeBuilderTab)}
               className={`flex-1 border-b-2 px-4 py-3 text-sm font-semibold transition ${
                 active
-                  ? "border-discord-blurple bg-[#1a2d44] text-white"
-                  : "border-transparent text-discord-text-muted hover:bg-[#17283d] hover:text-white"
+                  ? "border-white/35 bg-[#1f2026] text-white"
+                  : "border-transparent text-discord-text-muted hover:bg-[#1c1d24] hover:text-white"
               }`}
             >
               {item.label}
@@ -2058,7 +2058,7 @@ export function WelcomeConfigBuilder({
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-discord-text-muted">Each group sends one weighted-random message when onboarding welcome runs.</p>
-            <Button onClick={addGroup} className="bg-[#162b40] hover:bg-[#1b334d]">
+            <Button onClick={addGroup} className="bg-[#2a2c33] hover:bg-[#353840]">
               <PlusIcon className="mr-1 h-4 w-4" />
               New group
             </Button>
@@ -2069,7 +2069,7 @@ export function WelcomeConfigBuilder({
             const totalWeight = groupMessages.reduce((sum, item) => sum + Math.max(1, Number(item.weight) || 1), 0);
 
             return (
-              <div key={group.id} className="rounded-xl border border-[#253951] bg-[#142336] p-4">
+              <div key={group.id} className="rounded-xl border border-[#2a2b31] bg-[#1a1b21] p-4">
                 <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-[1.2fr_1fr_auto]">
                   <Input
                     value={group.name}
@@ -2091,7 +2091,7 @@ export function WelcomeConfigBuilder({
                     placeholder="Group channel (optional)"
                   />
                   <div className="flex items-center gap-2">
-                    <Button onClick={() => addMessageToGroup(group.id)} className="h-10 bg-[#1d3651] hover:bg-[#254264]">
+                    <Button onClick={() => addMessageToGroup(group.id)} className="h-10 bg-[#2a2c33] hover:bg-[#353840]">
                       <PlusIcon className="mr-1 h-4 w-4" />
                       New message
                     </Button>
@@ -2112,7 +2112,7 @@ export function WelcomeConfigBuilder({
                     const dynamic = dynamicImages.find((image) => image.id === message.dynamic_image_id);
                     const modeLabel = message.dynamic_image_id ? "Normal (dynamic)" : message.message_mode === "embed" ? "Embed" : "Normal";
                     return (
-                      <div key={message.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#2f465f] bg-[#1a2b3f] px-3 py-2">
+                      <div key={message.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#2a2b31] bg-[#1a1b21] px-3 py-2">
                         <div>
                           <p className="font-semibold text-white">{message.name}</p>
                           <p className="text-xs text-discord-text-muted">
@@ -2121,7 +2121,7 @@ export function WelcomeConfigBuilder({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-2 rounded-lg border border-[#304862] bg-[#111c2b] px-2 py-1">
+                          <div className="flex items-center gap-2 rounded-lg border border-[#2a2b31] bg-[#14151a] px-2 py-1">
                             <Input
                               type="number"
                               min={1}
@@ -2165,7 +2165,7 @@ export function WelcomeConfigBuilder({
                     <button
                       type="button"
                       onClick={() => addMessageToGroup(group.id)}
-                      className="flex h-14 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[#3a5168] bg-[#142335] text-discord-text-muted transition hover:border-[#4f6b88] hover:text-white"
+                      className="flex h-14 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[#3a3b42] bg-[#1a1b21] text-discord-text-muted transition hover:border-white/30 hover:text-white"
                     >
                       <PlusIcon className="h-4 w-4" />
                       New message
@@ -2189,7 +2189,7 @@ export function WelcomeConfigBuilder({
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {dynamicImages.map((image) => (
-              <div key={image.id} className="rounded-xl border border-[#2b425a] bg-[#142336] p-3">
+              <div key={image.id} className="rounded-xl border border-[#2a2b31] bg-[#1a1b21] p-3">
                 <BotRenderedDynamicImage
                   guildId={guildId}
                   image={image}
@@ -2225,7 +2225,7 @@ export function WelcomeConfigBuilder({
                 <button
                   type="button"
                   onClick={() => setAttachImageId(image.id)}
-                  className="mt-3 flex w-full items-center justify-between rounded-lg bg-[#1983e8] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#1676cf]"
+                  className="mt-3 flex w-full items-center justify-between rounded-lg bg-[#8f939c] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#7f838c]"
                 >
                   <span>Attach to message</span>
                   <span className="text-2xl leading-none">›</span>
@@ -2236,7 +2236,7 @@ export function WelcomeConfigBuilder({
             <button
               type="button"
               onClick={addDynamicImage}
-              className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[#3b5268] bg-[#122133] text-discord-text-muted transition hover:border-[#557898] hover:text-white"
+              className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[#3a3b42] bg-[#1a1b21] text-discord-text-muted transition hover:border-white/30 hover:text-white"
             >
               <PlusIcon className="mb-2 h-6 w-6" />
               <span className="text-xl font-semibold">New dynamic image</span>
@@ -2250,11 +2250,11 @@ export function WelcomeConfigBuilder({
           <p className="text-sm text-discord-text-muted">Run local simulations to preview which messages are selected from each randomized group.</p>
           <p className="text-xs text-discord-text-muted/80">Simulation renders with your logged-in Discord identity for tokenized fields.</p>
           <div className="flex items-center gap-2">
-            <Button onClick={() => setSimulationOpen(true)} className="bg-[#1c6fbd] text-white hover:bg-[#1a62a5]">
+            <Button onClick={() => setSimulationOpen(true)} className="bg-[#8f939c] text-white hover:bg-[#7f838c]">
               <PlayIcon className="mr-1 h-4 w-4" />
               Open simulation picker
             </Button>
-            <Button onClick={runSimulation} className="bg-[#16304a] hover:bg-[#1d3e5e]">
+            <Button onClick={runSimulation} className="bg-[#2a2c33] hover:bg-[#353840]">
               Simulate with current groups
             </Button>
             <Button
@@ -2262,7 +2262,7 @@ export function WelcomeConfigBuilder({
                 void sendSimulationToChannels();
               }}
               disabled={simulationSending}
-              className="bg-[#1d6f44] text-white hover:bg-[#1b613d] disabled:opacity-60"
+              className="bg-[#8f939c] text-white hover:bg-[#7f838c] disabled:opacity-60"
             >
               {simulationSending ? "Sending..." : "Send simulation to channels"}
             </Button>
@@ -2270,7 +2270,7 @@ export function WelcomeConfigBuilder({
 
           <div className="space-y-4">
             {simulationResults.length === 0 && (
-              <div className="rounded-xl border border-dashed border-[#3b536a] bg-[#111c2b] p-8 text-center text-discord-text-muted">
+              <div className="rounded-xl border border-dashed border-[#3a3b42] bg-[#14151a] p-8 text-center text-discord-text-muted">
                 No simulation has run yet.
               </div>
             )}
@@ -2282,7 +2282,7 @@ export function WelcomeConfigBuilder({
               const usesEmbedMode = !usesAttachmentMode && message.message_mode === "embed";
 
               return (
-                <div key={message.id} className="rounded-xl border border-[#2a3f57] bg-[#111c2b] p-4">
+                <div key={message.id} className="rounded-xl border border-[#2a2b31] bg-[#14151a] p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-white">{message.name}</p>
@@ -2290,7 +2290,7 @@ export function WelcomeConfigBuilder({
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-[#223145] bg-[#0f1a27] p-5">
+                  <div className="rounded-xl border border-[#2a2b31] bg-[#121317] p-5">
                     <DiscordMessagePreview
                       message={{
                         content: applyWelcomeTokens(message.content),
@@ -2319,7 +2319,7 @@ export function WelcomeConfigBuilder({
                   </div>
 
                   {dynamic && (
-                    <div className="mt-3 rounded-xl border border-[#253a50] bg-[#0e1824] p-3">
+                    <div className="mt-3 rounded-xl border border-[#2a2b31] bg-[#121317] p-3">
                       <p className="mb-2 text-xs uppercase tracking-[0.12em] text-discord-text-muted">Attached Dynamic Image</p>
                       <BotRenderedDynamicImage guildId={guildId} image={dynamic} className="max-w-xl" simulateUserId={simulateUserId} />
                     </div>

@@ -482,7 +482,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                   onClick={() => setActiveDraftKey(key)}
                   className={`flex-1 truncate rounded-lg px-3 py-2 text-left text-sm transition ${
                     activeDraftKey === key
-                      ? "bg-discord-blurple text-white"
+                      ? "bg-white/14 text-white"
                       : "text-discord-text-muted hover:bg-[#383A40] hover:text-white"
                   }`}
                 >
@@ -609,7 +609,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                     <select
                       value={normalizeKeyTier(activeDraft.key_tier)}
                       onChange={(e) => updateDraft({ key_tier: normalizeKeyTier(e.target.value) })}
-                      className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm text-discord-text outline-none transition focus:border-discord-blurple"
+                      className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm text-discord-text outline-none transition focus:border-white/30"
                     >
                       <option value="none">No key reward</option>
                       <option value="weekly">Weekly key</option>
@@ -728,7 +728,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                           href={item.jump_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-[#122033] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-discord-blurple/45 hover:text-white"
+                          className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-[#1b1d22] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-white/30 hover:text-white"
                         >
                           Open
                         </a>
@@ -825,7 +825,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                           href={item.jump_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-[#122033] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-discord-blurple/45 hover:text-white"
+                          className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-[#1b1d22] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-white/30 hover:text-white"
                         >
                           Open
                         </a>
@@ -838,7 +838,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                           if (!messageId) return;
                           setRerollCounts((prev) => ({ ...prev, [messageId]: next }));
                         }}
-                        className="h-9 rounded-lg border border-white/10 bg-[#122033] px-3 text-xs font-semibold text-discord-text outline-none transition focus:border-discord-blurple/45"
+                        className="h-9 rounded-lg border border-white/10 bg-[#1b1d22] px-3 text-xs font-semibold text-discord-text outline-none transition focus:border-white/30"
                       >
                         {Array.from({ length: maxRerollWinners }, (_, idx) => idx + 1).map((count) => (
                           <option key={`${messageId}-reroll-count-${count}`} value={count}>

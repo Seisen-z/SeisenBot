@@ -238,19 +238,19 @@ export function AdvancedEmbedEditor({
   return (
     <div className="flex flex-col">
       {/* Top Navigation */}
-      <div className="flex overflow-hidden rounded-t-2xl border border-white/12 border-b-0 bg-[#0a1624]">
+      <div className="flex overflow-hidden rounded-t-2xl border border-white/12 border-b-0 bg-[#121317]">
         {["visual", "raw", "preview"].map(t => (
           <button
             key={t}
             onClick={() => setTab(t as any)}
-            className={`flex-1 border-t-2 py-3 text-[12px] font-bold uppercase tracking-[0.14em] transition ${tab === t ? 'border-discord-blurple bg-[#102133] text-discord-blurple' : 'border-transparent bg-[#0e1c2b] text-discord-text-muted hover:bg-[#13283d] hover:text-white'}`}
+            className={`flex-1 border-t-2 py-3 text-[12px] font-bold uppercase tracking-[0.14em] transition ${tab === t ? 'border-white/40 bg-[#1b1c22] text-white' : 'border-transparent bg-[#14151a] text-discord-text-muted hover:bg-[#1c1d24] hover:text-white'}`}
           >
             {t}
           </button>
         ))}
       </div>
 
-      <div className="glass-card min-h-[450px] rounded-b-2xl border border-t-0 border-white/12 bg-[linear-gradient(165deg,rgba(17,31,46,0.88),rgba(8,13,20,0.94))] p-6">
+      <div className="glass-card min-h-[450px] rounded-b-2xl border border-t-0 border-white/12 bg-[linear-gradient(165deg,rgba(24,24,27,0.92),rgba(16,16,18,0.94))] p-6">
         {tab === "visual" && (
           <div className="flex flex-col gap-5">
             {children}
@@ -278,7 +278,7 @@ export function AdvancedEmbedEditor({
                   <div>
                     <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Embed Color</label>
                     <div className="flex items-center gap-3">
-                      <Input value={config.color || ""} placeholder="#5865F2 or Decimal" onChange={(e) => onChange("color", e.target.value)} />
+                      <Input value={config.color || ""} placeholder="#A3A7B0 or Decimal" onChange={(e) => onChange("color", e.target.value)} />
                     </div>
                   </div>
                   <div>
@@ -316,7 +316,7 @@ export function AdvancedEmbedEditor({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/15 bg-[#112136] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-discord-text transition hover:border-discord-blurple/40 hover:bg-[#16304b]"
+                  className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/15 bg-[#1b1d22] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-discord-text transition hover:border-white/35 hover:bg-[#252831]"
                 >
                   <UploadIcon className="h-3.5 w-3.5" />
                   Upload JSON
@@ -327,7 +327,7 @@ export function AdvancedEmbedEditor({
             {rawError && <p className="text-xs text-discord-red">{rawError}</p>}
 
             <Textarea
-              className="min-h-[400px] flex-1 border-white/10 bg-[#081321] font-mono text-[13px] leading-relaxed text-[#DBDEE1]"
+              className="min-h-[400px] flex-1 border-white/10 bg-[#111216] font-mono text-[13px] leading-relaxed text-[#DBDEE1]"
               value={rawText}
               onChange={(e) => handleRawChange(e.target.value)}
               placeholder="{...}"
@@ -337,7 +337,7 @@ export function AdvancedEmbedEditor({
         )}
 
         {tab === "preview" && (
-          <div className="min-h-[400px] rounded-xl border border-white/12 bg-[#0b1726] p-8 shadow-inner">
+          <div className="min-h-[400px] rounded-xl border border-white/12 bg-[#101116] p-8 shadow-inner">
             <div className="w-full max-w-[500px]">
               <DiscordMessagePreview
                 message={{

@@ -50,7 +50,7 @@ export default async function HomePage() {
   let user: any = null;
   let guilds: any[] = [];
   let botGuildIds: Set<string> = new Set();
-  let botFeatureAvailable = false;
+  let botGuildLookupAvailable = false;
   let requiresReauth = false;
 
   try {
@@ -94,7 +94,7 @@ export default async function HomePage() {
     if (resBotGuilds.ok) {
       const botData = await resBotGuilds.json();
       botGuildIds = new Set(botData.guild_ids || []);
-      botFeatureAvailable = botGuildIds.size > 0;
+      botGuildLookupAvailable = true;
     }
   } catch {
     // Bot API may be unavailable in local/dev deployments.
@@ -120,14 +120,16 @@ export default async function HomePage() {
     : null;
 
   const displayName = user?.global_name || user?.username || "Unknown";
-  const connectedGuildCount = sortedGuilds.filter((g) => !botFeatureAvailable || botGuildIds.has(g.id)).length;
+  const connectedGuildCount = botGuildLookupAvailable
+    ? sortedGuilds.filter((g) => botGuildIds.has(g.id)).length
+    : 0;
 
   return (
     <div className="relative min-h-screen w-full px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 page-enter">
         <header className="glass-card flex flex-col gap-4 rounded-3xl px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-discord-blurple via-[#49c5df] to-[#4f8ff7] text-sm font-black text-white shadow-[0_10px_24px_rgba(45,196,183,0.35)]">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#a3a7b0] via-[#878b94] to-[#686c75] text-sm font-black text-white shadow-[0_10px_24px_rgba(18,20,24,0.45)]">
               S
             </div>
             <div className="min-w-0">
@@ -137,7 +139,7 @@ export default async function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-white/10 bg-[#0f1b2a]/80 px-3 py-2">
+            <div className="rounded-xl border border-white/10 bg-[rgba(20,24,34,0.8)] px-3 py-2">
               <div className="flex items-center gap-2">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={displayName} className="h-7 w-7 rounded-full object-cover ring-1 ring-white/20" />
@@ -155,7 +157,7 @@ export default async function HomePage() {
 
             <a
               href="/api/auth/discord/logout"
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#122033] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-discord-red/40 hover:bg-discord-red/20 hover:text-white"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[rgba(22,27,38,0.92)] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-discord-text transition hover:border-discord-red/40 hover:bg-discord-red/20 hover:text-white"
             >
               <LogOutIcon className="h-4 w-4" />
               Logout
@@ -170,13 +172,13 @@ export default async function HomePage() {
                 <h2 className="text-xl font-bold text-white">Available Servers</h2>
                 <p className="text-sm text-discord-text-muted">Only servers where you can manage configuration are shown.</p>
               </div>
-              <div className="rounded-xl border border-discord-green/30 bg-discord-green/12 px-3 py-2 text-xs font-semibold text-[#8ef2ca]">
-                {connectedGuildCount} active with bot
+              <div className="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-white/90">
+                {botGuildLookupAvailable ? `${connectedGuildCount} active with bot` : "bot status unavailable"}
               </div>
             </div>
 
             {sortedGuilds.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#0f1b2a]/65 px-5 py-12 text-center">
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[rgba(20,24,34,0.7)] px-5 py-12 text-center">
                 <AlertCircleIcon className="h-10 w-10 text-discord-red/80" />
                 <p className="text-base font-semibold text-white">No eligible servers found.</p>
                 <p className="max-w-sm text-sm text-discord-text-muted">
@@ -186,7 +188,8 @@ export default async function HomePage() {
             ) : (
               <div className="grid gap-3">
                 {sortedGuilds.map((guild: any) => {
-                  const botHere = !botFeatureAvailable || botGuildIds.has(guild.id);
+                  // Keep server selection usable if bot-status lookup is temporarily unavailable.
+                  const botHere = !botGuildLookupAvailable || botGuildIds.has(guild.id);
                   const iconUrl = guild.icon
                     ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`
                     : null;
@@ -196,8 +199,8 @@ export default async function HomePage() {
                     return (
                       <Link
                         key={guild.id}
-                        href={`/dashboard/${guild.id}/autoreply`}
-                        className="group flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0f1b2a]/75 px-4 py-3 transition hover:border-discord-blurple/45 hover:bg-[#152337]"
+                        href={`/dashboard/${guild.id}`}
+                        className="group flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[rgba(20,24,34,0.8)] px-4 py-3 transition hover:border-discord-blurple/45 hover:bg-[rgba(27,32,44,0.92)]"
                       >
                         <div className="flex min-w-0 items-center gap-3">
                           <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full ring-1 ring-discord-blurple/40">
@@ -224,14 +227,14 @@ export default async function HomePage() {
                   return (
                     <div
                       key={guild.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0d1724]/80 px-4 py-3"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[rgba(16,20,29,0.82)] px-4 py-3"
                     >
                       <div className="flex min-w-0 items-center gap-3 opacity-80">
                         <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full ring-1 ring-white/20 grayscale">
                           {iconUrl ? (
                             <img src={iconUrl} alt={guild.name} className="h-full w-full object-cover" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-[#20344c] text-sm font-bold text-white">
+                            <div className="flex h-full w-full items-center justify-center bg-[rgba(35,44,62,0.95)] text-sm font-bold text-white">
                               {guild.name.charAt(0).toUpperCase()}
                             </div>
                           )}
@@ -247,7 +250,7 @@ export default async function HomePage() {
                           href={inviteUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-[#132234] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-discord-text transition hover:border-discord-blurple/45 hover:text-white"
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-[rgba(21,26,37,0.95)] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-discord-text transition hover:border-discord-blurple/45 hover:text-white"
                         >
                           Invite
                           <ExternalLinkIcon className="h-3.5 w-3.5" />
@@ -269,11 +272,11 @@ export default async function HomePage() {
                 <p className="text-xs font-bold uppercase tracking-[0.14em]">Workspace Snapshot</p>
               </div>
               <div className="space-y-3">
-                <div className="rounded-2xl border border-white/10 bg-[#0f1b2a]/75 p-3">
+                <div className="rounded-2xl border border-white/10 bg-[rgba(20,24,34,0.78)] p-3">
                   <p className="text-xs text-discord-text-muted">Servers You Can Manage</p>
                   <p className="text-2xl font-bold text-white">{sortedGuilds.length}</p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-[#0f1b2a]/75 p-3">
+                <div className="rounded-2xl border border-white/10 bg-[rgba(20,24,34,0.78)] p-3">
                   <p className="text-xs text-discord-text-muted">Servers With Bot Active</p>
                   <p className="text-2xl font-bold text-white">{connectedGuildCount}</p>
                 </div>

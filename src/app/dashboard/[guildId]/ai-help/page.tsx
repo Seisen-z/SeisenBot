@@ -316,7 +316,7 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
             onChange={(e) => {
               const v = e.target.value;
               // Root system_instructions backs the Supabase ai_help_global row; guild copy is for the bot runtime merge.
-              setConfig((prev) => ({
+                setConfig((prev: any) => ({
                 ...prev,
                 system_instructions: v,
                 guilds: {

@@ -74,6 +74,7 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingLogging, setTestingLogging] = useState(false);
   const [config, setConfig] = useState<ActivityRewardsConfig>(DEFAULT_CONFIG);
   const [status, setStatus] = useState<ActivityRewardsStatus>({
     tracked_users: 0,
@@ -159,6 +160,18 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
     }
   };
 
+  const testLogging = async () => {
+    setTestingLogging(true);
+    try {
+      await fetchApi(`/guilds/${guildId}/activity_rewards/test_logging`, undefined, { method: "POST" });
+      toast("Test log sent to the configured channel.");
+    } catch (err: any) {
+      toast(`Failed to send test log: ${err?.message || "Unknown error"}`, "error");
+    } finally {
+      setTestingLogging(false);
+    }
+  };
+
   const runManualReroll = async () => {
     setActionBusy("reroll");
     try {
@@ -210,8 +223,9 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
         subtitle="Random key drops for active community chatters. Users must pass the configured message threshold window before they are eligible for RNG selection."
         stats={[
           { label: "Tracked Users", value: status.tracked_users },
-          { label: "Eligible Users", value: status.eligible_users },
-          { label: "Last Draw", value: formatDate(status.last_draw_at) },
+          { label: "E              <Button variant="outline" onClick={testLogging} disabled={testingLogging || !config.logging_channel_id}>
+                {testingLogging ? "Testing..." : "Test Logging"}
+              </Button>          { label: "Last Draw", value: formatDate(status.last_draw_at) },
           { label: "Next Draw", value: formatDate(status.next_draw_at) },
         ]}
         actions={

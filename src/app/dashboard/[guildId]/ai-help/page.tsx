@@ -115,7 +115,7 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
   };
 
   const toggleModel = (modelId: string) => {
-    setConfig((prev) => {
+    setConfig((prev: any) => {
       const g0 = (prev.guilds || {})[guildId] || { enabled: false, targets: [], system_instructions: "" };
       const currentModels = g0.models || [];
       const isSelected = currentModels.includes(modelId);

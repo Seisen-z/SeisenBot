@@ -92,14 +92,23 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
 
   const updateButton = (btnIdx: number, field: string, value: string) => {
     const newRules = [...rules];
-    if (!newRules[activeIdx].buttons) newRules[activeIdx].buttons = [];
-    if (!newRules[activeIdx].buttons[btnIdx]) newRules[activeIdx].buttons[btnIdx] = { label: "", url: "" };
+    newRules[activeIdx] = { ...newRules[activeIdx] };
+    newRules[activeIdx].buttons = [...(newRules[activeIdx].buttons || [])];
+    
+    if (!newRules[activeIdx].buttons[btnIdx]) {
+      newRules[activeIdx].buttons[btnIdx] = { label: "", url: "" };
+    } else {
+      newRules[activeIdx].buttons[btnIdx] = { ...newRules[activeIdx].buttons[btnIdx] };
+    }
+    
     newRules[activeIdx].buttons[btnIdx][field] = value;
     setRules(newRules);
   };
 
   const removeButton = (btnIdx: number) => {
     const newRules = [...rules];
+    newRules[activeIdx] = { ...newRules[activeIdx] };
+    newRules[activeIdx].buttons = [...(newRules[activeIdx].buttons || [])];
     newRules[activeIdx].buttons.splice(btnIdx, 1);
     setRules(newRules);
   };
@@ -244,7 +253,8 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                         {(activeRule.buttons?.length || 0) < 5 && (
                           <Button variant="outline" size="sm" className="w-fit bg-[#2B2D31] text-discord-text hover:bg-discord-blurple border-[#1E1F22] hover:text-white" onClick={() => {
                             const newRules = [...rules];
-                            if (!newRules[activeIdx].buttons) newRules[activeIdx].buttons = [];
+                              newRules[activeIdx] = { ...newRules[activeIdx] };
+                              newRules[activeIdx].buttons = [...(newRules[activeIdx].buttons || [])];
                             newRules[activeIdx].buttons.push({ label: "New Button", url: "https://" });
                             setRules(newRules);
                           }}>

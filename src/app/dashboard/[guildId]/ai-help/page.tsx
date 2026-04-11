@@ -19,7 +19,7 @@ interface AIModel {
 
 export default function AIHelpPage({ params }: { params: Promise<{ guildId: string }> }) {
   const resolvedParams = use(params);
-  const guildId = resolvedParams.guildId;
+  const guildId = String(resolvedParams.guildId);
   const { toast } = useToast();
   const [config, setConfig] = useState<any>(null);
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
@@ -43,7 +43,9 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
       .then((data) => {
         setAvailableModels(data?.models || []);
       })
-      .catch((err) => console.error("Failed to load models", err));
+      .catch(() => {
+        toast("Could not load model list (check OpenRouter API key on the bot API).", "error");
+      });
   }, [toast]);
 
   const persistConfig = useCallback(async (nextConfig: any) => {
@@ -113,16 +115,22 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
   };
 
   const toggleModel = (modelId: string) => {
-    const currentModels = guildConfig.models || [];
-    const isSelected = currentModels.includes(modelId);
-    
-    if (isSelected) {
-      // Remove model
-      updateGuildConfig("models", currentModels.filter((m: string) => m !== modelId));
-    } else {
-      // Add model
-      updateGuildConfig("models", [...currentModels, modelId]);
-    }
+    setConfig((prev) => {
+      const g0 = (prev.guilds || {})[guildId] || { enabled: false, targets: [], system_instructions: "" };
+      const currentModels = g0.models || [];
+      const isSelected = currentModels.includes(modelId);
+      const nextModels = isSelected
+        ? currentModels.filter((m: string) => m !== modelId)
+        : [...currentModels, modelId];
+      const g = { ...g0, models: nextModels };
+      const out: Record<string, unknown> = { ...prev, guilds: { ...(prev.guilds || {}), [guildId]: g } };
+      if (!isSelected && modelId) {
+        const roots = Array.isArray(prev.available_models) ? [...prev.available_models] : [];
+        if (!roots.includes(modelId)) roots.push(modelId);
+        out.available_models = roots;
+      }
+      return out as typeof prev;
+    });
   };
 
   const isModelSelected = (modelId: string) => {
@@ -304,8 +312,22 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
           <span className="text-xs text-discord-text-muted font-normal block mb-2">Configure what knowledge the AI draws from. Paste the rule context, specific executor lists, Premium pricing structures, and game statuses here.</span>
           <Textarea 
             className="h-96 w-full p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap rounded-xl"
-            value={guildConfig.system_instructions || ""}
-            onChange={(e) => updateGuildConfig("system_instructions", e.target.value)}
+            value={guildConfig.system_instructions || config.system_instructions || ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              // Root system_instructions backs the Supabase ai_help_global row; guild copy is for the bot runtime merge.
+              setConfig((prev) => ({
+                ...prev,
+                system_instructions: v,
+                guilds: {
+                  ...(prev.guilds || {}),
+                  [guildId]: {
+                    ...((prev.guilds || {})[guildId] || { enabled: false, targets: [], system_instructions: "" }),
+                    system_instructions: v,
+                  },
+                },
+              }));
+            }}
           />
         </div>
       </div>

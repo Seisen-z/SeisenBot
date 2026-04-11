@@ -54,6 +54,7 @@ export async function fetchApi(endpoint: string, jwt?: string, init?: RequestIni
       ...init,
       headers,
       credentials: 'include', // Ensure cookies are sent with requests
+      cache: 'no-store',
     });
   } catch (err) {
     const reason = err instanceof Error && err.message ? err.message : 'Network request failed';

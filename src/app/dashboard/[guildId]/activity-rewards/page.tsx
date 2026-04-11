@@ -6,6 +6,7 @@ import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DiscordChannelSelect } from "@/components/ui/discord-selects";
 import { GiftIcon, RefreshCcwIcon } from "lucide-react";
 
 type ActivityRewardsConfig = {
@@ -18,9 +19,7 @@ type ActivityRewardsConfig = {
   daily_winner_cap: number;
   weekly_winner_cap: number;
   key_pool: "activity_pool" | "giveaway";
-  event_webhook_enabled: boolean;
-  event_webhook_url?: string | null;
-  event_webhook_retry_count: number;
+  logging_channel_id?: string | null;
 };
 
 type ActivityRewardsStatus = {
@@ -59,9 +58,7 @@ const DEFAULT_CONFIG: ActivityRewardsConfig = {
   daily_winner_cap: 3,
   weekly_winner_cap: 12,
   key_pool: "activity_pool",
-  event_webhook_enabled: false,
-  event_webhook_url: "",
-  event_webhook_retry_count: 2,
+  logging_channel_id: null,
 };
 
 function formatDate(value?: string | null): string {
@@ -77,7 +74,6 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testingWebhook, setTestingWebhook] = useState(false);
   const [config, setConfig] = useState<ActivityRewardsConfig>(DEFAULT_CONFIG);
   const [status, setStatus] = useState<ActivityRewardsStatus>({
     tracked_users: 0,
@@ -115,29 +111,6 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
     }
   };
 
-  const testWebhook = async () => {
-    if (!config.event_webhook_enabled) {
-      toast("Enable Event Webhook first before testing.", "error");
-      return;
-    }
-    if (!String(config.event_webhook_url || "").trim()) {
-      toast("Set Event Webhook URL before testing.", "error");
-      return;
-    }
-    setTestingWebhook(true);
-    try {
-      await fetchApi(`/guilds/${guildId}/activity_rewards/test_webhook`, undefined, {
-        method: "POST",
-      });
-      toast("Webhook test sent.");
-      await loadAll(true);
-    } catch (err: any) {
-      toast(`Webhook test failed: ${err?.message || "Unknown error"}`, "error");
-    } finally {
-      setTestingWebhook(false);
-    }
-  };
-
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
       .then(async (res) => {
@@ -154,7 +127,7 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
 
   useEffect(() => {
     loadAll(true);
-    const timer = window.setInterval(() => loadAll(true), 60000);
+    const timer = window.setInterval(() => loadAll(true), 20000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guildId]);
@@ -249,17 +222,6 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
             </Button>
             <Button variant="discord" onClick={saveConfig} disabled={saving}>
               {saving ? "Saving..." : "Save Settings"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={testWebhook}
-              disabled={
-                testingWebhook ||
-                !config.event_webhook_enabled ||
-                !String(config.event_webhook_url || "").trim()
-              }
-            >
-              {testingWebhook ? "Testing..." : "Test Webhook"}
             </Button>
             <Button variant="outline" onClick={runManualReroll} disabled={actionBusy === "reroll"}>
               {actionBusy === "reroll" ? "Rerolling..." : "Manual Reroll"}
@@ -366,35 +328,12 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
           </select>
         </label>
 
-        <label className="space-y-2 md:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">Event Webhook URL</span>
-          <Input
-            value={String(config.event_webhook_url || "")}
-            onChange={(e) => setConfig((prev) => ({ ...prev, event_webhook_url: e.target.value }))}
-            placeholder="https://example.com/webhook"
-          />
-        </label>
-
         <label className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">Event Webhook Enabled</span>
-          <select
-            value={config.event_webhook_enabled ? "1" : "0"}
-            onChange={(e) => setConfig((prev) => ({ ...prev, event_webhook_enabled: e.target.value === "1" }))}
-            className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm text-discord-text outline-none transition focus:border-white/30"
-          >
-            <option value="0">Disabled</option>
-            <option value="1">Enabled</option>
-          </select>
-        </label>
-
-        <label className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">Event Webhook Retries</span>
-          <Input
-            type="number"
-            min={0}
-            max={5}
-            value={config.event_webhook_retry_count}
-            onChange={(e) => setConfig((prev) => ({ ...prev, event_webhook_retry_count: Number(e.target.value || 0) }))}
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">Logging Channel</span>
+          <DiscordChannelSelect
+            guildId={guildId}
+            value={config.logging_channel_id || ""}
+            onChange={(val) => setConfig((prev) => ({ ...prev, logging_channel_id: val }))}
           />
         </label>
       </div>

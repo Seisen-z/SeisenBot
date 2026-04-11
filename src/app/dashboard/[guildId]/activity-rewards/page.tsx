@@ -6,7 +6,7 @@ import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DiscordChannelSelect } from "@/components/ui/discord-selects";
+import { ChannelSelect } from "@/components/ui/discord-selects";
 import { GiftIcon, RefreshCcwIcon } from "lucide-react";
 
 type ActivityRewardsConfig = {
@@ -330,7 +330,7 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
 
         <label className="space-y-2">
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">Logging Channel</span>
-          <DiscordChannelSelect
+          <ChannelSelect
             guildId={guildId}
             value={config.logging_channel_id || ""}
             onChange={(val) => setConfig((prev) => ({ ...prev, logging_channel_id: val }))}

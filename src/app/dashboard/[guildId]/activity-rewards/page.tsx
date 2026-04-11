@@ -223,19 +223,21 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
         subtitle="Random key drops for active community chatters. Users must pass the configured message threshold window before they are eligible for RNG selection."
         stats={[
           { label: "Tracked Users", value: status.tracked_users },
-          { label: "E              <Button variant="outline" onClick={testLogging} disabled={testingLogging || !config.logging_channel_id}>
-                {testingLogging ? "Testing..." : "Test Logging"}
-              </Button>          { label: "Last Draw", value: formatDate(status.last_draw_at) },
+          { label: "Eligible Users", value: status.eligible_users },
+          { label: "Last Draw", value: formatDate(status.last_draw_at) },
           { label: "Next Draw", value: formatDate(status.next_draw_at) },
         ]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={() => loadAll(false)}>
               <RefreshCcwIcon className="mr-2 h-4 w-4" />
               Refresh
             </Button>
             <Button variant="discord" onClick={saveConfig} disabled={saving}>
               {saving ? "Saving..." : "Save Settings"}
+            </Button>
+            <Button variant="outline" onClick={testLogging} disabled={testingLogging || !config.logging_channel_id}>
+              {testingLogging ? "Testing..." : "Test Logging"}
             </Button>
             <Button variant="outline" onClick={runManualReroll} disabled={actionBusy === "reroll"}>
               {actionBusy === "reroll" ? "Rerolling..." : "Manual Reroll"}

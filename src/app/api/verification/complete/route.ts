@@ -1,146 +1,100 @@
-import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-function decodeCookieToken(value: string | undefined) {
-  if (!value) return undefined;
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
+export const runtime = "nodejs";
+
+function normalizeBase(base: string): string {
+  return String(base || "").trim().replace(/\/+$/, "");
 }
 
-function resolveApiBase(request: NextRequest) {
-  const origin = request.nextUrl.origin;
-  const envApi = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (!envApi) {
-    return `${origin}/api/bot`;
+function resolvePrimaryBotApiBase(): string {
+  const raw = process.env.API_PROXY_TARGET || process.env.BOT_API_URL || "http://127.0.0.1:8000";
+  const first = raw
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
+  const cleaned = normalizeBase(first || "");
+  if (/^https?:\/\//i.test(cleaned)) {
+    return cleaned;
   }
-
-  if (envApi.startsWith("/")) {
-    return `${origin}${envApi}`.replace(/\/$/, "");
-  }
-
-  try {
-    const parsed = new URL(envApi);
-    const hostname = parsed.hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
-      return `${origin}/api/bot`;
-    }
-    return envApi.replace(/\/$/, "");
-  } catch {
-    return `${origin}/api/bot`;
-  }
+  const host = cleaned.replace(/^\/+/, "");
+  return normalizeBase(`http://${host}`);
 }
 
-function isDiscordSnowflake(value: string) {
-  return /^\d{17,20}$/.test(value);
-}
-
-async function readErrorMessage(response: Response) {
-  try {
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      const data = await response.json();
-      if (String(data?.error || "") === "BOT_API_UNAVAILABLE") {
-        const detailText = String(data?.detail || "").toLowerCase();
-        if (detailText.includes("aborted")) {
-          return "Verification is still finishing in Discord. Please wait a few seconds and try again.";
+function formatFastApiDetail(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((entry) => {
+        if (entry && typeof entry === "object" && "msg" in entry) {
+          return String((entry as { msg?: string }).msg || entry);
         }
-      }
-      return data?.message || data?.detail || data?.error || JSON.stringify(data);
-    }
-    return (await response.text()).trim();
-  } catch {
-    return "";
+        return JSON.stringify(entry);
+      })
+      .join("; ");
   }
+  if (detail && typeof detail === "object") {
+    return JSON.stringify(detail);
+  }
+  return "Verification failed.";
 }
 
-export async function POST(request: NextRequest) {
-  let guildId = "";
-  try {
-    const body = await request.json();
-    guildId = String(body?.guildId || "").trim();
-  } catch {
-    return NextResponse.json({ message: "Invalid request payload." }, { status: 400 });
+export async function POST(request: Request) {
+  const body = (await request.json().catch(() => ({}))) as {
+    guildId?: string;
+    challenge?: string;
+  };
+  const guildId = String(body.guildId || "").trim();
+  const challenge = String(body.challenge || "").trim();
+
+  if (!/^\d{17,20}$/.test(guildId)) {
+    return NextResponse.json({ message: "Invalid verification link (guild)." }, { status: 400 });
   }
 
-  if (!isDiscordSnowflake(guildId)) {
-    return NextResponse.json({ message: "Invalid guild id." }, { status: 400 });
+  if (!challenge) {
+    return NextResponse.json({ message: "Missing verification token." }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const token = decodeCookieToken(cookieStore.get("session_token")?.value);
-  const cookieUserId = decodeCookieToken(cookieStore.get("user_id")?.value);
+  const base = resolvePrimaryBotApiBase();
+  const timeoutMs = Number(process.env.BOT_API_VERIFY_TIMEOUT_MS || "90000");
 
-  if (!token || !cookieUserId) {
-    return NextResponse.json({ message: "Login required. Please sign in with Discord." }, { status: 401 });
-  }
-
-  let discordUserRes: Response;
-  try {
-    discordUserRes = await fetch("https://discord.com/api/users/@me", {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-  } catch {
-    return NextResponse.json({ message: "Could not validate with Discord right now. Please try again." }, { status: 503 });
-  }
-
-  if (!discordUserRes.ok) {
-    return NextResponse.json({ message: "Discord session expired. Please sign in again." }, { status: 401 });
-  }
-
-  const discordUser = await discordUserRes.json();
-  const oauthUserId = String(discordUser?.id || "");
-
-  if (!isDiscordSnowflake(oauthUserId)) {
-    return NextResponse.json({ message: "Could not validate Discord account." }, { status: 401 });
-  }
-
-  if (oauthUserId !== String(cookieUserId)) {
-    return NextResponse.json({ message: "Discord account mismatch. Please sign in again." }, { status: 401 });
-  }
-
-  const apiBase = resolveApiBase(request);
-  let triggerRes: Response;
-  try {
-    triggerRes = await fetch(`${apiBase}/trigger/verify_member_web`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      cache: "no-store",
-      body: JSON.stringify({
-        guild_id: guildId,
-        payload: {
-          user_id: oauthUserId,
-        },
-      }),
-    });
-  } catch {
+  const secret = process.env.VERIFICATION_INTERNAL_SECRET?.trim();
+  if (!secret) {
     return NextResponse.json(
-      { message: "Verification backend is currently unavailable. Please try again in a moment." },
+      { message: "Verification is not configured (missing VERIFICATION_INTERNAL_SECRET)." },
       { status: 503 },
     );
   }
 
-  if (!triggerRes.ok) {
-    const detail = await readErrorMessage(triggerRes);
-    return NextResponse.json(
-      {
-        message: detail || "Verification failed. Please try again.",
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${base}/api/internal/verification/complete`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${secret}`,
       },
-      { status: triggerRes.status },
-    );
+      body: JSON.stringify({ guild_id: guildId, challenge }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      redirect_url?: string;
+      message?: string;
+      detail?: unknown;
+    };
+    if (!res.ok) {
+      const msg = formatFastApiDetail(data.detail) || data.message || `Verification failed (${res.status})`;
+      return NextResponse.json({ message: msg }, { status: res.status });
+    }
+    return NextResponse.json({
+      redirect_url: data.redirect_url,
+      message: data.message,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Verification request failed.";
+    return NextResponse.json({ message: msg }, { status: 503 });
+  } finally {
+    clearTimeout(timer);
   }
-
-  const data = await triggerRes.json().catch(() => ({}));
-  const redirectUrl = String(data?.discord_redirect_url || `https://discord.com/channels/${guildId}`);
-  return NextResponse.json({
-    status: "success",
-    message: String(data?.message || "You are now verified. Return to Discord."),
-    redirect_url: redirectUrl,
-  });
 }

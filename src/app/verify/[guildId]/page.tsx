@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { CheckCircle2Icon, LoaderCircleIcon, ShieldAlertIcon } from "lucide-react";
 
-type VerifyState = "checking" | "redirecting" | "success" | "error";
-
-function hasDiscordSessionCookie() {
-  return /(^| )session_token=([^;]+)/.test(document.cookie);
-}
+type VerifyState = "checking" | "success" | "error";
 
 function isDiscordSnowflake(value: string) {
   return /^\d{17,20}$/.test(value);
+}
+
+function readChallengeFromSearch(): string {
+  if (typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  return String(params.get("c") || params.get("token") || "").trim();
 }
 
 export default function VerifyGuildPage() {
@@ -19,14 +21,9 @@ export default function VerifyGuildPage() {
   const guildId = typeof params.guildId === "string" ? params.guildId : "";
 
   const [state, setState] = useState<VerifyState>("checking");
-  const [message, setMessage] = useState("Verifying your Discord identity...");
+  const [message, setMessage] = useState("Verifying…");
   const [redirectUrl, setRedirectUrl] = useState<string>("https://discord.com/channels/@me");
   const didRunRef = useRef(false);
-
-  const loginHref = useMemo(() => {
-    if (!isDiscordSnowflake(guildId)) return "/login";
-    return `/api/auth/discord/login?next=${encodeURIComponent(`/verify/${guildId}`)}`;
-  }, [guildId]);
 
   useEffect(() => {
     if (didRunRef.current) return;
@@ -34,26 +31,26 @@ export default function VerifyGuildPage() {
 
     if (!isDiscordSnowflake(guildId)) {
       setState("error");
-      setMessage("Invalid verification link. Ask a staff member for a new verification button.");
+      setMessage("Invalid verification link. Ask a staff member for a new verification link.");
       return;
     }
 
-    if (!hasDiscordSessionCookie()) {
-      setState("redirecting");
-      setMessage("Redirecting to Discord login for secure verification...");
-      window.location.href = loginHref;
+    const challenge = readChallengeFromSearch();
+    if (!challenge) {
+      setState("error");
+      setMessage("Missing verification token. Please use the button in the Discord server.");
       return;
     }
 
     const verify = async () => {
-      const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
           const res = await fetch("/api/verification/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ guildId }),
+            body: JSON.stringify({ guildId, challenge }),
           });
 
           const data = await res.json().catch(() => ({}));
@@ -64,7 +61,7 @@ export default function VerifyGuildPage() {
               /aborted|unavailable|timed out|timeout/i.test(apiMessage);
 
             if (isRetryable && attempt === 0) {
-              setMessage("Finishing verification in Discord. Retrying...");
+              setMessage("Finishing verification. Retrying…");
               await sleep(1200);
               continue;
             }
@@ -80,11 +77,11 @@ export default function VerifyGuildPage() {
           }
 
           setState("success");
-          setMessage("Verification complete. Opening your Discord server...");
+          setMessage("Verification complete. Opening your Discord server…");
           return;
         } catch (err) {
           if (attempt === 0) {
-            setMessage("Finishing verification in Discord. Retrying...");
+            setMessage("Finishing verification. Retrying…");
             await sleep(1200);
             continue;
           }
@@ -96,13 +93,15 @@ export default function VerifyGuildPage() {
     };
 
     verify();
-  }, [guildId, loginHref]);
+  }, [guildId]);
 
   useEffect(() => {
     if (state !== "success") return;
     const nextUrl = redirectUrl.startsWith("https://discord.com/channels/")
       ? redirectUrl
-      : (isDiscordSnowflake(guildId) ? `https://discord.com/channels/${guildId}` : "https://discord.com/channels/@me");
+      : isDiscordSnowflake(guildId)
+        ? `https://discord.com/channels/${guildId}`
+        : "https://discord.com/channels/@me";
     const timer = window.setTimeout(() => {
       window.location.href = nextUrl;
     }, 900);
@@ -130,13 +129,11 @@ export default function VerifyGuildPage() {
         {state === "error" && (
           <div className="mt-5 flex flex-wrap justify-center gap-3">
             <a
-              href={loginHref}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-discord-blurple px-4 text-sm font-semibold text-white transition hover:brightness-110"
-            >
-              Login and Verify
-            </a>
-            <a
-              href={isDiscordSnowflake(guildId) ? `https://discord.com/channels/${guildId}` : "https://discord.com/channels/@me"}
+              href={
+                isDiscordSnowflake(guildId)
+                  ? `https://discord.com/channels/${guildId}`
+                  : "https://discord.com/channels/@me"
+              }
               className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 px-4 text-sm font-semibold text-discord-text transition hover:border-white/35 hover:text-white"
             >
               Open Discord
@@ -147,7 +144,13 @@ export default function VerifyGuildPage() {
         {state === "success" && (
           <div className="mt-5">
             <a
-              href={redirectUrl.startsWith("https://discord.com/channels/") ? redirectUrl : (isDiscordSnowflake(guildId) ? `https://discord.com/channels/${guildId}` : "https://discord.com/channels/@me")}
+              href={
+                redirectUrl.startsWith("https://discord.com/channels/")
+                  ? redirectUrl
+                  : isDiscordSnowflake(guildId)
+                    ? `https://discord.com/channels/${guildId}`
+                    : "https://discord.com/channels/@me"
+              }
               className="inline-flex h-11 items-center justify-center rounded-xl bg-discord-green px-4 text-sm font-semibold text-[#072016] transition hover:brightness-110"
             >
               Continue in Discord

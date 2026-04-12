@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { fetchApi } from "@/lib/api";
 import { toDashboardErrorState, type DashboardErrorState } from "@/lib/dashboard-errors";
 import { useToast } from "@/components/ui/toast";
-import { ChannelSelect, RoleMultiSelect, RoleSelect } from "@/components/ui/discord-selects";
+import { ChannelSelect, ChannelMultiSelect, RoleMultiSelect, RoleSelect } from "@/components/ui/discord-selects";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { DashboardErrorBanner } from "@/components/ui/dashboard-error-banner";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
@@ -63,6 +63,8 @@ interface OnboardingConfig {
   block_default_avatar: boolean;
   join_guard_action: "kick" | "ban";
   join_guard_log_channel_id: string;
+
+  visible_before_verify_channel_ids: string[];
 }
 
 const DEFAULT_CONFIG: OnboardingConfig = {
@@ -128,6 +130,8 @@ const DEFAULT_CONFIG: OnboardingConfig = {
   block_default_avatar: false,
   join_guard_action: "kick",
   join_guard_log_channel_id: "",
+
+  visible_before_verify_channel_ids: [],
 };
 
 function normalizeConfig(raw: any): OnboardingConfig {
@@ -178,6 +182,9 @@ function normalizeConfig(raw: any): OnboardingConfig {
     min_account_age_days: Math.max(0, Number(raw?.min_account_age_days || 0)),
     join_guard_action: raw?.join_guard_action === "ban" ? "ban" : "kick",
     join_guard_log_channel_id: String(raw?.join_guard_log_channel_id || ""),
+    visible_before_verify_channel_ids: Array.isArray(raw?.visible_before_verify_channel_ids)
+      ? raw.visible_before_verify_channel_ids.map(String)
+      : [],
   };
 }
 
@@ -330,6 +337,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
         welcome_messages: sanitizedWelcomeMessages,
         welcome_dynamic_images: sanitizedDynamicImages,
         join_guard_log_channel_id: nextConfig.join_guard_log_channel_id || null,
+        visible_before_verify_channel_ids: (nextConfig.visible_before_verify_channel_ids || []).map(String),
       }),
     });
     setLastSaved(new Date());
@@ -569,6 +577,23 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
             DM users on join with verification instructions
           </label>
         </div>
+
+        {config.lock_until_verified && (
+          <div className="mt-4 rounded-xl border border-[#1E1F22] bg-[#202225]/60 p-4">
+            <label className="mb-1 block text-sm font-medium text-discord-text-muted">
+              🔓 Channels Visible Before Verification
+            </label>
+            <p className="mb-3 text-xs text-discord-text-muted">
+              These channels will remain visible to unverified members alongside the verification and welcome channels.
+              Useful for <strong>#rules</strong>, <strong>#announcements</strong>, etc.
+            </p>
+            <ChannelMultiSelect
+              guildId={guildId}
+              value={config.visible_before_verify_channel_ids}
+              onChange={(ids) => updateConfig("visible_before_verify_channel_ids", ids)}
+            />
+          </div>
+        )}
 
         <div className="mt-6 rounded-xl border border-[#1E1F22] bg-[#202225]/80 p-4 space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wide text-discord-text-muted">Verification Panel</h3>

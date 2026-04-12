@@ -13,6 +13,7 @@ interface DiscordMessageProps {
   authorIcon?: string;
   description?: string;
   thumbnailUrl?: string;
+  imageUrl?: string;
   footerText?: string;
   footerIconUrl?: string;
   buttons?: { label: string; url?: string }[];
@@ -30,6 +31,9 @@ interface DiscordMessage {
       icon_url?: string;
     };
     thumbnail?: {
+      url?: string;
+    };
+    image?: {
       url?: string;
     };
     footer?: {
@@ -231,6 +235,18 @@ function NewDiscordMessagePreview({
                 )}
               </div>
 
+              {/* Large Body Image */}
+              {embed.image?.url && (
+                <div className="mt-4 shrink-0 rounded-[4px] overflow-hidden max-w-full">
+                  <img
+                    src={embed.image.url}
+                    alt="Embed Image"
+                    className="max-h-[300px] w-auto max-w-[400px] object-cover cursor-pointer hover:opacity-90"
+                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                  />
+                </div>
+              )}
+
               {/* Footer */}
               {embed.footer?.text && (
                 <div className="mt-3 flex items-center gap-2 text-[0.75rem] font-medium text-[#DBDEE1]">
@@ -312,6 +328,7 @@ function LegacyDiscordMessagePreview({
   url,
   description,
   thumbnailUrl,
+  imageUrl,
   footerText,
   footerIconUrl,
   buttons,
@@ -432,6 +449,18 @@ function LegacyDiscordMessagePreview({
                   </div>
                 )}
               </div>
+
+              {/* Large Body Image */}
+              {imageUrl && (
+                <div className="mt-4 shrink-0 rounded-[4px] overflow-hidden max-w-full">
+                  <img
+                    src={imageUrl}
+                    alt="Embed Image"
+                    className="max-h-[300px] w-auto max-w-[400px] object-cover cursor-pointer hover:opacity-90"
+                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                  />
+                </div>
+              )}
 
               {/* Footer */}
               {footerText && (

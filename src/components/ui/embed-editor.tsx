@@ -4,7 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { UploadIcon } from "lucide-react";
 import { Input } from "./input";
 import { Textarea } from "./textarea";
+import { Copy, Eye, FileJson, Layout, Upload } from "lucide-react";
 import { DiscordMessagePreview } from "./discord-message";
+import { ImageUploader } from "./image-uploader";
 
 export interface EmbedConfig {
   content?: string;
@@ -12,6 +14,7 @@ export interface EmbedConfig {
   description?: string;
   color?: string | number;
   thumbnail_url?: string;
+  image_url?: string;
   footer?: string;
   [key: string]: any; // Allow other properties
 }
@@ -77,6 +80,9 @@ export function AdvancedEmbedEditor({
 
       const thumbnailUrl = em.thumbnail?.url ?? em.thumbnail_url ?? "";
       onChange("thumbnail_url", thumbnailUrl);
+
+      const imageUrl = em.image?.url ?? em.image_url ?? "";
+      onChange("image_url", imageUrl);
 
       const footerText = typeof em.footer === "string" ? em.footer : em.footer?.text || "";
       onChange("footer", footerText);
@@ -171,6 +177,7 @@ export function AdvancedEmbedEditor({
           description: config.description || null,
           color: numericalColor,
           thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : null,
+          image: config.image_url ? { url: config.image_url } : null,
           footer: config.footer ? { text: config.footer } : null
         }],
         components: config.components || undefined,
@@ -210,6 +217,7 @@ export function AdvancedEmbedEditor({
     config.description,
     config.color,
     config.thumbnail_url,
+    config.image_url,
     config.footer,
     config.components,
     config.placeholder,
@@ -265,7 +273,11 @@ export function AdvancedEmbedEditor({
 
             <div className="mt-2 pt-4 border-t border-[#1E1F22]">
               <h3 className="mb-4 text-sm font-bold text-discord-text-muted uppercase tracking-wide">Embed Configuration</h3>
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-5">
+                <ImageUploader 
+                  onApplyImage={(url) => onChange("image_url", url)}
+                  onApplyThumbnail={(url) => onChange("thumbnail_url", url)}
+                />
                 <div>
                   <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Embed Title</label>
                   <Input value={config.title || ""} onChange={(e) => onChange("title", e.target.value)} />
@@ -286,9 +298,15 @@ export function AdvancedEmbedEditor({
                     <Input value={config.thumbnail_url || ""} placeholder="https://..." onChange={(e) => onChange("thumbnail_url", e.target.value)} />
                   </div>
                 </div>
-                <div>
-                  <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Footer Text</label>
-                  <Input value={config.footer || ""} onChange={(e) => onChange("footer", e.target.value)} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Image URL (Large Body Image)</label>
+                    <Input value={config.image_url || ""} placeholder="https://..." onChange={(e) => onChange("image_url", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Footer Text</label>
+                    <Input value={config.footer || ""} onChange={(e) => onChange("footer", e.target.value)} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -349,6 +367,7 @@ export function AdvancedEmbedEditor({
                       ? parseInt(config.color.replace("#", ""), 16) 
                       : parseInt(String(config.color)) || 5814783,
                     thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : undefined,
+                    image: config.image_url ? { url: config.image_url } : undefined,
                     footer: config.footer ? { text: config.footer } : undefined,
                     fields: config.fields || []
                   }],

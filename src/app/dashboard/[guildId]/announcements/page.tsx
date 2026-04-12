@@ -19,6 +19,7 @@ type AnnouncementDraft = {
   title: string;
   description: string;
   thumbnail_url: string;
+  image_url: string;
   footer: string;
   channel_id: string;
   ping_role_id: string;
@@ -29,6 +30,7 @@ const createEmptyDraft = (): AnnouncementDraft => ({
   title: "",
   description: "",
   thumbnail_url: "",
+  image_url: "",
   footer: "",
   channel_id: "",
   ping_role_id: "",
@@ -56,6 +58,7 @@ function normalizeDraft(input: any): AnnouncementDraft {
     title: typeof source.title === "string" ? source.title : "",
     description: typeof source.description === "string" ? source.description : "",
     thumbnail_url: typeof source.thumbnail_url === "string" ? source.thumbnail_url : "",
+    image_url: typeof source.image_url === "string" ? source.image_url : "",
     footer: typeof source.footer === "string" ? source.footer : "",
     channel_id: typeof source.channel_id === "string" ? source.channel_id : "",
     ping_role_id: typeof source.ping_role_id === "string" ? source.ping_role_id : "",
@@ -230,6 +233,12 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
         return;
       } else {
         // Rename the draft
+        const oldKeySafe = encodeURIComponent(oldKey);
+        fetchApi(`/guilds/${guildId}/announcements/${oldKeySafe}/rename`, undefined, {
+          method: "POST",
+          body: JSON.stringify({ new_name: newKey }),
+        }).catch(e => console.error("Rename failed", e));
+        
         const updated = { ...drafts };
         updated[newKey] = updated[oldKey];
         delete updated[oldKey];
@@ -242,6 +251,11 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   };
 
   const deleteDraft = (key: string) => {
+    const keySafe = encodeURIComponent(key);
+    fetchApi(`/guilds/${guildId}/announcements/${keySafe}`, undefined, {
+      method: "DELETE",
+    }).catch(e => console.error("Delete failed", e));
+    
     const updated = { ...drafts };
     delete updated[key];
     setDrafts(updated);

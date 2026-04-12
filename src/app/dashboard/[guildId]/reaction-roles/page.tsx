@@ -260,12 +260,22 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       if (drafts[newKey]) {
         toast("A draft with that name already exists.", "error");
       } else {
-        const updated = { ...drafts };
-        updated[newKey] = updated[oldKey];
-        delete updated[oldKey];
-        setDrafts(updated);
-        setActiveDraftKey(newKey);
-        toast("Draft renamed!");
+        const oldSafe = encodeURIComponent(oldKey);
+        fetchApi(`/guilds/${guildId}/select_menu_roles/${oldSafe}/rename`, undefined, {
+          method: "POST",
+          body: JSON.stringify({ new_name: newKey })
+        })
+        .then(() => {
+          const updated = { ...drafts };
+          updated[newKey] = updated[oldKey];
+          delete updated[oldKey];
+          setDrafts(updated);
+          setActiveDraftKey(newKey);
+          toast("Draft renamed!");
+        })
+        .catch((err: any) => {
+          toast("Rename failed: " + err.message, "error");
+        });
       }
     }
     setPromptOpen(false);
@@ -273,10 +283,21 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
 
   const deleteDraft = (key: string) => {
     if (!confirm("Are you sure you want to delete this draft?")) return;
-    const updated = { ...drafts };
-    delete updated[key];
-    setDrafts(updated);
-    setActiveDraftKey(Object.keys(updated)[0] || "");
+    
+    const keySafe = encodeURIComponent(key);
+    fetchApi(`/guilds/${guildId}/select_menu_roles/${keySafe}`, undefined, {
+      method: "DELETE"
+    })
+    .then(() => {
+      const updated = { ...drafts };
+      delete updated[key];
+      setDrafts(updated);
+      setActiveDraftKey(Object.keys(updated)[0] || "");
+      toast("Draft deleted.");
+    })
+    .catch((err: any) => {
+      toast("Delete failed " + err.message, "error");
+    });
   };
 
   const toggleCategory = (cat: string) => {

@@ -7,7 +7,7 @@ export const maxDuration = 60;
 
 const API_TIMEOUT_MS = Number(process.env.BOT_API_TIMEOUT_MS || "45000");
 const VERIFY_API_TIMEOUT_MS = Number(process.env.BOT_API_VERIFY_TIMEOUT_MS || "90000");
-const DEFAULT_BOT_API_BASE = "http://127.0.0.1:8000";
+const DEFAULT_BOT_API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const ENABLE_PROTOCOL_FALLBACK = String(process.env.BOT_API_ENABLE_PROTOCOL_FALLBACK || "0").trim() === "1";
 
 function resolveRequestTimeoutMs(path: string[] | undefined) {

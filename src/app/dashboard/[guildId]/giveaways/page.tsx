@@ -582,15 +582,17 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-discord-text-muted">Duration (Minutes)</label>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-discord-text-muted">Duration (Hours)</label>
                     <Input
                       type="number"
-                      min={1}
-                      max={10080}
-                      value={activeDraft.duration_minutes}
+                      min={0.1}
+                      max={168}
+                      step="any"
+                      value={Number((activeDraft.duration_minutes / 60).toFixed(2))}
                       onChange={(e) => {
-                        const next = Math.max(1, Math.min(10080, Number(e.target.value) || 60));
-                        updateDraft({ duration_minutes: next });
+                        const hours = parseFloat(e.target.value) || 1;
+                        const nextMinutes = Math.max(1, Math.min(10080, Math.round(hours * 60)));
+                        updateDraft({ duration_minutes: nextMinutes });
                       }}
                     />
                   </div>
@@ -639,7 +641,13 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                     </div>
                     <div className="rounded-md bg-[#4a4d57] px-2.5 py-2">
                       <p className="text-[10px] uppercase tracking-wide text-[#c8ccd2]">Duration</p>
-                      <p className="mt-1 font-semibold text-[#f2f3f5]">{activeDraft.duration_minutes}m</p>
+                      <p className="mt-1 font-semibold text-[#f2f3f5]">
+                        {activeDraft.duration_minutes >= 60 && activeDraft.duration_minutes % 60 === 0
+                          ? `${activeDraft.duration_minutes / 60}h`
+                          : activeDraft.duration_minutes >= 60
+                          ? `${(activeDraft.duration_minutes / 60).toFixed(1).replace(/\.0$/, "")}h`
+                          : `${activeDraft.duration_minutes}m`}
+                      </p>
                     </div>
                   </div>
 

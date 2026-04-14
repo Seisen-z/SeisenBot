@@ -41,6 +41,7 @@ type ActivityRewardsStatus = {
 
 type LeaderboardRow = {
   user_id: string;
+  user_name?: string;
   message_count: number;
   unique_days: number;
   total_rewards: number;
@@ -393,7 +394,7 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
               <div key={`${row.user_id}-${index}`} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-discord-text">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-white/95">
-                    #{index + 1} • {row.user_id} • msgs: {row.message_count} • days: {row.unique_days} • rewards: {row.total_rewards}
+                    #{index + 1} • {row.user_name || row.user_id} • msgs: {row.message_count} • days: {row.unique_days} • rewards: {row.total_rewards}
                   </span>
                   <Button
                     variant="outline"

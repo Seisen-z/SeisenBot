@@ -41,6 +41,15 @@ function summarizeBody(text: string): string {
 
 const API_BASE = normalizeApiBase(process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_BASE);
 
+export class ApiError extends Error {
+  public status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = 'ApiError';
+  }
+}
+
 export async function fetchApi(endpoint: string, jwt?: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
   headers.set('Content-Type', 'application/json');
@@ -78,7 +87,7 @@ export async function fetchApi(endpoint: string, jwt?: string, init?: RequestIni
       // Ignore parse failures and fall back to status text only.
     }
 
-    throw new Error(`API Error ${res.status}: ${details || res.statusText}`);
+    throw new ApiError(res.status, details || res.statusText);
   }
 
   if (res.status === 204) {
@@ -88,8 +97,9 @@ export async function fetchApi(endpoint: string, jwt?: string, init?: RequestIni
   if (!isJsonResponse) {
     const payload = summarizeBody(await res.text());
     const renderedType = contentType || 'unknown content type';
-    throw new Error(
-      `API Error ${res.status}: Expected JSON response but received ${renderedType}.${payload ? ` ${payload}` : ''}`
+    throw new ApiError(
+      res.status,
+      `Expected JSON response but received ${renderedType}.${payload ? ` ${payload}` : ''}`
     );
   }
 

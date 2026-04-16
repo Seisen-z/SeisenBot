@@ -649,9 +649,36 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
             </div>
           </AdvancedEmbedEditor>
 
-          <Button onClick={handlePostVerificationPanel} disabled={postingPanel || !config.verification_channel_id}>
-            {postingPanel ? "Posting..." : "Post / Refresh Verification Panel"}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handlePostVerificationPanel} disabled={postingPanel || !config.verification_channel_id}>
+              {postingPanel ? "Posting..." : "Post / Refresh Verification Panel"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  const meRes = await fetch("/api/auth/me");
+                  if (!meRes.ok) {
+                    toast("Failed to determine your user ID to trigger test verification.", "error");
+                    return;
+                  }
+                  const me = await meRes.json();
+                  const triggerRes = await fetchApi(`/bot/trigger/verify_member_web`, undefined, {
+                    method: "POST",
+                    body: JSON.stringify({
+                      guild_id: guildId,
+                      payload: { user_id: me.id, test_mode: true },
+                    }),
+                  });
+                  toast(triggerRes.message || "Test verification completed successfully! Check Discord.", "success");
+                } catch (e: any) {
+                  toast(`Test failed: ${e.message}`, "error");
+                }
+              }}
+            >
+              Test Verification (Admin overrides)
+            </Button>
+          </div>
         </div>
       </div>
 

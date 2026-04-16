@@ -228,7 +228,7 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
     contextKey: guildId,
     delay: 1500,
     onSave: persistDrafts,
-    onError: () => toast("Auto-save failed for giveaway drafts", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for giveaway drafts", "error"),
   });
 
   const loadGiveaways = useCallback(async (silent = false) => {
@@ -258,9 +258,9 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
     try {
       await persistDrafts(drafts);
       toast("Giveaway drafts saved!");
-    } catch {
-      toast("Failed to save giveaway drafts", "error");
-    } finally {
+    } catch (err: any) {
+        toast(err?.message || "Failed to save giveaway drafts", "error");
+      } finally {
       setSaving(false);
     }
   };

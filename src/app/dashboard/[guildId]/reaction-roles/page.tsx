@@ -133,9 +133,9 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       });
       setLastSaved(new Date());
       toast("Drafts Saved Successfully!");
-    } catch (e) {
-      toast("Failed to save.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save.", "error");
+      } finally {
       setSaving(false);
     }
   };

@@ -243,9 +243,9 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
         setLastLoadedAt(new Date());
         setSaveSummary(null);
       })
-      .catch((err) => {
+      .catch((err: any) => {
         setLoadError(toDashboardErrorState(err, "Failed to load onboarding settings."));
-        toast("Failed to load onboarding settings", "error");
+        toast(err?.message || "Failed to load onboarding settings", "error");
       })
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
@@ -383,10 +383,10 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
     try {
       await persistConfig(config);
       toast("Onboarding settings saved!");
-    } catch {
-      setSaveSummary({ type: "error", text: "Failed to save onboarding settings." });
-      toast("Failed to save onboarding settings.", "error");
-    } finally {
+    } catch (err: any) {
+        setSaveSummary({ type: "error", text: err?.message || "Failed to save onboarding settings." });
+        toast(err?.message || "Failed to save onboarding settings.", "error");
+      } finally {
       setSaving(false);
     }
   };

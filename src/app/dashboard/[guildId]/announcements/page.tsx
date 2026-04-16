@@ -132,7 +132,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     contextKey: guildId,
     delay: 1400,
     onSave: persistDrafts,
-    onError: () => toast("Auto-save failed for announcements", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for announcements", "error"),
   });
 
   const handleSave = async () => {
@@ -140,9 +140,9 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     try {
       await persistDrafts(drafts);
       toast("Drafts Saved Successfully!");
-    } catch (e) {
-      toast("Failed to save.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save.", "error");
+      } finally {
       setSaving(false);
     }
   };

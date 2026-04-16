@@ -190,7 +190,7 @@ export default function PollsPage({ params }: { params: Promise<{ guildId: strin
     contextKey: guildId,
     delay: 1500,
     onSave: persistDrafts,
-    onError: () => toast("Auto-save failed for poll drafts", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for poll drafts", "error"),
   });
 
   const handleSave = async () => {
@@ -198,9 +198,9 @@ export default function PollsPage({ params }: { params: Promise<{ guildId: strin
     try {
       await persistDrafts(drafts);
       toast("Poll drafts saved!");
-    } catch {
-      toast("Failed to save poll drafts.", "error");
-    } finally {
+    } catch (err: any) {
+        toast(err?.message || "Failed to save poll drafts.", "error");
+      } finally {
       setSaving(false);
     }
   };

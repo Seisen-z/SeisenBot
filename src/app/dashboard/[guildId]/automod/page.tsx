@@ -211,9 +211,9 @@ export default function AutoModPage({ params }: { params: Promise<{ guildId: str
         setConfig(normalizeConfig(data || {}));
         setLastLoadedAt(new Date());
       })
-      .catch((err) => {
+      .catch((err: any) => {
         setLoadError(toDashboardErrorState(err, "Failed to load Auto-Mod settings."));
-        toast("Failed to load Auto-Mod settings", "error");
+        toast(err?.message || "Failed to load Auto-Mod settings", "error");
       })
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
@@ -243,7 +243,7 @@ export default function AutoModPage({ params }: { params: Promise<{ guildId: str
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
-    onError: () => toast("Auto-save failed for Auto-Mod settings", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for Auto-Mod settings", "error"),
   });
 
   const handleSave = async () => {
@@ -251,9 +251,9 @@ export default function AutoModPage({ params }: { params: Promise<{ guildId: str
     try {
       await persistConfig(config);
       toast("Auto-Mod settings saved!");
-    } catch {
-      toast("Failed to save Auto-Mod settings.", "error");
-    } finally {
+    } catch (err: any) {
+        toast(err?.message || "Failed to save Auto-Mod settings.", "error");
+      } finally {
       setSaving(false);
     }
   };
@@ -271,9 +271,9 @@ export default function AutoModPage({ params }: { params: Promise<{ guildId: str
         body: JSON.stringify({ guild_id: guildId, payload: { text: testText } }),
       });
       setTestResult(res?.result ?? null);
-    } catch {
-      toast("Test request failed.", "error");
-    } finally {
+    } catch (err: any) {
+        toast(err?.message || "Test request failed.", "error");
+      } finally {
       setTesting(false);
     }
   };

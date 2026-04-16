@@ -62,7 +62,7 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
-    onError: () => toast("Auto-save failed for AI Help settings", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for AI Help settings", "error"),
   });
 
   const handleSave = async () => {
@@ -70,9 +70,9 @@ export default function AIHelpPage({ params }: { params: Promise<{ guildId: stri
     try {
       await persistConfig(config);
       toast("AI Help Config Saved!");
-    } catch (e) {
-      toast("Failed to save AI configuration.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save AI configuration.", "error");
+      } finally {
       setSaving(false);
     }
   };

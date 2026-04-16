@@ -45,7 +45,7 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
-    onError: () => toast("Auto-save failed for boost config", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for boost config", "error"),
   });
 
   const handleSave = async () => {
@@ -53,9 +53,9 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
     try {
       await persistConfig(config);
       toast("Boost Config Saved!");
-    } catch (e) {
-      toast("Failed to save.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save.", "error");
+      } finally {
       setSaving(false);
     }
   };

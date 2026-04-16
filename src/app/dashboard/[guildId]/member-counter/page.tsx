@@ -104,9 +104,9 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
         setConfig(normalizeCounterConfig(data));
         setLastLoadedAt(new Date());
       })
-      .catch((err) => {
+      .catch((err: any) => {
         setLoadError(toDashboardErrorState(err, "Failed to load member counter config."));
-        toast("Failed to load member counter config", "error");
+        toast(err?.message || "Failed to load member counter config", "error");
       })
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
@@ -140,7 +140,7 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
-    onError: () => toast("Auto-save failed for member counter", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for member counter", "error"),
   });
 
   const updateConfig = (patch: Partial<MemberCounterConfig>) => {
@@ -152,9 +152,9 @@ export default function MemberCounterPage({ params }: { params: Promise<{ guildI
     try {
       await persistConfig(config);
       toast("Member counter config saved!");
-    } catch {
-      toast("Failed to save member counter config", "error");
-    } finally {
+    } catch (err: any) {
+        toast(err?.message || "Failed to save member counter config", "error");
+      } finally {
       setSaving(false);
     }
   };

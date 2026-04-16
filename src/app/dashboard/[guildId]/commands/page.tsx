@@ -168,7 +168,7 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
     contextKey: guildId,
     delay: 1400,
     onSave: persistCommands,
-    onError: () => toast("Auto-save failed for command access", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for command access", "error"),
   });
 
   const handleSave = async () => {
@@ -177,9 +177,9 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
     try {
       await persistCommands(commands);
       toast("Command Config Saved!");
-    } catch (e) {
-      toast("Failed to save.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save.", "error");
+      } finally {
       setSaving(false);
     }
   };

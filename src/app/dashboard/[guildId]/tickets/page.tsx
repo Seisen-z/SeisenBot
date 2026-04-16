@@ -53,7 +53,7 @@ export default function TicketsPage({ params }: { params: Promise<{ guildId: str
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
-    onError: () => toast("Auto-save failed for tickets", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for tickets", "error"),
   });
 
   const handleSave = async () => {
@@ -61,9 +61,9 @@ export default function TicketsPage({ params }: { params: Promise<{ guildId: str
     try {
       await persistConfig(config);
       toast("Tickets Config Saved!");
-    } catch (e) {
-      toast("Failed to save.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save.", "error");
+      } finally {
       setSaving(false);
     }
   };

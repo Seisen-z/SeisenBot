@@ -175,7 +175,7 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
     contextKey: guildId,
     delay: 1500,
     onSave: persistMonitors,
-    onError: () => toast("Auto-save failed for social monitors", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for social monitors", "error"),
   });
 
   const handleSave = async () => {
@@ -183,9 +183,9 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
     try {
       await persistMonitors(monitors);
       toast("Social monitors saved!");
-    } catch {
-      toast("Failed to save social monitors.", "error");
-    } finally {
+    } catch (err: any) {
+        toast(err?.message || "Failed to save social monitors.", "error");
+      } finally {
       setSaving(false);
     }
   };

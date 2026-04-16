@@ -139,7 +139,7 @@ export default function FunCommandsPage({ params }: { params: Promise<{ guildId:
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
-    onError: () => toast("Auto-save failed for fun commands", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for fun commands", "error"),
   });
 
   const handleSave = async () => {
@@ -147,9 +147,9 @@ export default function FunCommandsPage({ params }: { params: Promise<{ guildId:
     try {
       await persistConfig(config);
       toast("Saved Fun Commands Successfully!");
-    } catch (e) {
-      toast("Failed to save fun commands.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save fun commands.", "error");
+      } finally {
       setSaving(false);
     }
   };

@@ -52,7 +52,7 @@ export default function StickyMessagesPage({ params }: { params: Promise<{ guild
     contextKey: guildId,
     delay: 1400,
     onSave: persistStickies,
-    onError: () => toast("Auto-save failed for sticky messages", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for sticky messages", "error"),
   });
 
   const handleSave = async () => {
@@ -60,9 +60,9 @@ export default function StickyMessagesPage({ params }: { params: Promise<{ guild
     try {
       await persistStickies(stickies);
       toast("Sticky Messages Config Saved!");
-    } catch (e) {
-      toast("Failed to save.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save.", "error");
+      } finally {
       setSaving(false);
     }
   };

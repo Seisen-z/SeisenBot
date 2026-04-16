@@ -120,7 +120,7 @@ export default function RobloxMonitorsPage({ params }: { params: Promise<{ guild
     contextKey: guildId,
     delay: 1500,
     onSave: persistMonitors,
-    onError: () => toast("Auto-save failed for Roblox monitors", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for Roblox monitors", "error"),
   });
 
   const fetchGameInfo = async (uid: string) => {
@@ -142,9 +142,9 @@ export default function RobloxMonitorsPage({ params }: { params: Promise<{ guild
     try {
       await persistMonitors(monitors);
       toast("Roblox Monitors Saved Successfully!");
-    } catch (e) {
-      toast("Failed to save.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save.", "error");
+      } finally {
       setSaving(false);
     }
   };

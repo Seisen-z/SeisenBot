@@ -44,9 +44,9 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
         if (r.length > 0) setActiveIdx(0);
         setLastLoadedAt(new Date());
       })
-      .catch((err) => {
+      .catch((err: any) => {
         setLoadError(toDashboardErrorState(err, "Failed to load Auto Replies."));
-        toast("Failed to load Auto Replies", "error");
+        toast(err?.message || "Failed to load Auto Replies", "error");
       })
       .finally(() => setInitialLoadComplete(true));
   }, [guildId, toast]);
@@ -69,7 +69,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
     contextKey: guildId,
     delay: 1400,
     onSave: persistRules,
-    onError: () => toast("Auto-save failed for auto replies", "error"),
+    onError: (err: any) => toast(err?.message || "Auto-save failed for auto replies", "error"),
   });
 
   const handleSave = async () => {
@@ -77,9 +77,9 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
     try {
       await persistRules(rules);
       toast("Saved Auto Replies Successfully!");
-    } catch (e) {
-      toast("Failed to save auto replies.", "error");
-    } finally {
+    } catch (e: any) {
+        toast(e?.message || "Failed to save auto replies.", "error");
+      } finally {
       setSaving(false);
     }
   };

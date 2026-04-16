@@ -649,7 +649,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
             </div>
           </AdvancedEmbedEditor>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button onClick={handlePostVerificationPanel} disabled={postingPanel || !config.verification_channel_id}>
               {postingPanel ? "Posting..." : "Post / Refresh Verification Panel"}
             </Button>
@@ -676,7 +676,36 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
                 }
               }}
             >
-              Test Verification (Admin overrides)
+              Simulate Verification (Direct)
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const meRes = await fetch("/api/auth/me");
+                  if (!meRes.ok) {
+                    toast("Failed to load user ID", "error");
+                    return;
+                  }
+                  const me = await meRes.json();
+                  const res = await fetchApi(`/bot/trigger/generate_verification_link`, undefined, {
+                    method: "POST",
+                    body: JSON.stringify({
+                      guild_id: guildId,
+                      payload: { user_id: me.id, test_mode: true },
+                    }),
+                  });
+                  if (res.url) {
+                    window.open(res.url, "_blank");
+                  } else {
+                    throw new Error(res.message || "Failed to generate link");
+                  }
+                } catch(e: any) {
+                  toast(`Link generation failed: ${e.message}`, "error");
+                }
+              }}
+            >
+              Test Website Verification Flow
             </Button>
           </div>
         </div>

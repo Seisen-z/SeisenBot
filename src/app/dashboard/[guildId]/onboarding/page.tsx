@@ -790,6 +790,35 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
             />
           </div>
         </div>
+
+        <div className="mt-4 pt-4 border-t border-[#1E1F22]">
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              try {
+                const meRes = await fetch("/api/auth/me");
+                if (!meRes.ok) throw new Error("Failed to load your user ID");
+                const me = await meRes.json();
+                
+                const triggerRes = await fetchApi(`/bot/trigger/test_join_guard`, undefined, {
+                  method: "POST",
+                  body: JSON.stringify({
+                    guild_id: guildId,
+                    payload: { user_id: me.id },
+                  }),
+                });
+                toast(triggerRes.message || "Test DM and Log sent!", "success");
+              } catch (e: any) {
+                toast(`Test failed: ${e.message}`, "error");
+              }
+            }}
+          >
+            Test Join Guard DM & Log Format
+          </Button>
+          <p className="mt-2 text-xs text-discord-text-muted">
+            Simulates a blocker event so you can view the PM an offender would receive, and the embed to the log channel. You will not actually be kicked or banned.
+          </p>
+        </div>
       </div>
     </div>
   );

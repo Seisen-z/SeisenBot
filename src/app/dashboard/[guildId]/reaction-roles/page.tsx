@@ -8,7 +8,7 @@ import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
 import { Input } from "@/components/ui/input";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
-import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon, FolderIcon, Send, ListIcon, Sparkles } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon, FolderIcon, ListIcon, Sparkles, RefreshCwIcon, LinkIcon, XIcon, DownloadIcon } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
 // Draft key format: "Category/DraftName" — uncategorized uses "General/DraftName"
@@ -33,6 +33,7 @@ interface SelectMenuDraft {
   min_values: number;
   max_values: number;
   options: SelectOption[];
+  message_id?: string; // Linked Discord message ID (for live updates)
 }
 
 function parseDrafts(drafts: Record<string, any>) {
@@ -56,6 +57,8 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -64,6 +67,10 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
     title: "", label: "", action: "category"
   });
 
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importLink, setImportLink] = useState("");
+  const [importError, setImportError] = useState("");
+
   const [newOptionLabel, setNewOptionLabel] = useState("");
   const [newOptionDescription, setNewOptionDescription] = useState("");
   const [newOptionEmoji, setNewOptionEmoji] = useState("");
@@ -71,11 +78,10 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
 
   // Auto-save drafts after changes (with debounce)
   useEffect(() => {
-    if (!initialLoadComplete) return; // Don't save until initial load is complete
-    if (Object.keys(drafts).length === 0) return; // Don't save empty state
+    if (!initialLoadComplete) return; 
+    if (Object.keys(drafts).length === 0) return;
     
     const timeoutId = setTimeout(() => {
-      // Auto-save after 2 seconds of no changes
       setSaving(true);
       fetchApi(`/guilds/${guildId}/select_menu_roles`, undefined, {
         method: "PUT",
@@ -144,7 +150,6 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
 
   const updateDraft = (key: string, val: any) => {
     setDrafts(prev => {
-      // Ensure the draft exists in state before updating
       const existingDraft = prev[activeDraftKey] || { ...DEFAULT_DRAFT };
       return {
         ...prev,
@@ -153,78 +158,139 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
     });
   };
 
-  const handlePostNow = async () => {
-    if (!currentDraft.channel_id) {
-      toast("Select a target channel first.", "error");
-      return;
-    }
-    if (currentDraft.options.length === 0) {
-      toast("Add at least one role option.", "error");
-      return;
-    }
+  const _buildDiscordPayload = (draft: SelectMenuDraft) => ({
+    content: draft.content || null,
+    embeds: [{
+      title: draft.title,
+      description: draft.description ? draft.description.split('\n') : [],
+      color: typeof draft.color === 'string' && draft.color.startsWith('#') 
+        ? parseInt(draft.color.replace('#', ''), 16) 
+        : parseInt(String(draft.color || "5814783")),
+      fields: null
+    }],
+    components: [{
+      type: 1,
+      components: [{
+        type: 3,
+        custom_id: "role_select",
+        placeholder: draft.placeholder,
+        min_values: Math.min(draft.min_values, draft.options.length) || 1,
+        max_values: Math.min(draft.max_values, draft.options.length) || 1,
+        options: draft.options.map(opt => ({
+          label: opt.label,
+          value: opt.value,
+          description: opt.description,
+          default: false
+        }))
+      }]
+    }]
+  });
 
-    // Validate Discord requirements for select menu options
-    for (const option of currentDraft.options) {
-      if (!option.label || option.label.length < 1 || option.label.length > 100) {
-        toast("All option labels must be between 1-100 characters.", "error");
-        return;
-      }
-      if (option.description && option.description.length > 100) {
-        toast("All option descriptions must be 100 characters or less.", "error");
-        return;
-      }
+  const _validateOptions = (draft: SelectMenuDraft): string | null => {
+    if (!draft.channel_id) return "Select a target channel first.";
+    if (draft.options.length === 0) return "Add at least one role option.";
+    for (const option of draft.options) {
+      if (!option.label || option.label.length < 1 || option.label.length > 100)
+        return "All option labels must be between 1-100 characters.";
+      if (option.description && option.description.length > 100)
+        return "All option descriptions must be 100 characters or less.";
     }
+    return null;
+  };
+
+  const handlePostNow = async () => {
+    const err = _validateOptions(currentDraft);
+    if (err) { toast(err, "error"); return; }
 
     setPosting(true);
     try {
-      // Format description as array of lines (split by newlines)
-      const descriptionLines = currentDraft.description 
-        ? currentDraft.description.split('\n') 
-        : [];
-
-      const discordPayload = {
-        content: currentDraft.content || null,
-        embeds: [{
-          title: currentDraft.title,
-          description: descriptionLines,
-          color: typeof currentDraft.color === 'string' && currentDraft.color.startsWith('#') 
-            ? parseInt(currentDraft.color.replace('#', ''), 16) 
-            : parseInt(String(currentDraft.color || "5814783")),
-          fields: null
-        }],
-        components: [{
-          type: 1,
-          components: [{
-            type: 3,
-            custom_id: "role_select",
-            placeholder: currentDraft.placeholder,
-            min_values: Math.min(currentDraft.min_values, currentDraft.options.length) || 1,
-            max_values: Math.min(currentDraft.max_values, currentDraft.options.length) || 1,
-            options: currentDraft.options.map(opt => ({
-              label: opt.label,
-              value: opt.value,
-              description: opt.description,
-              default: false
-            }))
-          }]
-        }]
-      };
-
-      await fetchApi('/trigger/create_select_menu_role', undefined, {
+      const res = await fetchApi('/trigger/create_select_menu_role', undefined, {
         method: "POST",
         body: JSON.stringify({
           guild_id: guildId,
           payload: {
             channel_id: currentDraft.channel_id,
-            message_data: discordPayload
+            message_data: _buildDiscordPayload(currentDraft)
           }
         })
       });
+      if (res?.message_id) {
+        updateDraft("message_id", String(res.message_id));
+      }
       toast("Select Menu Sent Successfully!");
     } catch (err: any) {
       toast(`Error posting: ${err.message}`, "error");
     } finally {
       setPosting(false);
+    }
+  };
+
+  const handleUpdateDiscord = async () => {
+    if (!currentDraft.message_id) return;
+    const err = _validateOptions(currentDraft);
+    if (err) { toast(err, "error"); return; }
+
+    setUpdating(true);
+    try {
+      await fetchApi('/trigger/update_select_menu_role', undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          guild_id: guildId,
+          payload: {
+            message_id: currentDraft.message_id,
+            channel_id: currentDraft.channel_id,
+            message_data: _buildDiscordPayload(currentDraft)
+          }
+        })
+      });
+      toast("Discord message updated successfully! ✅");
+    } catch (err: any) {
+      toast(`Update failed: ${err.message}`, "error");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleImportFromDiscord = async () => {
+    const raw = importLink.trim();
+    if (!raw) { setImportError("Please paste a Discord message link."); return; }
+    setImportError("");
+    setImporting(true);
+    try {
+      const data = await fetchApi(
+        `/guilds/${guildId}/select_menu_roles/import?message_link=${encodeURIComponent(raw)}`
+      );
+      const newDraftName = `Imported ${data.message_id?.slice(-6) ?? "Draft"}`;
+      const category = "Imported";
+      const key = `${category}/${newDraftName}`;
+      const newDraft: SelectMenuDraft = {
+        title: data.title || "Imported Menu",
+        description: data.description || "",
+        content: data.content || "",
+        color: data.color || "#5865F2",
+        thumbnail_url: data.thumbnail_url || "",
+        footer: data.footer || "",
+        channel_id: data.channel_id || "",
+        placeholder: data.placeholder || "Choose roles...",
+        min_values: data.min_values ?? 1,
+        max_values: data.max_values ?? 1,
+        options: (data.options || []).map((o: any) => ({
+          label: o.label || "",
+          value: o.value || "",
+          description: o.description || "",
+          emoji: o.emoji || undefined,
+        })),
+        message_id: data.message_id,
+      };
+      setDrafts(prev => ({ ...prev, [key]: newDraft }));
+      setActiveDraftKey(key);
+      setImportModalOpen(false);
+      setImportLink("");
+      toast(`Imported "${newDraftName}" from Discord!`);
+    } catch (err: any) {
+      setImportError(err?.message || "Import failed. Check the message link and try again.");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -327,8 +393,6 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       toast("Please enter a label and select a role", "error");
       return;
     }
-
-    // Discord validation rules
     const label = newOptionLabel.trim();
     const description = newOptionDescription.trim() || `Get the ${newOptionLabel} role`;
     
@@ -336,7 +400,6 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       toast("Option label must be between 1-100 characters", "error");
       return;
     }
-    
     if (description.length > 100) {
       toast("Option description must be 100 characters or less", "error");
       return;
@@ -360,35 +423,6 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
     updateDraft("options", currentDraft.options.filter((_, i) => i !== index));
   };
 
-  // Build full message object for preview
-  const previewMessage = {
-    content: currentDraft.content || null,
-    embeds: [{
-      title: currentDraft.title,
-      description: currentDraft.description ? currentDraft.description.split('\n') : [],
-      color: typeof currentDraft.color === 'string' && currentDraft.color.startsWith('#') 
-        ? parseInt(currentDraft.color.replace('#', ''), 16) 
-        : parseInt(String(currentDraft.color || "5814783")),
-      fields: null
-    }],
-    components: [{
-      type: 1,
-      components: [{
-        type: 3,
-        custom_id: "role_select",
-        placeholder: currentDraft.placeholder,
-        min_values: Math.min(currentDraft.min_values, currentDraft.options.length) || 1,
-        max_values: Math.min(currentDraft.max_values, currentDraft.options.length) || 1,
-        options: currentDraft.options.map(o => ({
-            label: o.label,
-            value: o.value,
-            description: o.description,
-            default: false
-        }))
-      }]
-    }]
-  };
-
   const totalDrafts = Object.keys(drafts).length;
   const totalCategories = Object.keys(categorized).length;
   const optionCount = currentDraft.options?.length || 0;
@@ -407,15 +441,34 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
           { label: "Post Ready", value: isPostReady ? "Yes" : "No" },
         ]}
         actions={
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center flex-wrap">
             {lastSaved && !saving && (
               <span className="text-xs text-green-400">
                 Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
+            <Button
+              variant="outline"
+              onClick={() => { setImportLink(""); setImportError(""); setImportModalOpen(true); }}
+              className="border-yellow-500/30 hover:bg-yellow-500/10 text-yellow-400"
+            >
+              <DownloadIcon className="w-4 h-4 mr-2" />
+              Import from Discord
+            </Button>
             <Button variant="outline" onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Now"}
             </Button>
+            {currentDraft.message_id && (
+              <Button
+                variant="outline"
+                onClick={handleUpdateDiscord}
+                disabled={updating}
+                className="border-green-500/30 hover:bg-green-500/10 text-green-400"
+              >
+                <RefreshCwIcon className={`w-4 h-4 mr-2 ${updating ? 'animate-spin' : ''}`} />
+                {updating ? "Updating..." : "Update Discord Message"}
+              </Button>
+            )}
             <Button variant="discord" onClick={handlePostNow} disabled={posting}>
               {posting ? "Posting..." : "Send to Channel"}
             </Button>
@@ -424,7 +477,6 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
       />
 
       <div className="flex gap-6 h-full min-h-[700px]">
-        {/* Sidebar */}
         <div className="w-64 shrink-0 flex flex-col gap-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-3 h-fit">
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-xs font-bold text-discord-text-muted uppercase tracking-wider">Saved Menus</span>
@@ -497,7 +549,6 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
           ))}
         </div>
 
-        {/* Editor Panel */}
         <div className="flex-1 flex flex-col">
           <div className="flex-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-0 relative overflow-hidden flex flex-col">
             {activeDraftKey ? (
@@ -513,7 +564,7 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                     <AdvancedEmbedEditor
-                    config={{...currentDraft, components: previewMessage.components}}
+                    config={currentDraft}
                     onChange={updateDraft}
                     bottomChildren={
                         <div className="mt-8 pt-8 border-t border-[#1E1F22]">
@@ -652,6 +703,23 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
                             placeholder="Where should this menu go?"
                         />
                         </div>
+                        {currentDraft.message_id && (
+                          <div>
+                            <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Linked Discord Message</label>
+                            <div className="flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2">
+                              <LinkIcon className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                              <span className="text-xs text-green-400 font-mono flex-1 truncate">Message ID: {currentDraft.message_id}</span>
+                              <button
+                                onClick={() => updateDraft("message_id", undefined)}
+                                className="text-discord-text-muted hover:text-red-400 transition"
+                                title="Unlink message"
+                              >
+                                <XIcon className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-discord-text-muted mt-1">Click &quot;Update Discord Message&quot; to push changes to this live message.</p>
+                          </div>
+                        )}
                     </div>
                     </AdvancedEmbedEditor>
                 </div>
@@ -681,6 +749,57 @@ export default function SelectMenuRolesPage({ params }: { params: Promise<{ guil
         onConfirm={handlePromptConfirm}
         onCancel={() => setPromptOpen(false)}
       />
+
+      {importModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg mx-4 rounded-2xl border border-[#1E1F22] bg-[#2B2D31] p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2 rounded-lg bg-yellow-500/10">
+                <DownloadIcon className="w-5 h-5 text-yellow-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">Import from Discord</h2>
+                <p className="text-xs text-discord-text-muted">Paste a Discord message link to load an existing select menu</p>
+              </div>
+              <button onClick={() => setImportModalOpen(false)} className="ml-auto text-discord-text-muted hover:text-white">
+                <XIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-3">
+              <label className="mb-2 block text-xs font-semibold text-discord-text-muted uppercase">Discord Message Link</label>
+              <Input
+                value={importLink}
+                onChange={(e) => { setImportLink(e.target.value); setImportError(""); }}
+                placeholder="https://discord.com/channels/1234/5678/9012"
+                className="font-mono text-sm"
+                onKeyDown={(e) => e.key === 'Enter' && handleImportFromDiscord()}
+                autoFocus
+              />
+              <p className="text-[10px] text-discord-text-muted mt-1.5">
+                Right-click a message in Discord → <span className="text-discord-blurple font-medium">Copy Message Link</span> and paste it here.
+              </p>
+            </div>
+
+            {importError && (
+              <div className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                ⚠️ {importError}
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-end mt-4">
+              <Button variant="outline" onClick={() => setImportModalOpen(false)}>Cancel</Button>
+              <Button
+                variant="discord"
+                onClick={handleImportFromDiscord}
+                disabled={importing || !importLink.trim()}
+              >
+                {importing ? "Importing..." : "Import Message"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

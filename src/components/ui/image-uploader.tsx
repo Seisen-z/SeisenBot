@@ -125,42 +125,34 @@ export function ImageUploader({ onApplyImage, onApplyThumbnail, onAddMultiImage 
       {uploadedUrls.length > 0 && (
         <div className="flex gap-3 mt-2 border-t border-white/5 pt-3 overflow-x-auto pb-2 scrollbar-thin">
           {uploadedUrls.map((url, i) => (
-            <div key={i} className="flex h-[100px] w-[320px] shrink-0 overflow-hidden items-center justify-between gap-3 rounded-lg bg-black/40 border border-white/5 pr-2 group transition-colors hover:border-[#5865F2]/50 hover:bg-black/60">
+            <div key={i} className="relative flex flex-col h-[160px] w-[160px] shrink-0 overflow-hidden rounded-lg bg-black/40 border border-white/5 group transition-colors hover:border-[#5865F2]/50 hover:bg-black/60">
               <div 
-                className="h-full w-[100px] shrink-0 bg-cover bg-center border-r border-white/5" 
+                className="h-full w-full shrink-0 bg-cover bg-center" 
                 style={{ backgroundImage: `url(${url})` }}
               />
-              <div className="flex-1 overflow-hidden">
-                 <button
-                   title="Copy literal URL"
-                   onClick={() => copyUrl(url)}
-                   className="flex items-center gap-1.5 text-[10px] text-discord-text-muted hover:text-white transition"
-                 >
-                   {copiedUrl === url ? <Check className="h-3 w-3 text-green-400" /> : <LinkIcon className="h-3 w-3" />}
-                   <span className="truncate">{url.split('/').pop()}</span>
-                 </button>
-              </div>
-              <div className="flex flex-col gap-1.5 shrink-0 opacity-100 sm:opacity-0 transition-opacity sm:group-hover:opacity-100 items-end">
+              
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 gap-2">
                 <button
                   type="button"
                   title="Remove from Studio"
                   onClick={() => removeUrl(url)}
-                  className="rounded p-1 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition shrink-0 self-end mr-1 mt-1"
+                  className="absolute top-1 right-1 rounded p-1 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
-                <div className="flex gap-1 mb-1 mr-1">
+
+                <div className="flex flex-col gap-1.5 w-full mt-2">
                   <button
                     type="button"
                     onClick={() => onApplyThumbnail?.(url)}
-                    className="rounded bg-[#5865F2]/20 px-2 py-1 text-[10px] font-bold text-[#5865F2] hover:bg-[#5865F2]/40 transition"
+                    className="w-full rounded bg-[#5865F2]/90 hover:bg-[#5865F2] px-2 py-1.5 text-[10px] font-bold text-white transition"
                   >
                     Set Thumb
                   </button>
                   <button
                     type="button"
                     onClick={() => onApplyImage?.(url)}
-                    className="rounded bg-[#5865F2]/20 px-2 py-1 text-[10px] font-bold text-[#5865F2] hover:bg-[#5865F2]/40 transition"
+                    className="w-full rounded bg-[#5865F2]/90 hover:bg-[#5865F2] px-2 py-1.5 text-[10px] font-bold text-white transition"
                   >
                     Set Body
                   </button>
@@ -168,7 +160,7 @@ export function ImageUploader({ onApplyImage, onApplyThumbnail, onAddMultiImage 
                     <button
                       type="button"
                       onClick={() => onAddMultiImage(url)}
-                      className="rounded bg-[#5865F2]/20 px-2 py-1 text-[10px] font-bold text-[#5865F2] hover:bg-[#5865F2]/40 transition"
+                      className="w-full rounded bg-[#5865F2]/90 hover:bg-[#5865F2] px-2 py-1.5 text-[10px] font-bold text-white transition"
                     >
                       + Outside Embed
                     </button>

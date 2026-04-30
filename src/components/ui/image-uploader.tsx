@@ -123,11 +123,11 @@ export function ImageUploader({ onApplyImage, onApplyThumbnail, onAddMultiImage 
       {error && <p className="text-xs text-red-500 bg-red-500/10 p-2 rounded">{error}</p>}
       
       {uploadedUrls.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 border-t border-white/5 pt-3">
+        <div className="flex gap-3 mt-2 border-t border-white/5 pt-3 overflow-x-auto pb-2 scrollbar-thin">
           {uploadedUrls.map((url, i) => (
-            <div key={i} className="flex h-[72px] overflow-hidden items-center justify-between gap-3 rounded-lg bg-black/40 border border-white/5 pr-2 group transition-colors hover:border-[#5865F2]/50 hover:bg-black/60">
+            <div key={i} className="flex h-[100px] w-[320px] shrink-0 overflow-hidden items-center justify-between gap-3 rounded-lg bg-black/40 border border-white/5 pr-2 group transition-colors hover:border-[#5865F2]/50 hover:bg-black/60">
               <div 
-                className="h-full w-[72px] shrink-0 bg-cover bg-center border-r border-white/5" 
+                className="h-full w-[100px] shrink-0 bg-cover bg-center border-r border-white/5" 
                 style={{ backgroundImage: `url(${url})` }}
               />
               <div className="flex-1 overflow-hidden">

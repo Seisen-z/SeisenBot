@@ -36,6 +36,9 @@ interface DiscordMessage {
     image?: {
       url?: string;
     };
+    images?: Array<{
+      url?: string;
+    }>;
     footer?: {
       text?: string;
       icon_url?: string;
@@ -244,6 +247,24 @@ function NewDiscordMessagePreview({
                     className="max-h-[300px] w-auto max-w-[400px] object-cover cursor-pointer hover:opacity-90"
                     onError={(e) => (e.currentTarget.style.display = 'none')}
                   />
+                </div>
+              )}
+
+              {/* Multiple Images */}
+              {embed.images && embed.images.length > 0 && (
+                <div className="mt-3 flex flex-col gap-2">
+                  {embed.images.map((img, idx) => (
+                    img.url ? (
+                      <div key={idx} className="shrink-0 rounded-[4px] overflow-hidden max-w-full">
+                        <img
+                          src={img.url}
+                          alt={`Target Image ${idx + 1}`}
+                          className="max-h-[300px] w-auto max-w-[400px] object-cover cursor-pointer hover:opacity-90"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      </div>
+                    ) : null
+                  ))}
                 </div>
               )}
 

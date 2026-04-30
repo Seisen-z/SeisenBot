@@ -15,6 +15,7 @@ export interface EmbedConfig {
   color?: string | number;
   thumbnail_url?: string;
   image_url?: string;
+  images?: string[];
   footer?: string;
   [key: string]: any; // Allow other properties
 }
@@ -83,6 +84,10 @@ export function AdvancedEmbedEditor({
 
       const imageUrl = em.image?.url ?? em.image_url ?? "";
       onChange("image_url", imageUrl);
+
+      if (Array.isArray(em.images)) {
+        onChange("images", em.images);
+      }
 
       const footerText = typeof em.footer === "string" ? em.footer : em.footer?.text || "";
       onChange("footer", footerText);
@@ -178,6 +183,7 @@ export function AdvancedEmbedEditor({
           color: numericalColor,
           thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : null,
           image: config.image_url ? { url: config.image_url } : null,
+          images: Array.isArray(config.images) && config.images.length > 0 ? config.images : undefined,
           footer: config.footer ? { text: config.footer } : null
         }],
         components: config.components || undefined,
@@ -277,6 +283,7 @@ export function AdvancedEmbedEditor({
                 <ImageUploader 
                   onApplyImage={(url) => onChange("image_url", url)}
                   onApplyThumbnail={(url) => onChange("thumbnail_url", url)}
+                  onAddMultiImage={(url) => onChange("images", [...(config.images || []), url])}
                 />
                 <div>
                   <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Embed Title</label>
@@ -306,6 +313,43 @@ export function AdvancedEmbedEditor({
                   <div>
                     <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Footer Text</label>
                     <Input value={config.footer || ""} onChange={(e) => onChange("footer", e.target.value)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Multiple Images (Gallery outside of embed)</label>
+                  <div className="space-y-2">
+                    {(config.images || []).map((url, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input 
+                          value={url} 
+                          placeholder="https://..."
+                          onChange={(e) => {
+                            const newImages = [...(config.images || [])];
+                            newImages[idx] = e.target.value;
+                            onChange("images", newImages);
+                          }}
+                          className="flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newImages = (config.images || []).filter((_, i) => i !== idx);
+                            onChange("images", newImages);
+                          }}
+                          className="px-3 py-2 bg-[#DA373C] hover:bg-[#A12828] transition-colors rounded text-white text-xs font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => onChange("images", [...(config.images || []), ""])}
+                      className="w-full px-3 py-2 bg-[#1b1d22] border border-white/15 rounded text-xs font-semibold text-discord-text-muted hover:bg-[#252831] transition-colors"
+                    >
+                      + Add Target Image URL
+                    </button>
                   </div>
                 </div>
               </div>
@@ -367,8 +411,7 @@ export function AdvancedEmbedEditor({
                       ? parseInt(config.color.replace("#", ""), 16) 
                       : parseInt(String(config.color)) || 5814783,
                     thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : undefined,
-                    image: config.image_url ? { url: config.image_url } : undefined,
-                    footer: config.footer ? { text: config.footer } : undefined,
+                    image: config.image_url ? { url: config.image_url } : undefined,                      images: Array.isArray(config.images) && config.images.length > 0 ? config.images.map(url => ({ url })) : undefined,                    footer: config.footer ? { text: config.footer } : undefined,
                     fields: config.fields || []
                   }],
                   components: config.components || []

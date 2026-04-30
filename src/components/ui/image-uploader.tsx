@@ -5,9 +5,10 @@ import { useParams } from "next/navigation";
 export interface ImageUploaderProps {
   onApplyImage?: (url: string) => void;
   onApplyThumbnail?: (url: string) => void;
+  onAddMultiImage?: (url: string) => void;
 }
 
-export function ImageUploader({ onApplyImage, onApplyThumbnail }: ImageUploaderProps) {
+export function ImageUploader({ onApplyImage, onApplyThumbnail, onAddMultiImage }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -163,6 +164,15 @@ export function ImageUploader({ onApplyImage, onApplyThumbnail }: ImageUploaderP
                   >
                     Set Body
                   </button>
+                  {onAddMultiImage && (
+                    <button
+                      type="button"
+                      onClick={() => onAddMultiImage(url)}
+                      className="rounded bg-[#5865F2]/20 px-2 py-1 text-[10px] font-bold text-[#5865F2] hover:bg-[#5865F2]/40 transition"
+                    >
+                      + Outside Embed
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

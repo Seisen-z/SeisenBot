@@ -20,6 +20,7 @@ type AnnouncementDraft = {
   description: string;
   thumbnail_url: string;
   image_url: string;
+  images: string[];
   footer: string;
   channel_id: string;
   ping_role_id: string;
@@ -31,6 +32,7 @@ const createEmptyDraft = (): AnnouncementDraft => ({
   description: "",
   thumbnail_url: "",
   image_url: "",
+  images: [],
   footer: "",
   channel_id: "",
   ping_role_id: "",
@@ -59,6 +61,7 @@ function normalizeDraft(input: any): AnnouncementDraft {
     description: typeof source.description === "string" ? source.description : "",
     thumbnail_url: typeof source.thumbnail_url === "string" ? source.thumbnail_url : "",
     image_url: typeof source.image_url === "string" ? source.image_url : "",
+    images: Array.isArray(source.images) ? source.images.filter((i: any) => typeof i === "string") : [],
     footer: typeof source.footer === "string" ? source.footer : "",
     channel_id: typeof source.channel_id === "string" ? source.channel_id : "",
     ping_role_id: typeof source.ping_role_id === "string" ? source.ping_role_id : "",

@@ -72,7 +72,6 @@ function formatDate(value?: string | null): string {
 export default function ActivityRewardsPage({ params }: { params: Promise<{ guildId: string }> }) {
   const { guildId } = use(params);
   const { toast } = useToast();
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingLogging, setTestingLogging] = useState(false);
@@ -247,13 +246,13 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
         }
       />
 
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <label className="space-y-2">
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">Enabled</span>
           <select
             value={config.enabled ? "1" : "0"}
-            onChange={(e) => setConfig((prev) => ({ ...prev, enabled: e.target.value === "1" }))}
-            className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm text-discord-text outline-none transition focus:border-white/30"
+            className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm outline-none transition focus:border-white/30 text-discord-text"
           >
             <option value="1">Enabled</option>
             <option value="0">Disabled</option>
@@ -338,7 +337,7 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
           <select
             value={config.key_pool}
             onChange={(e) => setConfig((prev) => ({ ...prev, key_pool: (e.target.value as "activity_pool" | "giveaway") }))}
-            className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm text-discord-text outline-none transition focus:border-white/30"
+            className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm outline-none transition focus:border-white/30 text-discord-text"
           >
             <option value="activity_pool">Activity Pool Webhooks</option>
             <option value="giveaway">Giveaway Weekly Pool</option>

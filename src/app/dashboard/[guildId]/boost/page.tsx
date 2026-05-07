@@ -60,7 +60,9 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
     }
   };
 
-  const updateConfig = (key: string, val: any) => setConfig({ ...config, [key]: val });
+  const updateConfig = (key: string, val: any) => {
+    setConfig({ ...config, [key]: val });
+  };
   const configuredRoles = (config.roles || []).length;
   const hasLogChannel = Boolean(config.channel_id);
   const hasCategory = Boolean(config.category_id);
@@ -90,6 +92,7 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
           </div>
         }
       />
+
 
       <div className="flex xl:flex-row flex-col gap-6">
         <div className="flex-1 flex flex-col gap-6 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6">

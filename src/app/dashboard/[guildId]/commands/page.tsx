@@ -34,6 +34,14 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "ai_help setup", desc: "Configure AI monitored channels" },
     { cmd: "ai_help toggle", desc: "Enable or disable AI Help" }
   ],
+  "Activity Rewards": [
+    { cmd: "activity leaderboard", desc: "Show top activity leaderboard for this server" },
+    { cmd: "activity me", desc: "Show your activity stats in this server" },
+    { cmd: "activity test", desc: "Test the activity command (debug)" },
+  ],
+  "Utility / Access": [
+    { cmd: "command", desc: "List commands with role-based access configured" },
+  ],
   "Announcements": [
     { cmd: "announce", desc: "Send an announcement via a form" },
     { cmd: "announce_draft delete", desc: "Delete a saved announcement draft" },
@@ -119,6 +127,7 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "riddle", desc: "Get a riddle to solve" }
   ],
   "General / Miscellaneous": [
+    { cmd: "command", desc: "List commands with role-based access configured" },
     { cmd: "help", desc: "Show all available commands" },
     { cmd: "ping", desc: "Check bot latency and response time" },
     { cmd: "hello", desc: "Get a friendly greeting from the bot" },

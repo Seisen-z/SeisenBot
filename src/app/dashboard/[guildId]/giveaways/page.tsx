@@ -164,7 +164,6 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
   const resolvedParams = use(params);
   const guildId = resolvedParams.guildId;
   const { toast } = useToast();
-
   const [drafts, setDrafts] = useState<Record<string, GiveawayDraft>>({});
   const [activeDraftKey, setActiveDraftKey] = useState<string>("");
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -607,11 +606,13 @@ export default function GiveawaysPage({ params }: { params: Promise<{ guildId: s
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-discord-text-muted">Key Tier</label>
+                    <label className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-discord-text-muted">
+                      Key Tier
+                    </label>
                     <select
                       value={normalizeKeyTier(activeDraft.key_tier)}
                       onChange={(e) => updateDraft({ key_tier: normalizeKeyTier(e.target.value) })}
-                      className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm text-discord-text outline-none transition focus:border-white/30"
+                      className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm outline-none transition focus:border-white/30 text-discord-text"
                     >
                       <option value="none">No key reward</option>
                       <option value="weekly">Weekly key</option>

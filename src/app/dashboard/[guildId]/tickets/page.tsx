@@ -37,11 +37,11 @@ export default function TicketsPage({ params }: { params: Promise<{ guildId: str
         panel_channel_id: nextConfig.panel_channel_id || null,
         panel_message_id: nextConfig.panel_message_id || null,
         ticket_category_id: nextConfig.ticket_category_id || null,
-        embed_title: nextConfig.embed_title || "",
-        embed_description: nextConfig.embed_description || "",
-        embed_color: nextConfig.embed_color || null,
-        embed_thumbnail: nextConfig.embed_thumbnail || null,
-        embed_footer: nextConfig.embed_footer || null,
+        embed_title: nextConfig.embed_title !== undefined && nextConfig.embed_title !== null ? nextConfig.embed_title : "",
+        embed_description: nextConfig.embed_description !== undefined && nextConfig.embed_description !== null ? nextConfig.embed_description : "",
+        embed_color: nextConfig.embed_color !== undefined && nextConfig.embed_color !== null ? nextConfig.embed_color : null,
+        embed_thumbnail: nextConfig.embed_thumbnail !== undefined && nextConfig.embed_thumbnail !== null ? nextConfig.embed_thumbnail : null,
+        embed_footer: nextConfig.embed_footer !== undefined && nextConfig.embed_footer !== null ? nextConfig.embed_footer : null,
       }),
     });
     setLastSaved(new Date());
@@ -83,11 +83,11 @@ export default function TicketsPage({ params }: { params: Promise<{ guildId: str
           support_role_ids: (config.support_role_ids || []).map(String),
           panel_channel_id: config.panel_channel_id || null,
           ticket_category_id: config.ticket_category_id || null,
-          embed_title: config.embed_title || "",
-          embed_description: config.embed_description || "",
-          embed_color: config.embed_color || null,
-          embed_thumbnail: config.embed_thumbnail || null,
-          embed_footer: config.embed_footer || null,
+          embed_title: config.embed_title !== undefined && config.embed_title !== null ? config.embed_title : "",
+          embed_description: config.embed_description !== undefined && config.embed_description !== null ? config.embed_description : "",
+          embed_color: config.embed_color !== undefined && config.embed_color !== null ? config.embed_color : null,
+          embed_thumbnail: config.embed_thumbnail !== undefined && config.embed_thumbnail !== null ? config.embed_thumbnail : null,
+          embed_footer: config.embed_footer !== undefined && config.embed_footer !== null ? config.embed_footer : null,
         }),
       });
 
@@ -98,11 +98,11 @@ export default function TicketsPage({ params }: { params: Promise<{ guildId: str
           guild_id: guildId,
           payload: {
             channel_id: config.panel_channel_id,
-            embed_title: config.embed_title || null,
-            embed_description: config.embed_description || null,
-            embed_color: config.embed_color || null,
-            embed_footer: config.embed_footer || null,
-            embed_thumbnail: config.embed_thumbnail || null,
+            embed_title: config.embed_title !== undefined && config.embed_title !== null ? config.embed_title : null,
+            embed_description: config.embed_description !== undefined && config.embed_description !== null ? config.embed_description : null,
+            embed_color: config.embed_color !== undefined && config.embed_color !== null ? config.embed_color : null,
+            embed_footer: config.embed_footer !== undefined && config.embed_footer !== null ? config.embed_footer : null,
+            embed_thumbnail: config.embed_thumbnail !== undefined && config.embed_thumbnail !== null ? config.embed_thumbnail : null,
           }
         })
       });

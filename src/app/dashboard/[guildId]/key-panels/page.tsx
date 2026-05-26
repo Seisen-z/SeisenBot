@@ -133,14 +133,14 @@ export default function KeyPanelsPage({ params }: { params: Promise<{ guildId: s
             description: currentPanel.description,
             button_label: currentPanel.button_label || "Generate Key",
             required_role_ids: currentPanel.required_role_ids,
-            webhook_url: currentPanel.webhook_url || null,
-            webhook_secret: currentPanel.webhook_secret || null,
-            webhook_hmac_header: currentPanel.webhook_hmac_header || null,
-            product_name: currentPanel.product_name || null,
-            embed_color: currentPanel.embed_color || null,
-            embed_thumbnail: currentPanel.embed_thumbnail || null,
-            embed_image: currentPanel.embed_image || null,
-            embed_footer: currentPanel.embed_footer || null,
+            webhook_url: currentPanel.webhook_url !== undefined && currentPanel.webhook_url !== null ? currentPanel.webhook_url : null,
+            webhook_secret: currentPanel.webhook_secret !== undefined && currentPanel.webhook_secret !== null ? currentPanel.webhook_secret : null,
+            webhook_hmac_header: currentPanel.webhook_hmac_header !== undefined && currentPanel.webhook_hmac_header !== null ? currentPanel.webhook_hmac_header : null,
+            product_name: currentPanel.product_name !== undefined && currentPanel.product_name !== null ? currentPanel.product_name : null,
+            embed_color: currentPanel.embed_color !== undefined && currentPanel.embed_color !== null ? currentPanel.embed_color : null,
+            embed_thumbnail: currentPanel.embed_thumbnail !== undefined && currentPanel.embed_thumbnail !== null ? currentPanel.embed_thumbnail : null,
+            embed_image: currentPanel.embed_image !== undefined && currentPanel.embed_image !== null ? currentPanel.embed_image : null,
+            embed_footer: currentPanel.embed_footer !== undefined && currentPanel.embed_footer !== null ? currentPanel.embed_footer : null,
           }
         })
       });
@@ -191,14 +191,14 @@ export default function KeyPanelsPage({ params }: { params: Promise<{ guildId: s
             description: currentPanel.description,
             button_label: currentPanel.button_label || "Generate Key",
             required_role_ids: currentPanel.required_role_ids,
-            webhook_url: currentPanel.webhook_url || null,
-            webhook_secret: currentPanel.webhook_secret || null,
-            webhook_hmac_header: currentPanel.webhook_hmac_header || null,
-            product_name: currentPanel.product_name || null,
-            embed_color: currentPanel.embed_color || null,
-            embed_thumbnail: currentPanel.embed_thumbnail || null,
-            embed_image: currentPanel.embed_image || null,
-            embed_footer: currentPanel.embed_footer || null,
+            webhook_url: currentPanel.webhook_url !== undefined && currentPanel.webhook_url !== null ? currentPanel.webhook_url : null,
+            webhook_secret: currentPanel.webhook_secret !== undefined && currentPanel.webhook_secret !== null ? currentPanel.webhook_secret : null,
+            webhook_hmac_header: currentPanel.webhook_hmac_header !== undefined && currentPanel.webhook_hmac_header !== null ? currentPanel.webhook_hmac_header : null,
+            product_name: currentPanel.product_name !== undefined && currentPanel.product_name !== null ? currentPanel.product_name : null,
+            embed_color: currentPanel.embed_color !== undefined && currentPanel.embed_color !== null ? currentPanel.embed_color : null,
+            embed_thumbnail: currentPanel.embed_thumbnail !== undefined && currentPanel.embed_thumbnail !== null ? currentPanel.embed_thumbnail : null,
+            embed_image: currentPanel.embed_image !== undefined && currentPanel.embed_image !== null ? currentPanel.embed_image : null,
+            embed_footer: currentPanel.embed_footer !== undefined && currentPanel.embed_footer !== null ? currentPanel.embed_footer : null,
           }
         })
       });
@@ -376,10 +376,10 @@ export default function KeyPanelsPage({ params }: { params: Promise<{ guildId: s
                     config={{
                       title: currentPanel.title,
                       description: currentPanel.description,
-                      color: currentPanel.embed_color || "#5865F2",
+                      color: currentPanel.embed_color !== undefined && currentPanel.embed_color !== null ? currentPanel.embed_color : "",
                       thumbnail_url: currentPanel.embed_thumbnail || "",
                       image_url: currentPanel.embed_image || "",
-                      footer: currentPanel.embed_footer || `Product: ${currentPanel.product_name || "Premium Key"}`
+                      footer: currentPanel.embed_footer !== undefined && currentPanel.embed_footer !== null ? currentPanel.embed_footer : ""
                     }}
                     onChange={(k, val) => {
                       if (k === "title") updatePanel("title", val);

@@ -134,16 +134,20 @@ const DEFAULT_CONFIG: OnboardingConfig = {
   visible_before_verify_channel_ids: [],
 };
 
+function getStr(val: any, fallback: string) {
+  return val !== undefined && val !== null ? String(val) : fallback;
+}
+
 function normalizeConfig(raw: any): OnboardingConfig {
   const normalizedWelcomeChannel = String(raw?.welcome_channel_id || "");
   const legacyWelcome: LegacyWelcomeMessage = {
     content: String(raw?.welcome_content || ""),
-    embed_title: String(raw?.welcome_embed_title || DEFAULT_CONFIG.welcome_embed_title),
-    embed_description: String(raw?.welcome_embed_description || DEFAULT_CONFIG.welcome_embed_description),
-    embed_color: String(raw?.welcome_embed_color || DEFAULT_CONFIG.welcome_embed_color),
+    embed_title: getStr(raw?.welcome_embed_title, DEFAULT_CONFIG.welcome_embed_title),
+    embed_description: getStr(raw?.welcome_embed_description, DEFAULT_CONFIG.welcome_embed_description),
+    embed_color: getStr(raw?.welcome_embed_color, DEFAULT_CONFIG.welcome_embed_color),
     embed_thumbnail: String(raw?.welcome_embed_thumbnail || ""),
     embed_image: String(raw?.welcome_embed_image || ""),
-    embed_footer: String(raw?.welcome_embed_footer || DEFAULT_CONFIG.welcome_embed_footer),
+    embed_footer: getStr(raw?.welcome_embed_footer, DEFAULT_CONFIG.welcome_embed_footer),
   };
 
   const normalizedWelcomeGroups = normalizeWelcomeGroups(raw?.welcome_message_groups, normalizedWelcomeChannel);
@@ -158,14 +162,14 @@ function normalizeConfig(raw: any): OnboardingConfig {
     auto_role_ids: Array.isArray(raw?.auto_role_ids) ? raw.auto_role_ids.map(String) : [],
 
     panel_message_id: String(raw?.panel_message_id || ""),
-    panel_button_label: String(raw?.panel_button_label || DEFAULT_CONFIG.panel_button_label),
+    panel_button_label: getStr(raw?.panel_button_label, DEFAULT_CONFIG.panel_button_label),
     panel_content: String(raw?.panel_content || ""),
-    panel_embed_title: String(raw?.panel_embed_title || DEFAULT_CONFIG.panel_embed_title),
-    panel_embed_description: String(raw?.panel_embed_description || DEFAULT_CONFIG.panel_embed_description),
-    panel_embed_color: String(raw?.panel_embed_color || DEFAULT_CONFIG.panel_embed_color),
+    panel_embed_title: getStr(raw?.panel_embed_title, DEFAULT_CONFIG.panel_embed_title),
+    panel_embed_description: getStr(raw?.panel_embed_description, DEFAULT_CONFIG.panel_embed_description),
+    panel_embed_color: getStr(raw?.panel_embed_color, DEFAULT_CONFIG.panel_embed_color),
     panel_embed_thumbnail: String(raw?.panel_embed_thumbnail || ""),
     panel_embed_image: String(raw?.panel_embed_image || ""),
-    panel_embed_footer: String(raw?.panel_embed_footer || DEFAULT_CONFIG.panel_embed_footer),
+    panel_embed_footer: getStr(raw?.panel_embed_footer, DEFAULT_CONFIG.panel_embed_footer),
 
     welcome_channel_id: normalizedWelcomeChannel,
     welcome_content: legacyWelcome.content,
@@ -221,7 +225,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
     const colorFields = [nextConfig.panel_embed_color, nextConfig.welcome_embed_color];
     const badColor = colorFields.find((value) => {
       const text = String(value || "").trim();
-      if (!text) return true;
+      if (!text) return false;
       if (/^\d+$/.test(text)) return false;
       return !/^#[0-9a-fA-F]{6}$/.test(text);
     });
@@ -272,7 +276,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
       content: String(message.content || ""),
       embed_title: String(message.embed_title || ""),
       embed_description: String(message.embed_description || ""),
-      embed_color: String(message.embed_color || "#A3A7B0"),
+      embed_color: message.embed_color !== undefined && message.embed_color !== null ? String(message.embed_color) : "#A3A7B0",
       embed_thumbnail: String(message.embed_thumbnail || ""),
       embed_image: String(message.embed_image || ""),
       embed_footer: String(message.embed_footer || ""),
@@ -326,13 +330,13 @@ export default function OnboardingPage({ params }: { params: Promise<{ guildId: 
         panel_embed_thumbnail: nextConfig.panel_embed_thumbnail || null,
         panel_embed_image: nextConfig.panel_embed_image || null,
         welcome_channel_id: nextConfig.welcome_channel_id || null,
-        welcome_content: firstMessage?.content || nextConfig.welcome_content || "",
-        welcome_embed_title: firstMessage?.embed_title || nextConfig.welcome_embed_title || "",
-        welcome_embed_description: firstMessage?.embed_description || nextConfig.welcome_embed_description || "",
-        welcome_embed_color: firstMessage?.embed_color || nextConfig.welcome_embed_color || "#A3A7B0",
-        welcome_embed_thumbnail: (firstMessage?.embed_thumbnail || nextConfig.welcome_embed_thumbnail || "") || null,
-        welcome_embed_image: (firstMessage?.embed_image || nextConfig.welcome_embed_image || "") || null,
-        welcome_embed_footer: firstMessage?.embed_footer || nextConfig.welcome_embed_footer || "",
+        welcome_content: firstMessage?.content !== undefined && firstMessage?.content !== null ? firstMessage.content : (nextConfig.welcome_content || ""),
+        welcome_embed_title: firstMessage?.embed_title !== undefined && firstMessage?.embed_title !== null ? firstMessage.embed_title : (nextConfig.welcome_embed_title || ""),
+        welcome_embed_description: firstMessage?.embed_description !== undefined && firstMessage?.embed_description !== null ? firstMessage.embed_description : (nextConfig.welcome_embed_description || ""),
+        welcome_embed_color: firstMessage?.embed_color !== undefined && firstMessage?.embed_color !== null ? firstMessage.embed_color : (nextConfig.welcome_embed_color !== undefined && nextConfig.welcome_embed_color !== null ? nextConfig.welcome_embed_color : "#A3A7B0"),
+        welcome_embed_thumbnail: (firstMessage?.embed_thumbnail !== undefined && firstMessage?.embed_thumbnail !== null ? firstMessage.embed_thumbnail : (nextConfig.welcome_embed_thumbnail || "")) || null,
+        welcome_embed_image: (firstMessage?.embed_image !== undefined && firstMessage?.embed_image !== null ? firstMessage.embed_image : (nextConfig.welcome_embed_image || "")) || null,
+        welcome_embed_footer: firstMessage?.embed_footer !== undefined && firstMessage?.embed_footer !== null ? firstMessage.embed_footer : (nextConfig.welcome_embed_footer !== undefined && nextConfig.welcome_embed_footer !== null ? nextConfig.welcome_embed_footer : ""),
         welcome_message_groups: sanitizedWelcomeGroups,
         welcome_messages: sanitizedWelcomeMessages,
         welcome_dynamic_images: sanitizedDynamicImages,

@@ -21,6 +21,10 @@ interface KeyPanelConfig {
   webhook_secret?: string | null;
   webhook_hmac_header?: string | null;
   product_name?: string | null;
+  embed_color?: string | null;
+  embed_thumbnail?: string | null;
+  embed_image?: string | null;
+  embed_footer?: string | null;
 }
 
 export default function KeyPanelsPage({ params }: { params: Promise<{ guildId: string }> }) {
@@ -45,7 +49,11 @@ export default function KeyPanelsPage({ params }: { params: Promise<{ guildId: s
     webhook_url: "",
     webhook_secret: "",
     webhook_hmac_header: "",
-    product_name: ""
+    product_name: "",
+    embed_color: "#5865F2",
+    embed_thumbnail: "",
+    embed_image: "",
+    embed_footer: ""
   };
 
   useEffect(() => {
@@ -129,6 +137,10 @@ export default function KeyPanelsPage({ params }: { params: Promise<{ guildId: s
             webhook_secret: currentPanel.webhook_secret || null,
             webhook_hmac_header: currentPanel.webhook_hmac_header || null,
             product_name: currentPanel.product_name || null,
+            embed_color: currentPanel.embed_color || null,
+            embed_thumbnail: currentPanel.embed_thumbnail || null,
+            embed_image: currentPanel.embed_image || null,
+            embed_footer: currentPanel.embed_footer || null,
           }
         })
       });
@@ -183,6 +195,10 @@ export default function KeyPanelsPage({ params }: { params: Promise<{ guildId: s
             webhook_secret: currentPanel.webhook_secret || null,
             webhook_hmac_header: currentPanel.webhook_hmac_header || null,
             product_name: currentPanel.product_name || null,
+            embed_color: currentPanel.embed_color || null,
+            embed_thumbnail: currentPanel.embed_thumbnail || null,
+            embed_image: currentPanel.embed_image || null,
+            embed_footer: currentPanel.embed_footer || null,
           }
         })
       });
@@ -360,12 +376,18 @@ export default function KeyPanelsPage({ params }: { params: Promise<{ guildId: s
                     config={{
                       title: currentPanel.title,
                       description: currentPanel.description,
-                      color: "#5865F2",
-                      footer: `Product: ${currentPanel.product_name || "Premium Key"}`
+                      color: currentPanel.embed_color || "#5865F2",
+                      thumbnail_url: currentPanel.embed_thumbnail || "",
+                      image_url: currentPanel.embed_image || "",
+                      footer: currentPanel.embed_footer || `Product: ${currentPanel.product_name || "Premium Key"}`
                     }}
                     onChange={(k, val) => {
                       if (k === "title") updatePanel("title", val);
                       else if (k === "description") updatePanel("description", val);
+                      else if (k === "color") updatePanel("embed_color", val);
+                      else if (k === "thumbnail_url") updatePanel("embed_thumbnail", val);
+                      else if (k === "image_url") updatePanel("embed_image", val);
+                      else if (k === "footer") updatePanel("embed_footer", val);
                     }}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-[#1E1F22] pb-6 mb-4">

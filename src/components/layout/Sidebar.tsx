@@ -80,6 +80,7 @@ export default function Sidebar({
         { name: "Activity Rewards", href: `/dashboard/${guildId}/activity-rewards`, icon: GiftIcon },
         { name: "Fun Commands", href: `/dashboard/${guildId}/fun-commands`, icon: SparklesIcon },
         { name: "Member Counter", href: `/dashboard/${guildId}/member-counter`, icon: UsersIcon },
+        { name: "Role Counters", href: `/dashboard/${guildId}/role-counters`, icon: UsersIcon },
         { name: "Social Notifications", href: `/dashboard/${guildId}/social`, icon: BellRing },
         { name: "Roblox Monitor", href: `/dashboard/${guildId}/roblox`, icon: Gamepad2 },
         { name: "Sticky Messages", href: `/dashboard/${guildId}/sticky`, icon: Pin },

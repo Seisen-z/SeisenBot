@@ -252,6 +252,7 @@ export default function ActivityRewardsPage({ params }: { params: Promise<{ guil
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">Enabled</span>
           <select
             value={config.enabled ? "1" : "0"}
+            onChange={(e) => setConfig((prev) => ({ ...prev, enabled: e.target.value === "1" }))}
             className="h-10 w-full rounded-md border border-[#1E1F22] bg-[#1f2023] px-3 text-sm outline-none transition focus:border-white/30 text-discord-text"
           >
             <option value="1">Enabled</option>

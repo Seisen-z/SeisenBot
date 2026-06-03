@@ -329,8 +329,12 @@ export default function SocialNotificationsPage({ params }: { params: Promise<{ 
     setMonitors(updated);
     if (updated.length === 0) {
       setActiveIdx(-1);
-    } else if (activeIdx >= updated.length) {
-      setActiveIdx(updated.length - 1);
+    } else if (index === activeIdx) {
+      // Removed the active monitor — clamp to last item
+      setActiveIdx(Math.min(activeIdx, updated.length - 1));
+    } else if (index < activeIdx) {
+      // Removed a monitor above the active one — shift index down to stay on same item
+      setActiveIdx(activeIdx - 1);
     }
   };
 

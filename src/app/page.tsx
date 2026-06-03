@@ -9,6 +9,8 @@ import {
   SparklesIcon,
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 const SERVER_API_BASE = process.env.API_PROXY_TARGET
   ? `${process.env.API_PROXY_TARGET}/api`
   : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -60,7 +62,7 @@ export default async function HomePage() {
       }),
       fetch("https://discord.com/api/users/@me/guilds", {
         headers: { Authorization: `Bearer ${token}` },
-        next: { revalidate: 60 },
+        cache: "no-store",
       }),
     ]);
 
@@ -88,7 +90,7 @@ export default async function HomePage() {
   try {
     const resBotGuilds = await fetch(`${SERVER_API_BASE.replace(/\/api$/, '')}/api/bot/guilds`, {
       headers: { Authorization: `Bearer ${token}` },
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
 
     if (resBotGuilds.ok) {

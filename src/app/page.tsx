@@ -8,6 +8,7 @@ import {
   ShieldCheckIcon,
   SparklesIcon,
 } from "lucide-react";
+import { AutoRefresh } from "@/components/ui/auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,7 @@ export default async function HomePage() {
 
   return (
     <div className="relative min-h-screen w-full px-4 py-8 sm:px-6 lg:px-8">
+      <AutoRefresh />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 page-enter">
         <header className="glass-card flex flex-col gap-4 rounded-3xl px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex min-w-0 items-center gap-3">

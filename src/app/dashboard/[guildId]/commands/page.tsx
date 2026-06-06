@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, use, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -501,9 +502,9 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
         )}
       </div>
 
-      {/* Sticky bulk action bar */}
-      {hasSelection && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4">
+      {/* Sticky bulk action bar — portalled to body so parent transforms don't trap fixed positioning */}
+      {hasSelection && typeof document !== "undefined" && createPortal(
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-2xl px-4">
           <div className="rounded-2xl border border-[#5865F2]/40 bg-[#1a1b1e]/95 backdrop-blur-md shadow-2xl p-4 flex flex-col gap-3">
             {/* Header row */}
             <div className="flex items-center justify-between">
@@ -550,7 +551,8 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

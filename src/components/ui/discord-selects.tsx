@@ -169,7 +169,7 @@ export function ChannelSelect({
       {isOpen && portalReady && panelStyle &&
         createPortal(
           <>
-            <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
+            <div className="fixed inset-0" style={{ zIndex: 10000 }} onClick={() => setIsOpen(false)} />
             <div
               className="flex flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#1f2024] shadow-2xl"
               style={{
@@ -178,7 +178,7 @@ export function ChannelSelect({
                 left: panelStyle.left,
                 width: panelStyle.width,
                 maxHeight: panelStyle.maxHeight,
-                zIndex: 90,
+                zIndex: 10001,
               }}
             >
               <div className="border-b border-[#1E1F22] p-2">
@@ -302,7 +302,7 @@ export function RoleSelect({
       {isOpen && portalReady && panelStyle &&
         createPortal(
           <>
-            <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
+            <div className="fixed inset-0" style={{ zIndex: 10000 }} onClick={() => setIsOpen(false)} />
             <div
               className="flex flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#1f2024] shadow-2xl"
               style={{
@@ -311,7 +311,7 @@ export function RoleSelect({
                 left: panelStyle.left,
                 width: panelStyle.width,
                 maxHeight: panelStyle.maxHeight,
-                zIndex: 90,
+                zIndex: 10001,
               }}
             >
               <div className="border-b border-[#1E1F22] p-2">
@@ -443,7 +443,7 @@ export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMul
       {isOpen && portalReady && panelStyle &&
         createPortal(
           <>
-            <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
+            <div className="fixed inset-0" style={{ zIndex: 10000 }} onClick={() => setIsOpen(false)} />
             <div
               className="mt-2 flex max-h-56 flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl"
               style={{
@@ -452,7 +452,7 @@ export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMul
                 left: panelStyle.left,
                 width: panelStyle.width,
                 maxHeight: panelStyle.maxHeight,
-                zIndex: 90,
+                zIndex: 10001,
               }}
             >
               <div className="border-b border-[#1E1F22] p-2">
@@ -594,7 +594,7 @@ export function ChannelMultiSelect({
       {isOpen && portalReady && panelStyle &&
         createPortal(
           <>
-            <div className="fixed inset-0" style={{ zIndex: 80 }} onClick={() => setIsOpen(false)} />
+            <div className="fixed inset-0" style={{ zIndex: 10000 }} onClick={() => setIsOpen(false)} />
             <div
               className="mt-2 flex max-h-56 flex-col overflow-hidden rounded-xl border border-[#1E1F22] bg-[#2B2D31] shadow-2xl"
               style={{
@@ -603,7 +603,7 @@ export function ChannelMultiSelect({
                 left: panelStyle.left,
                 width: panelStyle.width,
                 maxHeight: panelStyle.maxHeight,
-                zIndex: 90,
+                zIndex: 10001,
               }}
             >
               <div className="border-b border-[#1E1F22] p-2">

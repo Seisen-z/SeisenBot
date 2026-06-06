@@ -25,6 +25,7 @@ import {
   UsersIcon,
   ShieldAlert,
   Key,
+  ShieldIcon,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -93,6 +94,7 @@ export default function Sidebar({
       label: "Misc",
       items: [
         { name: "Command Access", href: `/dashboard/${guildId}/commands`, icon: Settings2 },
+        { name: "Channel Permissions", href: `/dashboard/${guildId}/channel-permissions`, icon: ShieldIcon },
         { name: "Reaction Roles", href: `/dashboard/${guildId}/reaction-roles`, icon: UserPlus },
         { name: "Polls", href: `/dashboard/${guildId}/polls`, icon: BarChart3 },
         { name: "Tickets Panel", href: `/dashboard/${guildId}/tickets`, icon: Ticket },

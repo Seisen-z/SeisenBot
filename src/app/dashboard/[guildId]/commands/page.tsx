@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { RoleMultiSelect } from "@/components/ui/discord-selects";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
-import { ShieldCheckIcon } from "lucide-react";
+import { ShieldCheckIcon, Layers2Icon, XIcon, CheckSquareIcon, SquareIcon } from "lucide-react";
 
 const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
   "Administration & Moderation": [
@@ -149,6 +149,12 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
   const [expandedCmd, setExpandedCmd] = useState<string | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
+  // Bulk configure state
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedCmds, setSelectedCmds] = useState<Set<string>>(new Set());
+  const [bulkRoles, setBulkRoles] = useState<string[]>([]);
+  const bulkBarRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/commands`)
       .then((data) => setCommands(data?.commands || {}))
@@ -182,22 +188,80 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
 
   const handleSave = async () => {
     setSaving(true);
-
     try {
       await persistCommands(commands);
       toast("Command Config Saved!");
     } catch (e: any) {
-        toast(e?.message || "Failed to save.", "error");
-      } finally {
+      toast(e?.message || "Failed to save.", "error");
+    } finally {
       setSaving(false);
     }
   };
 
   const handleRoleChange = (cmd: string, roleIds: string[]) => {
-    setCommands((prev) => ({
-      ...prev,
-      [cmd]: roleIds,
-    }));
+    setCommands((prev) => ({ ...prev, [cmd]: roleIds }));
+  };
+
+  // Bulk mode helpers
+  const toggleBulkMode = () => {
+    setBulkMode((v) => !v);
+    setSelectedCmds(new Set());
+    setBulkRoles([]);
+    setExpandedCmd(null);
+  };
+
+  const toggleCmd = (cmd: string) => {
+    setSelectedCmds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cmd)) next.delete(cmd);
+      else next.add(cmd);
+      return next;
+    });
+  };
+
+  const toggleCategory = (cmdList: { cmd: string }[]) => {
+    const keys = cmdList.map((c) => c.cmd);
+    const allSelected = keys.every((k) => selectedCmds.has(k));
+    setSelectedCmds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) keys.forEach((k) => next.delete(k));
+      else keys.forEach((k) => next.add(k));
+      return next;
+    });
+  };
+
+  const applyBulkRoles = () => {
+    if (selectedCmds.size === 0) {
+      toast("Select at least one command first.", "error");
+      return;
+    }
+    setCommands((prev) => {
+      const next = { ...prev };
+      selectedCmds.forEach((cmd) => {
+        next[cmd] = [...bulkRoles];
+      });
+      return next;
+    });
+    toast(`Applied ${bulkRoles.length} role(s) to ${selectedCmds.size} command(s).`);
+    setSelectedCmds(new Set());
+    setBulkRoles([]);
+  };
+
+  const clearBulkRoles = () => {
+    if (selectedCmds.size === 0) {
+      toast("Select at least one command first.", "error");
+      return;
+    }
+    setCommands((prev) => {
+      const next = { ...prev };
+      selectedCmds.forEach((cmd) => {
+        next[cmd] = [];
+      });
+      return next;
+    });
+    toast(`Cleared roles from ${selectedCmds.size} command(s).`);
+    setSelectedCmds(new Set());
+    setBulkRoles([]);
   };
 
   const totalCommands = Object.values(COMMAND_GROUPS).reduce((sum, list) => sum + list.length, 0);
@@ -223,6 +287,17 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
                 Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
+            <Button
+              onClick={toggleBulkMode}
+              className={`flex items-center gap-2 transition-all shadow-md ${
+                bulkMode
+                  ? "bg-[#FAA61A] hover:bg-[#e09515] text-black font-bold"
+                  : "bg-[#2B2D31] hover:bg-[#36383D] text-white"
+              }`}
+            >
+              <Layers2Icon className="w-4 h-4" />
+              {bulkMode ? "Exit Bulk Mode" : "Bulk Configure"}
+            </Button>
             <Button onClick={handleSave} disabled={saving} className="bg-[#5865F2] hover:bg-[#4752C4] shadow-md transition-all">
               {saving ? "Saving..." : "Save Config"}
             </Button>
@@ -230,73 +305,181 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
         }
       />
 
+      {/* Bulk mode hint */}
+      {bulkMode && (
+        <div className="flex items-center gap-3 rounded-xl border border-[#FAA61A]/30 bg-[#FAA61A]/[0.06] px-4 py-3 text-sm text-[#FAA61A]">
+          <Layers2Icon className="w-4 h-4 shrink-0" />
+          <span>
+            <strong>Bulk mode active.</strong> Click commands to select them, then use the action bar at the bottom to apply roles to all selected commands at once.
+            {selectedCmds.size > 0 && (
+              <span className="ml-2 font-bold text-white">{selectedCmds.size} selected</span>
+            )}
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-col gap-10">
-        {Object.entries(COMMAND_GROUPS).map(([category, cmdList]) => (
-          <div key={category} className="flex flex-col gap-4">
-            <h2 className="text-xl font-bold tracking-tight text-white border-b border-[#2B2D31] pb-2">
-              {category}
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              {cmdList.map(({ cmd, desc }) => {
-                const isActive = commands[cmd] && commands[cmd].length > 0;
-                const isExpanded = expandedCmd === cmd;
-                
-                return (
-                  <div 
-                    key={cmd} 
-                    className={`relative rounded-xl border transition-all duration-200 cursor-pointer overflow-visible ${
-                      isExpanded 
-                        ? "border-[#5865F2] bg-[#1a1b1e] shadow-[0_0_12px_rgba(88,101,242,0.15)] ring-1 ring-[#5865F2]/50" 
-                        : isActive 
-                        ? "border-[#5865F2]/40 bg-[#5865F2]/[0.03] hover:border-[#5865F2]/60" 
-                        : "border-[#1E1F22] bg-[#1a1b1e] hover:border-[#5865F2]/30 hover:bg-[#1f2125]"
-                    }`}
-                    onClick={() => setExpandedCmd(isExpanded ? null : cmd)}
+        {Object.entries(COMMAND_GROUPS).map(([category, cmdList]) => {
+          const allInCatSelected = bulkMode && cmdList.every((c) => selectedCmds.has(c.cmd));
+          const someInCatSelected = bulkMode && cmdList.some((c) => selectedCmds.has(c.cmd));
+
+          return (
+            <div key={category} className="flex flex-col gap-4">
+              <div className="flex items-center gap-3 border-b border-[#2B2D31] pb-2">
+                {bulkMode && (
+                  <button
+                    onClick={() => toggleCategory(cmdList)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-[#B5BAC1] hover:text-white transition-colors shrink-0"
+                    title={allInCatSelected ? "Deselect all in category" : "Select all in category"}
                   >
-                    {/* Compact Card Header */}
-                    <div className="flex items-start justify-between p-4">
-                      <div>
-                        <h3 className={`text-[14px] font-semibold transition-colors leading-none ${isActive || isExpanded ? "text-white" : "text-[#B5BAC1]"}`}>
-                          <span className={isActive || isExpanded ? "text-[#5865F2]" : "text-[#5865F2]/70"}>/</span>{cmd}
-                        </h3>
-                        {desc && (
-                          <p className={`text-[11px] mt-2 line-clamp-2 leading-tight ${isActive || isExpanded ? "text-[#a0a4ab]" : "text-[#7a7e86]"}`}>
-                            {desc}
-                          </p>
+                    {allInCatSelected ? (
+                      <CheckSquareIcon className="w-4 h-4 text-[#5865F2]" />
+                    ) : someInCatSelected ? (
+                      <CheckSquareIcon className="w-4 h-4 text-[#5865F2]/50" />
+                    ) : (
+                      <SquareIcon className="w-4 h-4 text-[#4B4D55]" />
+                    )}
+                    All
+                  </button>
+                )}
+                <h2 className="text-xl font-bold tracking-tight text-white">{category}</h2>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                {cmdList.map(({ cmd, desc }) => {
+                  const isActive = commands[cmd] && commands[cmd].length > 0;
+                  const isExpanded = !bulkMode && expandedCmd === cmd;
+                  const isSelected = bulkMode && selectedCmds.has(cmd);
+
+                  return (
+                    <div
+                      key={cmd}
+                      className={`relative rounded-xl border transition-all duration-200 overflow-visible ${
+                        bulkMode
+                          ? isSelected
+                            ? "border-[#FAA61A] bg-[#FAA61A]/[0.07] shadow-[0_0_10px_rgba(250,166,26,0.15)] cursor-pointer"
+                            : "border-[#1E1F22] bg-[#1a1b1e] hover:border-[#FAA61A]/40 cursor-pointer"
+                          : isExpanded
+                          ? "border-[#5865F2] bg-[#1a1b1e] shadow-[0_0_12px_rgba(88,101,242,0.15)] ring-1 ring-[#5865F2]/50 cursor-pointer"
+                          : isActive
+                          ? "border-[#5865F2]/40 bg-[#5865F2]/[0.03] hover:border-[#5865F2]/60 cursor-pointer"
+                          : "border-[#1E1F22] bg-[#1a1b1e] hover:border-[#5865F2]/30 hover:bg-[#1f2125] cursor-pointer"
+                      }`}
+                      onClick={() => {
+                        if (bulkMode) toggleCmd(cmd);
+                        else setExpandedCmd(isExpanded ? null : cmd);
+                      }}
+                    >
+                      <div className="flex items-start justify-between p-4">
+                        <div className="flex items-start gap-2 min-w-0">
+                          {bulkMode && (
+                            <div className={`mt-0.5 shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                              isSelected ? "bg-[#FAA61A] border-[#FAA61A]" : "border-[#4B4D55] bg-transparent"
+                            }`}>
+                              {isSelected && (
+                                <svg className="w-2.5 h-2.5 text-black" fill="none" viewBox="0 0 10 10">
+                                  <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <h3 className={`text-[14px] font-semibold transition-colors leading-none ${isActive || isExpanded || isSelected ? "text-white" : "text-[#B5BAC1]"}`}>
+                              <span className={isActive || isExpanded || isSelected ? "text-[#5865F2]" : "text-[#5865F2]/70"}>/</span>{cmd}
+                            </h3>
+                            {desc && (
+                              <p className={`text-[11px] mt-2 line-clamp-2 leading-tight ${isActive || isExpanded || isSelected ? "text-[#a0a4ab]" : "text-[#7a7e86]"}`}>
+                                {desc}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {isActive && (
+                          <span className="text-[10px] shrink-0 ml-2 bg-[#5865F2] text-white px-2 py-0.5 rounded-full font-bold shadow-sm">
+                            {commands[cmd].length} Roles
+                          </span>
                         )}
                       </div>
-                      {isActive && (
-                        <span className="text-[10px] shrink-0 ml-2 bg-[#5865F2] text-white px-2 py-0.5 rounded-full font-bold shadow-sm">
-                          {commands[cmd].length} Roles
-                        </span>
+
+                      {isExpanded && (
+                        <div
+                          className="px-4 pb-4 pt-1 border-t border-[#2B2D31] bg-[#141518] rounded-b-xl"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="mt-3">
+                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-[#6b7280]">
+                              Allowed Roles
+                            </label>
+                            <RoleMultiSelect
+                              guildId={guildId}
+                              value={(commands[cmd] || []).map(String)}
+                              onChange={(ids) => handleRoleChange(cmd, ids)}
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-                    {/* Expandable Role Configuration Area */}
-                    {isExpanded && (
-                      <div 
-                        className="px-4 pb-4 pt-1 border-t border-[#2B2D31] bg-[#141518] rounded-b-xl"
-                        onClick={(e) => e.stopPropagation()} // Prevent clicking the roles from toggling the accordion
-                      >
-                        <div className="mt-3">
-                          <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-[#6b7280]">
-                            Allowed Roles
-                          </label>
-                          <RoleMultiSelect
-                            guildId={guildId}
-                            value={(commands[cmd] || []).map(String)}
-                            onChange={(ids) => handleRoleChange(cmd, ids)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+      {/* Sticky bulk action bar */}
+      {bulkMode && (
+        <div
+          ref={bulkBarRef}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4"
+        >
+          <div className="flex flex-col gap-3 rounded-2xl border border-[#FAA61A]/40 bg-[#1a1b1e]/95 backdrop-blur-md shadow-2xl p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-[#FAA61A]">
+                {selectedCmds.size > 0
+                  ? `${selectedCmds.size} command${selectedCmds.size !== 1 ? "s" : ""} selected`
+                  : "No commands selected"}
+              </span>
+              <button
+                onClick={toggleBulkMode}
+                className="text-[#B5BAC1] hover:text-white transition-colors"
+                title="Exit bulk mode"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div onClick={(e) => e.stopPropagation()}>
+              <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-[#6b7280]">
+                Roles to Apply
+              </label>
+              <RoleMultiSelect
+                guildId={guildId}
+                value={bulkRoles}
+                onChange={setBulkRoles}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                onClick={applyBulkRoles}
+                disabled={selectedCmds.size === 0}
+                className="flex-1 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-40 text-sm"
+              >
+                Apply to {selectedCmds.size > 0 ? selectedCmds.size : ""} Selected
+              </Button>
+              <Button
+                onClick={clearBulkRoles}
+                disabled={selectedCmds.size === 0}
+                className="bg-[#ED4245]/20 hover:bg-[#ED4245]/30 border border-[#ED4245]/40 text-[#ED4245] disabled:opacity-40 text-sm px-4"
+                title="Clear roles from selected commands"
+              >
+                Clear Roles
+              </Button>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

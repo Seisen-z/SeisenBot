@@ -429,9 +429,9 @@ function SetupTab({ guildId }: { guildId: string }) {
           <textarea
             value={config.description}
             onChange={(e) => set("description", e.target.value)}
-            rows={3}
             placeholder="Click a button below to apply…"
-            className="w-full rounded-lg border border-[#1E1F22] bg-[#0e0f11] px-3 py-2 text-sm text-white placeholder:text-[#6b7280] focus:outline-none focus:border-[#5865F2] resize-none"
+            className="w-full rounded-lg border border-[#1E1F22] bg-[#0e0f11] px-3 py-2 text-sm text-white placeholder:text-[#6b7280] focus:outline-none focus:border-[#5865F2] resize-y min-h-[160px]"
+            style={{ height: "160px" }}
           />
         </div>
 

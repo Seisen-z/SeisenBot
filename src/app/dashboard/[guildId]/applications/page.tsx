@@ -21,6 +21,7 @@ type PanelConfig = {
   message_id?: string;
   title: string;
   description: string;
+  accept_roles: { staff: string; tester: string; helper: string };
 };
 
 type Application = {
@@ -229,6 +230,34 @@ function ApplicationCard({
   );
 }
 
+// ─── Save Roles Button ────────────────────────────────────────────────────────
+
+function SaveRolesButton({ guildId, acceptRoles }: { guildId: string; acceptRoles: PanelConfig["accept_roles"] }) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await fetchApi(`/guilds/${guildId}/apppanel`, undefined, {
+        method: "PUT",
+        body: JSON.stringify({ accept_roles: acceptRoles }),
+      });
+      toast("✅ Accept roles saved!");
+    } catch (e: any) {
+      toast(e?.message || "Failed to save roles.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Button onClick={handleSave} disabled={saving} className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs">
+      {saving ? "Saving…" : "Save Roles"}
+    </Button>
+  );
+}
+
 // ─── Setup Tab ────────────────────────────────────────────────────────────────
 
 function SetupTab({ guildId }: { guildId: string }) {
@@ -238,6 +267,7 @@ function SetupTab({ guildId }: { guildId: string }) {
     log_channel_id: "",
     title: "📋 Staff Applications",
     description: "Click a button below to apply for a staff position in this server.",
+    accept_roles: { staff: "", tester: "", helper: "" },
   });
   const [loaded, setLoaded] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -247,12 +277,18 @@ function SetupTab({ guildId }: { guildId: string }) {
     fetchApi(`/guilds/${guildId}/apppanel`)
       .then((data) => {
         if (data && (data.channel_id || data.message_id)) {
+          const ar = data.accept_roles || {};
           setConfig({
             channel_id: String(data.channel_id || ""),
             log_channel_id: String(data.log_channel_id || ""),
             message_id: data.message_id ? String(data.message_id) : undefined,
             title: data.title || "📋 Staff Applications",
             description: data.description || "Click a button below to apply for a staff position in this server.",
+            accept_roles: {
+              staff: String(ar.staff || ""),
+              tester: String(ar.tester || ""),
+              helper: String(ar.helper || ""),
+            },
           });
         }
       })
@@ -269,6 +305,12 @@ function SetupTab({ guildId }: { guildId: string }) {
     try {
       const isLiveUpdate = !!config.message_id;
       const action = isLiveUpdate ? "apppanel_update" : "apppanel_post";
+      // Persist accept_roles immediately (independent of panel post/update)
+      await fetchApi(`/guilds/${guildId}/apppanel`, undefined, {
+        method: "PUT",
+        body: JSON.stringify({ accept_roles: config.accept_roles }),
+      }).catch(() => {});
+
       const res = await fetchApi(`/trigger/${action}`, undefined, {
         method: "POST",
         body: JSON.stringify({
@@ -406,6 +448,33 @@ function SetupTab({ guildId }: { guildId: string }) {
               <span key={label} className={`px-3 py-1 rounded text-xs font-semibold border ${cls}`}>{label}</span>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Accept Roles */}
+      <div className="rounded-xl border border-[#1E1F22] bg-[#141518] p-5 flex flex-col gap-4">
+        <div>
+          <h3 className="text-xs font-bold text-[#B5BAC1] uppercase tracking-wider">Auto-Assign Roles on Accept</h3>
+          <p className="text-[11px] text-[#6b7280] mt-1">When you accept an application, the matching role is automatically given to that user.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {([
+            { key: "staff",  label: "🛡️ Staff Role",  color: "text-[#ED4245]" },
+            { key: "tester", label: "🧪 Tester Role", color: "text-[#57F287]" },
+            { key: "helper", label: "🤝 Helper Role", color: "text-[#5865F2]" },
+          ] as const).map(({ key, label, color }) => (
+            <div key={key}>
+              <label className={`mb-2 block text-xs font-semibold uppercase tracking-wide ${color}`}>{label}</label>
+              <RoleMultiSelect
+                guildId={guildId}
+                value={config.accept_roles[key] ? [config.accept_roles[key]] : []}
+                onChange={(ids) => setConfig((p) => ({ ...p, accept_roles: { ...p.accept_roles, [key]: ids[0] || "" } }))}
+              />
+            </div>
+          ))}
+        </div>
+        <div>
+          <SaveRolesButton guildId={guildId} acceptRoles={config.accept_roles} />
         </div>
       </div>
 

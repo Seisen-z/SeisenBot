@@ -5,7 +5,23 @@ import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { Button } from "@/components/ui/button";
-import { ClipboardListIcon, CheckIcon, XIcon, ClockIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ChannelSelect } from "@/components/ui/discord-selects";
+import {
+  ClipboardListIcon, CheckIcon, XIcon, ClockIcon,
+  ChevronDownIcon, ChevronUpIcon, SettingsIcon, ListIcon,
+  Trash2Icon, SendIcon,
+} from "lucide-react";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type PanelConfig = {
+  channel_id: string;
+  log_channel_id: string;
+  message_id?: string;
+  title: string;
+  description: string;
+};
 
 type Application = {
   id: string;
@@ -19,8 +35,9 @@ type Application = {
   status: "pending" | "accepted" | "rejected";
   reviewed_by: string | null;
   reviewed_at: string | null;
-  notes: string | null;
 };
+
+// ─── Metadata ─────────────────────────────────────────────────────────────────
 
 const POSITION_META = {
   helper: { label: "Helper", emoji: "🤝", color: "text-[#5865F2] bg-[#5865F2]/10 border-[#5865F2]/30" },
@@ -44,12 +61,14 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+// ─── Application Card ─────────────────────────────────────────────────────────
+
 function ApplicationCard({
   app,
   onUpdateStatus,
 }: {
   app: Application;
-  onUpdateStatus: (id: string, status: string) => void;
+  onUpdateStatus: (id: string, status: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -65,20 +84,16 @@ function ApplicationCard({
 
   return (
     <div className="rounded-xl border border-[#1E1F22] bg-[#141518] overflow-hidden">
-      {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
         onClick={() => setExpanded((p) => !p)}
       >
-        {/* Avatar */}
         <img
           src={app.avatar_url}
           alt={app.display_name}
           className="w-9 h-9 rounded-full ring-1 ring-white/10 shrink-0"
           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
         />
-
-        {/* Name + meta */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-white truncate">{app.display_name}</span>
@@ -96,14 +111,11 @@ function ApplicationCard({
             <span className="text-[11px] text-[#4B4D55] font-mono">#{app.id}</span>
           </div>
         </div>
-
-        {/* Expand toggle */}
         <div className="shrink-0 text-[#6b7280]">
           {expanded ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
         </div>
       </div>
 
-      {/* Answers */}
       {expanded && (
         <div className="border-t border-[#1E1F22] px-4 py-4 space-y-4">
           {Object.entries(app.answers).map(([q, a]) => (
@@ -112,8 +124,6 @@ function ApplicationCard({
               <p className="text-sm text-white whitespace-pre-wrap bg-[#0e0f11] rounded-lg px-3 py-2 border border-[#1E1F22]">{a || "—"}</p>
             </div>
           ))}
-
-          {/* Actions */}
           {app.status === "pending" && (
             <div className="flex gap-2 pt-1">
               <Button
@@ -133,9 +143,7 @@ function ApplicationCard({
             </div>
           )}
           {app.status !== "pending" && app.reviewed_at && (
-            <p className="text-xs text-[#6b7280]">
-              Reviewed {timeAgo(app.reviewed_at)}
-            </p>
+            <p className="text-xs text-[#6b7280]">Reviewed {timeAgo(app.reviewed_at)}</p>
           )}
         </div>
       )}
@@ -143,17 +151,227 @@ function ApplicationCard({
   );
 }
 
-export default function ApplicationsPage({ params }: { params: Promise<{ guildId: string }> }) {
-  const { guildId } = use(params);
-  const { toast } = useToast();
+// ─── Setup Tab ────────────────────────────────────────────────────────────────
 
+function SetupTab({ guildId }: { guildId: string }) {
+  const { toast } = useToast();
+  const [config, setConfig] = useState<PanelConfig>({
+    channel_id: "",
+    log_channel_id: "",
+    title: "📋 Staff Applications",
+    description: "Click a button below to apply for a staff position in this server.",
+  });
+  const [loaded, setLoaded] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    fetchApi(`/guilds/${guildId}/apppanel`)
+      .then((data) => {
+        if (data && (data.channel_id || data.message_id)) {
+          setConfig({
+            channel_id: String(data.channel_id || ""),
+            log_channel_id: String(data.log_channel_id || ""),
+            message_id: data.message_id ? String(data.message_id) : undefined,
+            title: data.title || "📋 Staff Applications",
+            description: data.description || "Click a button below to apply for a staff position in this server.",
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, [guildId]);
+
+  const set = (k: keyof PanelConfig, v: string) => setConfig((p) => ({ ...p, [k]: v }));
+
+  const handlePost = async () => {
+    if (!config.channel_id) return toast("Select a panel channel first.", "error");
+    if (!config.log_channel_id) return toast("Select a log channel first.", "error");
+    setPosting(true);
+    try {
+      const res = await fetchApi(`/trigger/apppanel_post`, undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          guild_id: guildId,
+          payload: {
+            channel_id: config.channel_id,
+            log_channel_id: config.log_channel_id,
+            title: config.title,
+            description: config.description,
+          },
+        }),
+      });
+      if (res?.message_id) {
+        setConfig((p) => ({ ...p, message_id: String(res.message_id) }));
+        toast("✅ Application panel posted!");
+      } else {
+        throw new Error(res?.message || "No message_id returned.");
+      }
+    } catch (e: any) {
+      toast(e?.message || "Failed to post panel.", "error");
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Delete the application panel from Discord? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      await fetchApi(`/trigger/apppanel_delete`, undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          guild_id: guildId,
+          payload: {
+            message_id: config.message_id,
+            channel_id: config.channel_id,
+          },
+        }),
+      });
+      setConfig((p) => ({ ...p, message_id: undefined }));
+      toast("🗑️ Panel deleted.");
+    } catch (e: any) {
+      toast(e?.message || "Failed to delete panel.", "error");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (!loaded) {
+    return <div className="py-16 text-center text-[#6b7280] text-sm">Loading config…</div>;
+  }
+
+  const isLive = !!config.message_id;
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Status banner */}
+      {isLive ? (
+        <div className="flex items-center gap-3 rounded-xl border border-[#57F287]/20 bg-[#57F287]/5 px-4 py-3">
+          <span className="w-2 h-2 rounded-full bg-[#57F287] shrink-0 animate-pulse" />
+          <span className="text-sm text-[#57F287] font-medium">Panel is live</span>
+          <span className="text-xs text-[#6b7280] font-mono ml-1">msg:{config.message_id}</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 rounded-xl border border-[#FEE75C]/20 bg-[#FEE75C]/5 px-4 py-3">
+          <span className="w-2 h-2 rounded-full bg-[#FEE75C] shrink-0" />
+          <span className="text-sm text-[#FEE75C] font-medium">No panel posted yet</span>
+        </div>
+      )}
+
+      {/* Channels */}
+      <div className="rounded-xl border border-[#1E1F22] bg-[#141518] p-5 flex flex-col gap-5">
+        <h3 className="text-xs font-bold text-[#B5BAC1] uppercase tracking-wider">Channels</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-[#B5BAC1] uppercase tracking-wide">
+              Panel Channel <span className="text-[#ED4245]">*</span>
+            </label>
+            <ChannelSelect
+              guildId={guildId}
+              value={config.channel_id}
+              onChange={(v) => set("channel_id", v)}
+              placeholder="Where to post the apply buttons…"
+            />
+            <p className="mt-1 text-[11px] text-[#6b7280]">The channel where the embed with Helper/Staff/Tester buttons will appear.</p>
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-[#B5BAC1] uppercase tracking-wide">
+              Log Channel <span className="text-[#ED4245]">*</span>
+            </label>
+            <ChannelSelect
+              guildId={guildId}
+              value={config.log_channel_id}
+              onChange={(v) => set("log_channel_id", v)}
+              placeholder="Where to send submission logs…"
+            />
+            <p className="mt-1 text-[11px] text-[#6b7280]">Each submitted application is posted here as an embed.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Embed content */}
+      <div className="rounded-xl border border-[#1E1F22] bg-[#141518] p-5 flex flex-col gap-4">
+        <h3 className="text-xs font-bold text-[#B5BAC1] uppercase tracking-wider">Panel Embed</h3>
+        <div>
+          <label className="mb-2 block text-xs font-semibold text-[#B5BAC1] uppercase tracking-wide">Title</label>
+          <Input
+            value={config.title}
+            onChange={(e) => set("title", e.target.value)}
+            placeholder="📋 Staff Applications"
+          />
+        </div>
+        <div>
+          <label className="mb-2 block text-xs font-semibold text-[#B5BAC1] uppercase tracking-wide">Description</label>
+          <textarea
+            value={config.description}
+            onChange={(e) => set("description", e.target.value)}
+            rows={3}
+            placeholder="Click a button below to apply…"
+            className="w-full rounded-lg border border-[#1E1F22] bg-[#0e0f11] px-3 py-2 text-sm text-white placeholder:text-[#6b7280] focus:outline-none focus:border-[#5865F2] resize-none"
+          />
+        </div>
+
+        {/* Preview */}
+        <div className="rounded-lg border-l-4 border-[#5865F2] bg-[#0e0f11] px-4 py-3">
+          <p className="text-sm font-semibold text-white">{config.title || "📋 Staff Applications"}</p>
+          <p className="text-xs text-[#B5BAC1] mt-1 whitespace-pre-wrap">{config.description || "Click a button below to apply…"}</p>
+          <div className="flex gap-2 mt-3 flex-wrap">
+            {["🤝 Apply as Helper", "🛡️ Apply as Staff", "🧪 Apply as Tester"].map((label) => (
+              <span key={label} className="px-3 py-1 rounded text-xs font-semibold bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30">{label}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3 flex-wrap">
+        {isLive ? (
+          <>
+            <Button
+              onClick={handlePost}
+              disabled={posting}
+              className="bg-[#5865F2] hover:bg-[#4752C4] text-white"
+            >
+              <SendIcon className="w-4 h-4 mr-2" />
+              {posting ? "Re-posting…" : "Re-post Panel"}
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-[#ED4245]/15 hover:bg-[#ED4245]/25 border border-[#ED4245]/40 text-[#ED4245]"
+            >
+              <Trash2Icon className="w-4 h-4 mr-2" />
+              {deleting ? "Deleting…" : "Delete Panel"}
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={handlePost}
+            disabled={posting || !config.channel_id || !config.log_channel_id}
+            className="bg-[#5865F2] hover:bg-[#4752C4] text-white"
+          >
+            <SendIcon className="w-4 h-4 mr-2" />
+            {posting ? "Posting…" : "Post Panel to Discord"}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Applications Tab ─────────────────────────────────────────────────────────
+
+function ApplicationsTab({ guildId }: { guildId: string }) {
+  const { toast } = useToast();
   const [apps, setApps] = useState<Application[]>([]);
   const [counts, setCounts] = useState({ pending: 0, accepted: 0, rejected: 0 });
   const [loading, setLoading] = useState(true);
-  const [posFilter, setPosFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [posFilter, setPosFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await fetchApi(`/guilds/${guildId}/applications`);
       setApps(data?.applications || []);
@@ -168,24 +386,23 @@ export default function ApplicationsPage({ params }: { params: Promise<{ guildId
   useEffect(() => { load(); }, [load]);
 
   const handleUpdateStatus = useCallback(async (appId: string, status: string) => {
-    try {
-      await fetchApi(`/guilds/${guildId}/applications/${appId}`, undefined, {
-        method: "PUT",
-        body: JSON.stringify({ status }),
-      });
-      setApps((prev) => prev.map((a) => a.id === appId ? { ...a, status: status as any, reviewed_at: new Date().toISOString() } : a));
-      setCounts((prev) => {
-        const next = { ...prev };
-        next.pending = Math.max(0, next.pending - 1);
-        if (status === "accepted") next.accepted++;
-        else if (status === "rejected") next.rejected++;
-        return next;
-      });
-      toast(`Application ${status}!`);
-    } catch {
-      toast("Failed to update application", "error");
-    }
+    await fetchApi(`/guilds/${guildId}/applications/${appId}`, undefined, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    });
+    setApps((prev) => prev.map((a) => a.id === appId ? { ...a, status: status as any, reviewed_at: new Date().toISOString() } : a));
+    setCounts((prev) => {
+      const next = { ...prev };
+      next.pending = Math.max(0, next.pending - 1);
+      if (status === "accepted") next.accepted++;
+      else if (status === "rejected") next.rejected++;
+      return next;
+    });
+    toast(`Application ${status}!`);
   }, [guildId, toast]);
+
+  const POS_TABS = ["all", "helper", "staff", "tester"];
+  const STATUS_TABS = ["all", "pending", "accepted", "rejected"];
 
   const filtered = apps.filter((a) => {
     if (posFilter !== "all" && a.position !== posFilter) return false;
@@ -193,56 +410,44 @@ export default function ApplicationsPage({ params }: { params: Promise<{ guildId
     return true;
   });
 
-  const POS_TABS = ["all", "helper", "staff", "tester"];
-  const STATUS_TABS = ["all", "pending", "accepted", "rejected"];
-
   return (
-    <div className="glass-card flex flex-col gap-6 rounded-3xl p-6">
-      <DashboardPageHero
-        icon={ClipboardListIcon}
-        title="Staff Applications"
-        subtitle="Review applications submitted via the in-server panel."
-        stats={[
-          { label: "Total", value: apps.length },
-          { label: "Pending", value: counts.pending },
-          { label: "Accepted", value: counts.accepted },
-          { label: "Rejected", value: counts.rejected },
-        ]}
-        actions={
-          <Button onClick={load} className="bg-[#5865F2] hover:bg-[#4752C4] text-sm">
-            Refresh
-          </Button>
-        }
-      />
+    <div className="flex flex-col gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Total", value: apps.length, color: "text-white" },
+          { label: "Pending", value: counts.pending, color: "text-[#FEE75C]" },
+          { label: "Accepted", value: counts.accepted, color: "text-[#57F287]" },
+          { label: "Rejected", value: counts.rejected, color: "text-[#ED4245]" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl border border-[#1E1F22] bg-[#141518] px-4 py-3">
+            <p className="text-xs text-[#6b7280] uppercase tracking-wide">{s.label}</p>
+            <p className={`text-2xl font-bold mt-0.5 ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
+      </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4">
+      {/* Filters + Refresh */}
+      <div className="flex flex-wrap gap-3 items-center">
         <div className="flex items-center gap-1 bg-[#141518] border border-[#1E1F22] rounded-xl p-1">
           {POS_TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setPosFilter(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                posFilter === t ? "bg-[#5865F2] text-white" : "text-[#6b7280] hover:text-white"
-              }`}
-            >
+            <button key={t} onClick={() => setPosFilter(t)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${posFilter === t ? "bg-[#5865F2] text-white" : "text-[#6b7280] hover:text-white"}`}>
               {t === "all" ? "All Positions" : `${POSITION_META[t as keyof typeof POSITION_META]?.emoji} ${t.charAt(0).toUpperCase() + t.slice(1)}`}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-1 bg-[#141518] border border-[#1E1F22] rounded-xl p-1">
           {STATUS_TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setStatusFilter(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                statusFilter === t ? "bg-[#5865F2] text-white" : "text-[#6b7280] hover:text-white"
-              }`}
-            >
+            <button key={t} onClick={() => setStatusFilter(t)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${statusFilter === t ? "bg-[#5865F2] text-white" : "text-[#6b7280] hover:text-white"}`}>
               {t === "all" ? "All Statuses" : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </div>
+        <Button onClick={load} className="ml-auto bg-[#1E1F22] hover:bg-[#2B2D31] text-[#B5BAC1] border border-[#1E1F22] text-xs">
+          Refresh
+        </Button>
       </div>
 
       {/* List */}
@@ -250,7 +455,7 @@ export default function ApplicationsPage({ params }: { params: Promise<{ guildId
         <div className="py-16 text-center text-[#6b7280] text-sm">Loading applications…</div>
       ) : filtered.length === 0 ? (
         <div className="py-16 text-center text-[#6b7280] text-sm">
-          {apps.length === 0 ? "No applications yet. Set up a panel with /apppanel setup." : "No applications match the current filters."}
+          {apps.length === 0 ? "No applications yet. Set up and post a panel in the Setup tab." : "No applications match the current filters."}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -259,6 +464,43 @@ export default function ApplicationsPage({ params }: { params: Promise<{ guildId
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+type Tab = "setup" | "applications";
+
+export default function ApplicationsPage({ params }: { params: Promise<{ guildId: string }> }) {
+  const { guildId } = use(params);
+  const [tab, setTab] = useState<Tab>("setup");
+
+  return (
+    <div className="glass-card flex flex-col gap-6 rounded-3xl p-6">
+      <DashboardPageHero
+        icon={ClipboardListIcon}
+        title="Staff Applications"
+        subtitle="Configure your application panel and review submitted applications."
+      />
+
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-[#141518] border border-[#1E1F22] rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setTab("setup")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === "setup" ? "bg-[#5865F2] text-white" : "text-[#6b7280] hover:text-white"}`}
+        >
+          <SettingsIcon className="w-4 h-4" /> Setup
+        </button>
+        <button
+          onClick={() => setTab("applications")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === "applications" ? "bg-[#5865F2] text-white" : "text-[#6b7280] hover:text-white"}`}
+        >
+          <ListIcon className="w-4 h-4" /> Applications
+        </button>
+      </div>
+
+      {tab === "setup" ? <SetupTab guildId={guildId} /> : <ApplicationsTab guildId={guildId} />}
     </div>
   );
 }

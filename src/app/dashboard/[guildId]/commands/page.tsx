@@ -123,6 +123,10 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "vouch", desc: "Create a new vouch for this server" },
     { cmd: "vouch_setup", desc: "Set the channel where vouches post" },
   ],
+  "Key Generation": [
+    { cmd: "generatekeypremium", desc: "Generate a 1 Week Premium key" },
+    { cmd: "generatekeyregular", desc: "Generate a 1 Week Regular key" },
+  ],
   "Fun & Community Commands": [
     { cmd: "8ball", desc: "Ask the magic 8-ball a question" },
     { cmd: "coinflip", desc: "Flip a coin (heads or tails)" },

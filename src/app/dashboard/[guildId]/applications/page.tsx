@@ -6,11 +6,11 @@ import { useToast } from "@/components/ui/toast";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChannelSelect } from "@/components/ui/discord-selects";
+import { ChannelSelect, RoleMultiSelect } from "@/components/ui/discord-selects";
 import {
   ClipboardListIcon, CheckIcon, XIcon, ClockIcon,
   ChevronDownIcon, ChevronUpIcon, SettingsIcon, ListIcon,
-  Trash2Icon, SendIcon,
+  Trash2Icon, SendIcon, Hash,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,13 +65,20 @@ function timeAgo(iso: string) {
 
 function ApplicationCard({
   app,
+  guildId,
   onUpdateStatus,
 }: {
   app: Application;
+  guildId: string;
   onUpdateStatus: (id: string, status: string) => Promise<void>;
 }) {
+  const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [showChannelForm, setShowChannelForm] = useState(false);
+  const [channelName, setChannelName] = useState(`interview-${app.username.split("#")[0].toLowerCase().replace(/[^a-z0-9]/g, "-")}`);
+  const [roleIds, setRoleIds] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
   const pos = POSITION_META[app.position];
   const stat = STATUS_META[app.status];
   const StatIcon = stat.icon;
@@ -80,6 +87,27 @@ function ApplicationCard({
     setUpdating(true);
     await onUpdateStatus(app.id, status);
     setUpdating(false);
+  };
+
+  const handleCreateChannel = async () => {
+    if (!channelName.trim()) return toast("Enter a channel name.", "error");
+    setCreating(true);
+    try {
+      const res = await fetchApi(`/trigger/apppanel_create_channel`, undefined, {
+        method: "POST",
+        body: JSON.stringify({
+          guild_id: guildId,
+          payload: { user_id: app.user_id, channel_name: channelName.trim(), role_ids: roleIds },
+        }),
+      });
+      const roles = res?.assigned_roles?.length ? ` and assigned: ${res.assigned_roles.join(", ")}` : "";
+      toast(`✅ Created #${res?.channel_name}${roles}`);
+      setShowChannelForm(false);
+    } catch (e: any) {
+      toast(e?.message || "Failed to create channel.", "error");
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -144,6 +172,56 @@ function ApplicationCard({
           )}
           {app.status !== "pending" && app.reviewed_at && (
             <p className="text-xs text-[#6b7280]">Reviewed {timeAgo(app.reviewed_at)}</p>
+          )}
+
+          {/* Create Channel & Assign Roles */}
+          {app.status !== "rejected" && (
+            <div className="border-t border-[#1E1F22] pt-3 mt-1">
+              {!showChannelForm ? (
+                <button
+                  onClick={() => setShowChannelForm(true)}
+                  className="flex items-center gap-1.5 text-xs text-[#5865F2] hover:text-white transition-colors font-medium"
+                >
+                  <Hash className="w-3.5 h-3.5" /> Create Interview Channel &amp; Assign Roles
+                </button>
+              ) : (
+                <div className="flex flex-col gap-3 rounded-lg border border-[#1E1F22] bg-[#0e0f11] p-3">
+                  <p className="text-xs font-bold text-[#B5BAC1] uppercase tracking-wide">Create Interview Channel</p>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-[#6b7280]">Channel Name</label>
+                    <Input
+                      value={channelName}
+                      onChange={(e) => setChannelName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                      placeholder="interview-username"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-[#6b7280]">Roles to Assign (optional)</label>
+                    <RoleMultiSelect
+                      guildId={guildId}
+                      value={roleIds}
+                      onChange={setRoleIds}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleCreateChannel}
+                      disabled={creating || !channelName.trim()}
+                      className="bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs px-4"
+                    >
+                      <Hash className="w-3.5 h-3.5 mr-1.5" />
+                      {creating ? "Creating…" : "Create Channel"}
+                    </Button>
+                    <Button
+                      onClick={() => setShowChannelForm(false)}
+                      className="bg-transparent border border-[#1E1F22] text-[#6b7280] hover:text-white text-xs px-4"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -467,7 +545,7 @@ function ApplicationsTab({ guildId }: { guildId: string }) {
       ) : (
         <div className="flex flex-col gap-2">
           {filtered.map((app) => (
-            <ApplicationCard key={app.id} app={app} onUpdateStatus={handleUpdateStatus} />
+            <ApplicationCard key={app.id} app={app} guildId={guildId} onUpdateStatus={handleUpdateStatus} />
           ))}
         </div>
       )}

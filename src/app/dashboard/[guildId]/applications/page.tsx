@@ -189,13 +189,16 @@ function SetupTab({ guildId }: { guildId: string }) {
     if (!config.log_channel_id) return toast("Select a log channel first.", "error");
     setPosting(true);
     try {
-      const res = await fetchApi(`/trigger/apppanel_post`, undefined, {
+      const isLiveUpdate = !!config.message_id;
+      const action = isLiveUpdate ? "apppanel_update" : "apppanel_post";
+      const res = await fetchApi(`/trigger/${action}`, undefined, {
         method: "POST",
         body: JSON.stringify({
           guild_id: guildId,
           payload: {
             channel_id: config.channel_id,
             log_channel_id: config.log_channel_id,
+            message_id: config.message_id,
             title: config.title,
             description: config.description,
           },
@@ -203,7 +206,7 @@ function SetupTab({ guildId }: { guildId: string }) {
       });
       if (res?.message_id) {
         setConfig((p) => ({ ...p, message_id: String(res.message_id) }));
-        toast("✅ Application panel posted!");
+        toast(isLiveUpdate ? "✅ Panel updated!" : "✅ Application panel posted!");
       } else {
         throw new Error(res?.message || "No message_id returned.");
       }
@@ -338,7 +341,7 @@ function SetupTab({ guildId }: { guildId: string }) {
               className="bg-[#5865F2] hover:bg-[#4752C4] text-white"
             >
               <SendIcon className="w-4 h-4 mr-2" />
-              {posting ? "Re-posting…" : "Re-post Panel"}
+              {posting ? "Updating…" : "Update Panel"}
             </Button>
             <Button
               onClick={handleDelete}

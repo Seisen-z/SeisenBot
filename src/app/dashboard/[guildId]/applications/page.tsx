@@ -317,8 +317,12 @@ function SetupTab({ guildId }: { guildId: string }) {
           <p className="text-sm font-semibold text-white">{config.title || "📋 Staff Applications"}</p>
           <p className="text-xs text-[#B5BAC1] mt-1 whitespace-pre-wrap">{config.description || "Click a button below to apply…"}</p>
           <div className="flex gap-2 mt-3 flex-wrap">
-            {["🤝 Apply as Helper", "🛡️ Apply as Staff", "🧪 Apply as Tester"].map((label) => (
-              <span key={label} className="px-3 py-1 rounded text-xs font-semibold bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30">{label}</span>
+            {[
+              { label: "🛡️ Apply as Staff", cls: "bg-[#ED4245]/20 text-[#ED4245] border-[#ED4245]/30" },
+              { label: "🧪 Apply as Tester", cls: "bg-[#57F287]/20 text-[#57F287] border-[#57F287]/30" },
+              { label: "🤝 Apply as Helper", cls: "bg-[#5865F2]/20 text-[#5865F2] border-[#5865F2]/30" },
+            ].map(({ label, cls }) => (
+              <span key={label} className={`px-3 py-1 rounded text-xs font-semibold border ${cls}`}>{label}</span>
             ))}
           </div>
         </div>

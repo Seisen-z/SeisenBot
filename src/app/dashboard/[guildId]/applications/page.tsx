@@ -18,6 +18,7 @@ import {
 type PanelConfig = {
   channel_id: string;
   log_channel_id: string;
+  interview_category_id: string;
   message_id?: string;
   title: string;
   description: string;
@@ -265,6 +266,7 @@ function SetupTab({ guildId }: { guildId: string }) {
   const [config, setConfig] = useState<PanelConfig>({
     channel_id: "",
     log_channel_id: "",
+    interview_category_id: "",
     title: "📋 Staff Applications",
     description: "Click a button below to apply for a staff position in this server.",
     accept_roles: { staff: "", tester: "", helper: "" },
@@ -281,6 +283,7 @@ function SetupTab({ guildId }: { guildId: string }) {
           setConfig({
             channel_id: String(data.channel_id || ""),
             log_channel_id: String(data.log_channel_id || ""),
+            interview_category_id: String(data.interview_category_id || ""),
             message_id: data.message_id ? String(data.message_id) : undefined,
             title: data.title || "📋 Staff Applications",
             description: data.description || "Click a button below to apply for a staff position in this server.",
@@ -308,7 +311,7 @@ function SetupTab({ guildId }: { guildId: string }) {
       // Persist accept_roles immediately (independent of panel post/update)
       await fetchApi(`/guilds/${guildId}/apppanel`, undefined, {
         method: "PUT",
-        body: JSON.stringify({ accept_roles: config.accept_roles }),
+        body: JSON.stringify({ accept_roles: config.accept_roles, interview_category_id: config.interview_category_id }),
       }).catch(() => {});
 
       const res = await fetchApi(`/trigger/${action}`, undefined, {
@@ -409,6 +412,19 @@ function SetupTab({ guildId }: { guildId: string }) {
               placeholder="Where to send submission logs…"
             />
             <p className="mt-1 text-[11px] text-[#6b7280]">Each submitted application is posted here as an embed.</p>
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-[#B5BAC1] uppercase tracking-wide">
+              Interview Category
+            </label>
+            <ChannelSelect
+              guildId={guildId}
+              value={config.interview_category_id}
+              onChange={(v) => set("interview_category_id", v)}
+              placeholder="Category for interview channels…"
+              channelType="category"
+            />
+            <p className="mt-1 text-[11px] text-[#6b7280]">Interview channels created from the log button will be placed here.</p>
           </div>
         </div>
       </div>

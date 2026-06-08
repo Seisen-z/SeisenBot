@@ -19,6 +19,7 @@ type PanelConfig = {
   channel_id: string;
   log_channel_id: string;
   interview_category_id: string;
+  interviewer_role_ids: string[];
   message_id?: string;
   title: string;
   description: string;
@@ -267,6 +268,7 @@ function SetupTab({ guildId }: { guildId: string }) {
     channel_id: "",
     log_channel_id: "",
     interview_category_id: "",
+    interviewer_role_ids: [],
     title: "📋 Staff Applications",
     description: "Click a button below to apply for a staff position in this server.",
     accept_roles: { staff: "", tester: "", helper: "" },
@@ -284,6 +286,7 @@ function SetupTab({ guildId }: { guildId: string }) {
             channel_id: String(data.channel_id || ""),
             log_channel_id: String(data.log_channel_id || ""),
             interview_category_id: String(data.interview_category_id || ""),
+            interviewer_role_ids: Array.isArray(data.interviewer_role_ids) ? data.interviewer_role_ids.map(String) : [],
             message_id: data.message_id ? String(data.message_id) : undefined,
             title: data.title || "📋 Staff Applications",
             description: data.description || "Click a button below to apply for a staff position in this server.",
@@ -311,7 +314,11 @@ function SetupTab({ guildId }: { guildId: string }) {
       // Persist accept_roles immediately (independent of panel post/update)
       await fetchApi(`/guilds/${guildId}/apppanel`, undefined, {
         method: "PUT",
-        body: JSON.stringify({ accept_roles: config.accept_roles, interview_category_id: config.interview_category_id }),
+        body: JSON.stringify({
+          accept_roles: config.accept_roles,
+          interview_category_id: config.interview_category_id,
+          interviewer_role_ids: config.interviewer_role_ids,
+        }),
       }).catch(() => {});
 
       const res = await fetchApi(`/trigger/${action}`, undefined, {
@@ -324,6 +331,8 @@ function SetupTab({ guildId }: { guildId: string }) {
             message_id: config.message_id,
             title: config.title,
             description: config.description,
+            interview_category_id: config.interview_category_id,
+            interviewer_role_ids: config.interviewer_role_ids,
           },
         }),
       });
@@ -425,6 +434,17 @@ function SetupTab({ guildId }: { guildId: string }) {
               channelType="category"
             />
             <p className="mt-1 text-[11px] text-[#6b7280]">Interview channels created from the log button will be placed here.</p>
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-2 block text-xs font-semibold text-[#B5BAC1] uppercase tracking-wide">
+              Interviewer Roles
+            </label>
+            <RoleMultiSelect
+              guildId={guildId}
+              value={config.interviewer_role_ids}
+              onChange={(ids) => setConfig((p) => ({ ...p, interviewer_role_ids: ids }))}
+            />
+            <p className="mt-1 text-[11px] text-[#6b7280]">These roles will have read & send access in every interview channel created from Discord.</p>
           </div>
         </div>
       </div>

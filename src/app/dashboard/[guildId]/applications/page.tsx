@@ -431,7 +431,8 @@ function SetupTab({ guildId }: { guildId: string }) {
               value={config.interview_category_id}
               onChange={(v) => set("interview_category_id", v)}
               placeholder="Category for interview channels…"
-              channelType="category"
+              types={[4]}
+              includeCategories={true}
             />
             <p className="mt-1 text-[11px] text-[#6b7280]">Interview channels created from the log button will be placed here.</p>
           </div>

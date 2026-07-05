@@ -85,14 +85,12 @@ interface WelcomeConfigBuilderProps {
   welcomeEnabled: boolean;
   welcomeChannelId: string;
   sendWelcomeOnJoin: boolean;
-  sendWelcomeOnVerify: boolean;
   groups: WelcomeMessageGroup[];
   messages: WelcomeMessageTemplate[];
   dynamicImages: WelcomeDynamicImage[];
   onWelcomeEnabledChange: (value: boolean) => void;
   onWelcomeChannelChange: (channelId: string) => void;
   onSendOnJoinChange: (value: boolean) => void;
-  onSendOnVerifyChange: (value: boolean) => void;
   onGroupsChange: (groups: WelcomeMessageGroup[]) => void;
   onMessagesChange: (messages: WelcomeMessageTemplate[]) => void;
   onDynamicImagesChange: (images: WelcomeDynamicImage[]) => void;
@@ -1680,14 +1678,12 @@ export function WelcomeConfigBuilder({
   welcomeEnabled,
   welcomeChannelId,
   sendWelcomeOnJoin,
-  sendWelcomeOnVerify,
   groups,
   messages,
   dynamicImages,
   onWelcomeEnabledChange,
   onWelcomeChannelChange,
   onSendOnJoinChange,
-  onSendOnVerifyChange,
   onGroupsChange,
   onMessagesChange,
   onDynamicImagesChange,
@@ -1988,7 +1984,7 @@ export function WelcomeConfigBuilder({
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-[#2a2b31] bg-[#1a1b21] p-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-[#2a2b31] bg-[#1a1b21] p-4 md:grid-cols-2 lg:grid-cols-3">
         <label className="flex items-center gap-2 text-sm text-discord-text-muted">
           <input
             type="checkbox"
@@ -2007,16 +2003,6 @@ export function WelcomeConfigBuilder({
             className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
           />
           Send on join
-        </label>
-
-        <label className="flex items-center gap-2 text-sm text-discord-text-muted">
-          <input
-            type="checkbox"
-            checked={sendWelcomeOnVerify}
-            onChange={(event) => onSendOnVerifyChange(event.target.checked)}
-            className="h-4 w-4 rounded border-[#1E1F22] bg-discord-darkest text-white"
-          />
-          Send after verify
         </label>
 
         <div>

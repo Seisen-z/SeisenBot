@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
-const PUBLIC_PATHS = ['/login', '/auth', '/verify', '/'];
+const PUBLIC_PATHS = ['/login', '/auth', '/'];
 type AuthUser = {
   id?: string;
   username?: string;

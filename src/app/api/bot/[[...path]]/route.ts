@@ -6,19 +6,10 @@ export const preferredRegion = ["fra1"];
 export const maxDuration = 60;
 
 const API_TIMEOUT_MS = Number(process.env.BOT_API_TIMEOUT_MS || "45000");
-const VERIFY_API_TIMEOUT_MS = Number(process.env.BOT_API_VERIFY_TIMEOUT_MS || "90000");
 const DEFAULT_BOT_API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const ENABLE_PROTOCOL_FALLBACK = String(process.env.BOT_API_ENABLE_PROTOCOL_FALLBACK || "0").trim() === "1";
 
-function resolveRequestTimeoutMs(path: string[] | undefined) {
-  const safePath = Array.isArray(path) ? path : [];
-  const triggerIndex = safePath.findIndex((segment) => segment === "trigger");
-  const action = triggerIndex >= 0 ? safePath[triggerIndex + 1] : "";
-
-  if (action === "verify_member_web") {
-    return VERIFY_API_TIMEOUT_MS;
-  }
-
+function resolveRequestTimeoutMs(_path: string[] | undefined) {
   return API_TIMEOUT_MS;
 }
 

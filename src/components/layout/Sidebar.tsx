@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   Key,
   ClipboardListIcon,
+  AtSign,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -68,6 +69,7 @@ export default function Sidebar({
       items: [
         { name: "Auto Moderation", href: `/dashboard/${guildId}/automod`, icon: ShieldAlert },
         { name: "Anti-Spam", href: `/dashboard/${guildId}/anti-spam`, icon: ShieldAlert },
+        { name: "Ping Protection", href: `/dashboard/${guildId}/ping-protection`, icon: AtSign },
         { name: "Auto Reply", href: `/dashboard/${guildId}/autoreply`, icon: MessageSquareReply },
         { name: "AI Help", href: `/dashboard/${guildId}/ai-help`, icon: Bot },
         { name: "Announcements", href: `/dashboard/${guildId}/announcements`, icon: Megaphone },

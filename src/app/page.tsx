@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { createHash } from "crypto";
 import {
   AlertCircleIcon,
   ExternalLinkIcon,
@@ -11,6 +12,20 @@ import {
 import { AutoRefresh } from "@/components/ui/auto-refresh";
 
 export const dynamic = "force-dynamic";
+
+// Discord's /users/@me/guilds is tightly rate-limited per token. AutoRefresh
+// forces a router.refresh() right after this page mounts, so a single visit
+// already re-runs this server component at least twice — without a cache,
+// that's 4+ direct Discord calls per page view, which is exactly what trips
+// a 429 that then stays stuck (see the backend cooldown in api.py). A short
+// in-memory cache collapses those repeats into one real Discord call.
+const HOME_CACHE_TTL_MS = 20_000;
+const _profileCache = new Map<string, { user: any; guilds: any[]; expiresAt: number }>();
+const _botGuildsCache = new Map<string, { botGuildIds: string[]; expiresAt: number }>();
+
+function tokenCacheKey(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 const SERVER_API_BASE = process.env.API_PROXY_TARGET
   ? `${process.env.API_PROXY_TARGET}/api`
@@ -50,57 +65,100 @@ export default async function HomePage() {
 
   if (!token) redirect("/login");
 
+  const cacheKey = tokenCacheKey(token);
+  const now = Date.now();
+
   let user: any = null;
   let guilds: any[] = [];
   let botGuildIds: Set<string> = new Set();
   let botGuildLookupAvailable = false;
   let requiresReauth = false;
 
-  try {
-    const [resUser, resGuilds] = await Promise.all([
-      fetch("https://discord.com/api/users/@me", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      fetch("https://discord.com/api/users/@me/guilds", {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      }),
-    ]);
+  const cachedProfile = _profileCache.get(cacheKey);
+  if (cachedProfile && cachedProfile.expiresAt > now) {
+    user = cachedProfile.user;
+    guilds = cachedProfile.guilds;
+  } else {
+    try {
+      const [resUser, resGuilds] = await Promise.all([
+        fetch("https://discord.com/api/users/@me", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("https://discord.com/api/users/@me/guilds", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        }),
+      ]);
 
-    if (resUser.status === 401 || resGuilds.status === 401) {
-      requiresReauth = true;
+      if (resUser.status === 401 || resGuilds.status === 401) {
+        requiresReauth = true;
+      }
+
+      if (resUser.ok) user = await resUser.json();
+      if (resGuilds.ok) guilds = await resGuilds.json();
+
+      if (resUser.ok && resGuilds.ok) {
+        _profileCache.set(cacheKey, { user, guilds, expiresAt: now + HOME_CACHE_TTL_MS });
+      } else if (!requiresReauth && cachedProfile) {
+        // Discord likely rate-limited us (429) — fall back to the last known-good
+        // profile/guild list instead of rendering an empty/broken page.
+        user = cachedProfile.user;
+        guilds = cachedProfile.guilds;
+      }
+
+      if ((!resUser.ok || !resGuilds.ok) && !requiresReauth && process.env.NODE_ENV === "development") {
+        console.info("Discord profile/guild fetch non-auth failure", {
+          userStatus: resUser.status,
+          guildStatus: resGuilds.status,
+        });
+      }
+    } catch {
+      if (cachedProfile) {
+        user = cachedProfile.user;
+        guilds = cachedProfile.guilds;
+      }
     }
-
-    if (resUser.ok) user = await resUser.json();
-    if (resGuilds.ok) guilds = await resGuilds.json();
-
-    if ((!resUser.ok || !resGuilds.ok) && !requiresReauth && process.env.NODE_ENV === "development") {
-      console.info("Discord profile/guild fetch non-auth failure", {
-        userStatus: resUser.status,
-        guildStatus: resGuilds.status,
-      });
-    }
-  } catch {
-    // Network/transient issues are handled by fallback UI and login flow.
   }
 
   if (requiresReauth) {
     redirect("/login?error=auth_failed");
   }
 
-  try {
-    const resBotGuilds = await fetch(`${SERVER_API_BASE.replace(/\/api$/, '')}/api/bot/guilds`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
+  const cachedBotGuilds = _botGuildsCache.get(cacheKey);
+  if (cachedBotGuilds && cachedBotGuilds.expiresAt > now) {
+    botGuildIds = new Set(cachedBotGuilds.botGuildIds);
+    botGuildLookupAvailable = true;
+  } else {
+    try {
+      const resBotGuilds = await fetch(`${SERVER_API_BASE.replace(/\/api$/, '')}/api/bot/guilds`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
 
-    if (resBotGuilds.ok) {
-      const botData = await resBotGuilds.json();
-      botGuildIds = new Set(botData.guild_ids || []);
-      botGuildLookupAvailable = true;
+      if (resBotGuilds.ok) {
+        const botData = await resBotGuilds.json();
+        const ids: string[] = botData.guild_ids || [];
+        if (ids.length > 0 || !botData.rate_limited) {
+          botGuildIds = new Set(ids);
+          botGuildLookupAvailable = true;
+          _botGuildsCache.set(cacheKey, { botGuildIds: ids, expiresAt: now + HOME_CACHE_TTL_MS });
+        } else if (cachedBotGuilds) {
+          // Backend reported it's rate-limited with nothing to show — reuse the
+          // last known-good bot membership list rather than flashing everything
+          // to "Bot not added yet".
+          botGuildIds = new Set(cachedBotGuilds.botGuildIds);
+          botGuildLookupAvailable = true;
+        }
+      } else if (cachedBotGuilds) {
+        botGuildIds = new Set(cachedBotGuilds.botGuildIds);
+        botGuildLookupAvailable = true;
+      }
+    } catch {
+      if (cachedBotGuilds) {
+        botGuildIds = new Set(cachedBotGuilds.botGuildIds);
+        botGuildLookupAvailable = true;
+      }
     }
-  } catch {
-    // Bot API may be unavailable in local/dev deployments.
   }
 
   const adminGuilds = guilds.filter((g: any) => {

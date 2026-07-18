@@ -15,6 +15,8 @@ import { PromptModal } from "@/components/ui/prompt-modal";
 // Draft key format: "Category/DraftName" — uncategorized uses "General/DraftName"
 const DEFAULT_CATEGORY = "General";
 
+type AnnouncementButton = { label: string; url: string };
+
 type AnnouncementDraft = {
   title: string;
   description: string;
@@ -24,6 +26,7 @@ type AnnouncementDraft = {
   footer: string;
   channel_id: string;
   ping_role_id: string;
+  buttons: AnnouncementButton[];
   [key: string]: any;
 };
 
@@ -36,6 +39,7 @@ const createEmptyDraft = (): AnnouncementDraft => ({
   footer: "",
   channel_id: "",
   ping_role_id: "",
+  buttons: [],
 });
 
 function normalizeDraft(input: any): AnnouncementDraft {
@@ -65,6 +69,15 @@ function normalizeDraft(input: any): AnnouncementDraft {
     footer: typeof source.footer === "string" ? source.footer : "",
     channel_id: typeof source.channel_id === "string" ? source.channel_id : "",
     ping_role_id: typeof source.ping_role_id === "string" ? source.ping_role_id : "",
+    buttons: Array.isArray(source.buttons)
+      ? source.buttons
+          .filter((b: any) => b && typeof b === "object")
+          .map((b: any) => ({
+            label: typeof b.label === "string" ? b.label : "",
+            url: typeof b.url === "string" ? b.url : "",
+          }))
+          .slice(0, 5)
+      : [],
   };
 }
 
@@ -163,6 +176,20 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
         },
       };
     });
+  };
+
+  const updateButton = (idx: number, field: "label" | "url", value: string) => {
+    const newButtons = [...(currentDraft.buttons || [])];
+    newButtons[idx] = { ...(newButtons[idx] || { label: "", url: "" }), [field]: value };
+    updateDraft("buttons", newButtons);
+  };
+
+  const addButton = () => {
+    updateDraft("buttons", [...(currentDraft.buttons || []), { label: "New Button", url: "https://" }]);
+  };
+
+  const removeButton = (idx: number) => {
+    updateDraft("buttons", (currentDraft.buttons || []).filter((_, i) => i !== idx));
   };
 
   const handlePostNow = async () => {
@@ -406,6 +433,46 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                 <AdvancedEmbedEditor
                   config={currentDraft}
                   onChange={updateDraft}
+                  bottomChildren={
+                    <div className="mt-2 pt-4 border-t border-[#1E1F22]">
+                      <h3 className="mb-1 text-sm font-bold text-discord-text-muted uppercase tracking-wide">Link Buttons (Max 5)</h3>
+                      <p className="mb-4 text-xs text-discord-text-muted opacity-70">Clickable buttons shown below the message, e.g. "Buy Key", "Redeem Key".</p>
+                      <div className="space-y-2">
+                        {(currentDraft.buttons || []).map((btn, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <Input
+                              value={btn.label || ""}
+                              placeholder="Button Label"
+                              onChange={(e) => updateButton(idx, "label", e.target.value)}
+                              className="flex-1"
+                            />
+                            <Input
+                              value={btn.url || ""}
+                              placeholder="https://..."
+                              onChange={(e) => updateButton(idx, "url", e.target.value)}
+                              className="flex-[2]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeButton(idx)}
+                              className="px-3 py-2 bg-[#DA373C] hover:bg-[#A12828] transition-colors rounded text-white text-xs font-medium"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        {(currentDraft.buttons || []).length < 5 && (
+                          <button
+                            type="button"
+                            onClick={addButton}
+                            className="w-full px-3 py-2 bg-[#1b1d22] border border-white/15 rounded text-xs font-semibold text-discord-text-muted hover:bg-[#252831] transition-colors"
+                          >
+                            + Add Button
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  }
                 >
                   <div className="grid grid-cols-2 gap-4 border-b border-[#1E1F22] pb-6 mb-2">
                     <div>

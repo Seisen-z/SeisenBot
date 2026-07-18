@@ -54,6 +54,10 @@ interface DiscordMessage {
     components: Array<{
       type: number;
       custom_id?: string;
+      style?: number;
+      label?: string;
+      url?: string;
+      emoji?: string;
       options?: Array<{
         label: string;
         value: string;
@@ -323,6 +327,23 @@ function NewDiscordMessagePreview({
                           </div>
                         )}
                       </div>
+                    );
+                  }
+                  if (component.type === 2) { // Button
+                    return (
+                      <a
+                        key={compIdx}
+                        href={component.url || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center rounded-[3px] bg-[#4E5058] hover:bg-[#6D6F78] px-4 py-1.5 mr-2 text-[0.875rem] font-medium text-white no-underline transition-colors"
+                      >
+                        {component.emoji ? `${component.emoji} ` : ""}
+                        {component.label || "Button"}
+                        {component.style === 5 && (
+                          <svg className="ml-2 h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M10 5V3H5.375C4.062 3 3 4.062 3 5.375V18.625C3 19.938 4.062 21 5.375 21H18.625C19.938 21 21 19.938 21 18.625V14H19V18.625C19 18.832 18.832 19 18.625 19H5.375C5.168 19 5 18.832 5 18.625V5.375C5 5.168 5.168 5 5.375 5H10ZM21 3V8.875L18.414 6.289L11.75 12.953L9.625 10.828L16.289 4.164L13.703 1.578H21ZM21 3H16.125Z"/></svg>
+                        )}
+                      </a>
                     );
                   }
                   return null;

@@ -17,6 +17,7 @@ export interface EmbedConfig {
   image_url?: string;
   images?: string[];
   footer?: string;
+  buttons?: { label?: string; url?: string }[];
   [key: string]: any; // Allow other properties
 }
 
@@ -414,7 +415,17 @@ export function AdvancedEmbedEditor({
                     image: config.image_url ? { url: config.image_url } : undefined,                      images: Array.isArray(config.images) && config.images.length > 0 ? config.images.map(url => ({ url })) : undefined,                    footer: config.footer ? { text: config.footer } : undefined,
                     fields: config.fields || []
                   }],
-                  components: config.components || []
+                  components: Array.isArray(config.components) && config.components.length > 0
+                    ? config.components
+                    : Array.isArray(config.buttons) && config.buttons.length > 0
+                    ? [{
+                        type: 1,
+                        components: config.buttons
+                          .filter((b: any) => b?.url)
+                          .slice(0, 5)
+                          .map((b: any) => ({ type: 2, style: 5, label: b.label || "Button", url: b.url })),
+                      }]
+                    : []
                 }}
                 botUser={{
                   username: "Seisen Bot",

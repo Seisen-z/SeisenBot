@@ -27,6 +27,7 @@ import {
   Key,
   ClipboardListIcon,
   AtSign,
+  TrendingUpIcon,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -82,6 +83,7 @@ export default function Sidebar({
         { name: "Onboarding", href: `/dashboard/${guildId}/onboarding`, icon: UserCheck },
         { name: "Giveaways", href: `/dashboard/${guildId}/giveaways`, icon: GiftIcon },
         { name: "Activity Rewards", href: `/dashboard/${guildId}/activity-rewards`, icon: GiftIcon },
+        { name: "Leveling", href: `/dashboard/${guildId}/leveling`, icon: TrendingUpIcon },
         { name: "Fun Commands", href: `/dashboard/${guildId}/fun-commands`, icon: SparklesIcon },
         { name: "Member Counter", href: `/dashboard/${guildId}/member-counter`, icon: UsersIcon },
         { name: "Role Counters", href: `/dashboard/${guildId}/role-counters`, icon: UsersIcon },

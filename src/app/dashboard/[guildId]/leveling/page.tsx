@@ -57,19 +57,15 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
   const [config, setConfig] = useState<LevelingConfig>(DEFAULT_CONFIG);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
 
-  const loadAll = async (silent = false) => {
+  const loadConfig = async (silent = false) => {
     try {
-      const [cfg, lb] = await Promise.all([
-        fetchApi(`/guilds/${guildId}/leveling`),
-        fetchApi(`/guilds/${guildId}/leveling/leaderboard?limit=10`),
-      ]);
+      const cfg = await fetchApi(`/guilds/${guildId}/leveling`);
       setConfig({
         ...DEFAULT_CONFIG,
         ...cfg,
         tiers: Array.isArray(cfg?.tiers) ? cfg.tiers : [],
         excluded_channel_ids: Array.isArray(cfg?.excluded_channel_ids) ? cfg.excluded_channel_ids : [],
       });
-      setLeaderboard(Array.isArray(lb?.items) ? lb.items : []);
     } catch (err: any) {
       if (!silent) toast(`Failed to load leveling settings: ${err?.message || "Unknown error"}`, "error");
     } finally {
@@ -77,9 +73,26 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
     }
   };
 
+  const loadLeaderboard = async (silent = true) => {
+    try {
+      const lb = await fetchApi(`/guilds/${guildId}/leveling/leaderboard?limit=10`);
+      setLeaderboard(Array.isArray(lb?.items) ? lb.items : []);
+    } catch (err: any) {
+      if (!silent) toast(`Failed to load leaderboard: ${err?.message || "Unknown error"}`, "error");
+    }
+  };
+
+  // Config is loaded once on mount (and again after a save) — never on the
+  // background interval, so it can't clobber tiers/settings you're mid-editing.
   useEffect(() => {
-    loadAll(true);
-    const timer = window.setInterval(() => loadAll(true), 20000);
+    loadConfig(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guildId]);
+
+  // The leaderboard is safe to refresh in the background since it isn't editable.
+  useEffect(() => {
+    loadLeaderboard(true);
+    const timer = window.setInterval(() => loadLeaderboard(true), 20000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guildId]);
@@ -105,7 +118,7 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
       });
       setConfig(next);
       toast("Leveling settings saved.");
-      await loadAll(true);
+      await loadLeaderboard(true);
     } catch (err: any) {
       toast(`Failed to save settings: ${err?.message || "Unknown error"}`, "error");
     } finally {
@@ -147,7 +160,13 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
         ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => loadAll(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                loadConfig(false);
+                loadLeaderboard(false);
+              }}
+            >
               <RefreshCcwIcon className="mr-2 h-4 w-4" />
               Refresh
             </Button>

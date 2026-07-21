@@ -78,6 +78,97 @@ interface Channel {
   position: number;
 }
 
+interface Role {
+  id: string;
+  name: string;
+  color: number;
+  position: number;
+}
+
+// How often the channel/role lists silently refetch in the background so newly
+// created channels/roles on Discord show up without the user reloading the page.
+const GUILD_RESOURCE_REFRESH_MS = 45000;
+
+/** Shared fetch + background-refresh for a guild's channel list. Every ChannelSelect
+ * / ChannelMultiSelect instance uses this, so "new channel shows up" is handled once,
+ * globally, instead of per-page. */
+function useDiscordChannels(guildId: string) {
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!guildId) return;
+    let cancelled = false;
+
+    const load = (isInitial: boolean) => {
+      if (isInitial) setLoading(true);
+      fetchApi(`/guilds/${guildId}/channels`)
+        .then((data: Channel[]) => {
+          if (cancelled) return;
+          setChannels(data || []);
+          setErrorMsg(null);
+        })
+        .catch((err) => {
+          if (cancelled || !isInitial) return;
+          setErrorMsg(err.message || "Failed to load channels");
+        })
+        .finally(() => {
+          if (cancelled || !isInitial) return;
+          setLoading(false);
+        });
+    };
+
+    load(true);
+    const timer = window.setInterval(() => load(false), GUILD_RESOURCE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [guildId]);
+
+  return { channels, loading, errorMsg };
+}
+
+/** Shared fetch + background-refresh for a guild's role list (see useDiscordChannels). */
+function useDiscordRoles(guildId: string) {
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!guildId) return;
+    let cancelled = false;
+
+    const load = (isInitial: boolean) => {
+      if (isInitial) setLoading(true);
+      fetchApi(`/guilds/${guildId}/roles`)
+        .then((data: Role[]) => {
+          if (cancelled) return;
+          setRoles(data || []);
+          setErrorMsg(null);
+        })
+        .catch((err) => {
+          if (cancelled || !isInitial) return;
+          setErrorMsg(err.message || "Failed to load roles");
+        })
+        .finally(() => {
+          if (cancelled || !isInitial) return;
+          setLoading(false);
+        });
+    };
+
+    load(true);
+    const timer = window.setInterval(() => load(false), GUILD_RESOURCE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [guildId]);
+
+  return { roles, loading, errorMsg };
+}
+
 interface ChannelSelectProps {
   guildId: string;
   value: string;
@@ -100,24 +191,10 @@ export function ChannelSelect({
   className,
   includeCategories = false,
 }: ChannelSelectProps) {
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { channels, loading, errorMsg } = useDiscordChannels(guildId);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { containerRef, portalReady, panelStyle } = useDropdownPortal(isOpen);
-
-  useEffect(() => {
-    if (!guildId) return;
-    setLoading(true);
-    fetchApi(`/guilds/${guildId}/channels`)
-      .then((data: Channel[]) => {
-        setChannels(data || []);
-        setErrorMsg(null);
-      })
-      .catch((err) => setErrorMsg(err.message || "Failed to load channels"))
-      .finally(() => setLoading(false));
-  }, [guildId]);
 
   // If includeCategories is true, allow categories (type 4) too
   const allowedTypes = includeCategories ? [...types, 4] : types;
@@ -230,13 +307,6 @@ export function ChannelSelect({
 }
 
 
-interface Role {
-  id: string;
-  name: string;
-  color: number;
-  position: number;
-}
-
 interface RoleSelectProps {
   guildId: string;
   value: string;
@@ -252,24 +322,10 @@ export function RoleSelect({
   placeholder = "Select a role...",
   className,
 }: RoleSelectProps) {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { roles, loading, errorMsg } = useDiscordRoles(guildId);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { containerRef, portalReady, panelStyle } = useDropdownPortal(isOpen);
-
-  useEffect(() => {
-    if (!guildId) return;
-    setLoading(true);
-    fetchApi(`/guilds/${guildId}/roles`)
-      .then((data: Role[]) => {
-        setRoles(data || []);
-        setErrorMsg(null);
-      })
-      .catch((err) => setErrorMsg(err.message || "Failed to load roles"))
-      .finally(() => setLoading(false));
-  }, [guildId]);
 
   const hexColor = (color: number) =>
     color ? `#${color.toString(16).padStart(6, "0")}` : "#99AAB5";
@@ -375,24 +431,10 @@ interface RoleMultiSelectProps {
 }
 
 export function RoleMultiSelect({ guildId, value, onChange, className }: RoleMultiSelectProps) {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { roles, loading, errorMsg } = useDiscordRoles(guildId);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { containerRef, portalReady, panelStyle } = useDropdownPortal(isOpen);
-
-  useEffect(() => {
-    if (!guildId) return;
-    setLoading(true);
-    fetchApi(`/guilds/${guildId}/roles`)
-      .then((data: Role[]) => {
-        setRoles(data || []);
-        setErrorMsg(null);
-      })
-      .catch((err) => setErrorMsg(err.message || "Failed to load roles"))
-      .finally(() => setLoading(false));
-  }, [guildId]);
 
   const toggle = (id: string) => {
     if (value.includes(id)) {
@@ -518,24 +560,10 @@ export interface ChannelMultiSelectProps {
 export function ChannelMultiSelect({ 
   guildId, value, onChange, className, types = [0, 5], includeCategories = false, placeholder = "Select channels..." 
 }: ChannelMultiSelectProps) {
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { channels, loading, errorMsg } = useDiscordChannels(guildId);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { containerRef, portalReady, panelStyle } = useDropdownPortal(isOpen);
-
-  useEffect(() => {
-    if (!guildId) return;
-    setLoading(true);
-    fetchApi(`/guilds/${guildId}/channels`)
-      .then((data: Channel[]) => {
-        setChannels(data || []);
-        setErrorMsg(null);
-      })
-      .catch((err) => setErrorMsg(err.message || "Failed to load channels"))
-      .finally(() => setLoading(false));
-  }, [guildId]);
 
   const toggle = (id: string) => {
     if (value.includes(id)) {

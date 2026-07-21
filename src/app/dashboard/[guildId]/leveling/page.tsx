@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ChannelSelect, ChannelMultiSelect, RoleSelect } from "@/components/ui/discord-selects";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { TrendingUpIcon, RefreshCcwIcon, PlusIcon, TrashIcon } from "lucide-react";
 
 type LevelingTier = {
@@ -54,6 +55,8 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [config, setConfig] = useState<LevelingConfig>(DEFAULT_CONFIG);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
 
@@ -70,6 +73,7 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
       if (!silent) toast(`Failed to load leveling settings: ${err?.message || "Unknown error"}`, "error");
     } finally {
       setLoading(false);
+      setInitialLoadComplete(true);
     }
   };
 
@@ -97,13 +101,12 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guildId]);
 
-  const saveConfig = async () => {
-    setSaving(true);
-    try {
+  const persistConfig = useCallback(
+    async (value: LevelingConfig) => {
       const next: LevelingConfig = {
-        ...config,
-        cooldown_seconds: Math.max(0, Number(config.cooldown_seconds || 0)),
-        tiers: config.tiers
+        ...value,
+        cooldown_seconds: Math.max(0, Number(value.cooldown_seconds || 0)),
+        tiers: value.tiers
           .filter((t) => t.role_id)
           .map((t) => ({
             ...t,
@@ -116,7 +119,24 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
         method: "PUT",
         body: JSON.stringify(next),
       });
-      setConfig(next);
+      setLastSaved(new Date());
+    },
+    [guildId]
+  );
+
+  useDebouncedAutoSave({
+    value: config,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistConfig,
+    onError: (err: any) => toast(err?.message || "Auto-save failed for Leveling settings", "error"),
+  });
+
+  const saveConfig = async () => {
+    setSaving(true);
+    try {
+      await persistConfig(config);
       toast("Leveling settings saved.");
       await loadLeaderboard(true);
     } catch (err: any) {
@@ -160,6 +180,11 @@ export default function LevelingPage({ params }: { params: Promise<{ guildId: st
         ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
             <Button
               variant="outline"
               onClick={() => {

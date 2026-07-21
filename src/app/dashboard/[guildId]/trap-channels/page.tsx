@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ChannelSelect, ChannelMultiSelect, RoleMultiSelect } from "@/components/ui/discord-selects";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { ShieldBanIcon, RefreshCcwIcon } from "lucide-react";
 
 type TrapChannelConfig = {
@@ -37,6 +38,8 @@ export default function TrapChannelsPage({ params }: { params: Promise<{ guildId
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [config, setConfig] = useState<TrapChannelConfig>(DEFAULT_CONFIG);
 
   const loadConfig = async (silent = false) => {
@@ -52,6 +55,7 @@ export default function TrapChannelsPage({ params }: { params: Promise<{ guildId
       if (!silent) toast(`Failed to load trap channel settings: ${err?.message || "Unknown error"}`, "error");
     } finally {
       setLoading(false);
+      setInitialLoadComplete(true);
     }
   };
 
@@ -60,19 +64,35 @@ export default function TrapChannelsPage({ params }: { params: Promise<{ guildId
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guildId]);
 
-  const saveConfig = async () => {
-    setSaving(true);
-    try {
+  const persistConfig = useCallback(
+    async (value: TrapChannelConfig) => {
       const next: TrapChannelConfig = {
-        ...config,
-        delete_message_hours: Math.max(0, Math.min(168, Number(config.delete_message_hours || 0))),
-        reason: config.reason?.trim() || DEFAULT_CONFIG.reason,
+        ...value,
+        delete_message_hours: Math.max(0, Math.min(168, Number(value.delete_message_hours || 0))),
+        reason: value.reason?.trim() || DEFAULT_CONFIG.reason,
       };
       await fetchApi(`/guilds/${guildId}/trap_channels`, undefined, {
         method: "PUT",
         body: JSON.stringify(next),
       });
-      setConfig(next);
+      setLastSaved(new Date());
+    },
+    [guildId]
+  );
+
+  useDebouncedAutoSave({
+    value: config,
+    enabled: initialLoadComplete,
+    contextKey: guildId,
+    delay: 1400,
+    onSave: persistConfig,
+    onError: (err: any) => toast(err?.message || "Auto-save failed for Trap Channel settings", "error"),
+  });
+
+  const saveConfig = async () => {
+    setSaving(true);
+    try {
+      await persistConfig(config);
       toast("Trap channel settings saved.");
     } catch (err: any) {
       toast(`Failed to save settings: ${err?.message || "Unknown error"}`, "error");
@@ -94,6 +114,11 @@ export default function TrapChannelsPage({ params }: { params: Promise<{ guildId
         ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {lastSaved && !saving && (
+              <span className="text-xs text-green-400">
+                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
+              </span>
+            )}
             <Button variant="outline" onClick={() => loadConfig(false)}>
               <RefreshCcwIcon className="mr-2 h-4 w-4" />
               Refresh

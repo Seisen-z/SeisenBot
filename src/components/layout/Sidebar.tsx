@@ -29,6 +29,7 @@ import {
   AtSign,
   TrendingUpIcon,
   KeyRoundIcon,
+  ShieldBanIcon,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -70,6 +71,7 @@ export default function Sidebar({
       label: "Automation",
       items: [
         { name: "Auto Moderation", href: `/dashboard/${guildId}/automod`, icon: ShieldAlert },
+        { name: "Trap Channels", href: `/dashboard/${guildId}/trap-channels`, icon: ShieldBanIcon },
         { name: "Anti-Spam", href: `/dashboard/${guildId}/anti-spam`, icon: ShieldAlert },
         { name: "Ping Protection", href: `/dashboard/${guildId}/ping-protection`, icon: AtSign },
         { name: "Auto Reply", href: `/dashboard/${guildId}/autoreply`, icon: MessageSquareReply },

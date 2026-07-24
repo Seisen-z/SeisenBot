@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
-import { RoleMultiSelect } from "@/components/ui/discord-selects";
+import { RoleMultiSelect, GUILD_RESOURCE_REFRESH_EVENT } from "@/components/ui/discord-selects";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import {
@@ -217,13 +217,18 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
   }, [guildId, toast]);
 
   useEffect(() => {
-    fetchApi(`/guilds/${guildId}/roles`)
-      .then((data: any[]) => {
-        const map: Record<string, string> = {};
-        (data || []).forEach((r) => { map[String(r.id)] = r.name; });
-        setRoleNames(map);
-      })
-      .catch(() => {});
+    const loadRoleNames = () => {
+      fetchApi(`/guilds/${guildId}/roles`)
+        .then((data: any[]) => {
+          const map: Record<string, string> = {};
+          (data || []).forEach((r) => { map[String(r.id)] = r.name; });
+          setRoleNames(map);
+        })
+        .catch(() => {});
+    };
+    loadRoleNames();
+    window.addEventListener(GUILD_RESOURCE_REFRESH_EVENT, loadRoleNames);
+    return () => window.removeEventListener(GUILD_RESOURCE_REFRESH_EVENT, loadRoleNames);
   }, [guildId]);
 
   // ── Persistence ─────────────────────────────────────────────────────────────

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BellIcon, ChevronDownIcon, LoaderCircleIcon, LogOutIcon, MenuIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
+import { BellIcon, ChevronDownIcon, LoaderCircleIcon, LogOutIcon, MenuIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, RefreshCcwIcon } from "lucide-react";
+import { GUILD_RESOURCE_REFRESH_EVENT } from "@/components/ui/discord-selects";
 
 export default function Header({
   showMenuButton,
@@ -25,6 +26,13 @@ export default function Header({
   const [botLookupUnavailable, setBotLookupUnavailable] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement | null>(null);
+  const [refreshingResources, setRefreshingResources] = useState(false);
+
+  const handleRefreshResources = () => {
+    window.dispatchEvent(new Event(GUILD_RESOURCE_REFRESH_EVENT));
+    setRefreshingResources(true);
+    window.setTimeout(() => setRefreshingResources(false), 900);
+  };
 
   const currentGuildPrefix = useMemo(() => (guildId ? `/dashboard/${guildId}` : null), [guildId]);
   const canUseDropdown = Boolean(guildId);
@@ -253,6 +261,17 @@ export default function Header({
         </div>
 
         <div className="flex items-center gap-2">
+          {canUseDropdown && (
+            <button
+              type="button"
+              onClick={handleRefreshResources}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[rgba(18,18,20,0.86)] text-discord-text-muted transition hover:text-white"
+              title="Refresh channels & roles from Discord"
+              aria-label="Refresh channels & roles"
+            >
+              <RefreshCcwIcon className={`h-4 w-4 ${refreshingResources ? "animate-spin" : ""}`} />
+            </button>
+          )}
           <button
             type="button"
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[rgba(18,18,20,0.86)] text-discord-text-muted transition hover:text-white"

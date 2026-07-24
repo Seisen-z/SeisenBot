@@ -89,6 +89,11 @@ interface Role {
 // created channels/roles on Discord show up without the user reloading the page.
 const GUILD_RESOURCE_REFRESH_MS = 45000;
 
+// Dispatched by the header's manual refresh button — every mounted
+// ChannelSelect/ChannelMultiSelect/RoleMultiSelect refetches immediately
+// instead of waiting out the rest of its background-poll interval.
+export const GUILD_RESOURCE_REFRESH_EVENT = "seisen:refresh-guild-resources";
+
 /** Shared fetch + background-refresh for a guild's channel list. Every ChannelSelect
  * / ChannelMultiSelect instance uses this, so "new channel shows up" is handled once,
  * globally, instead of per-page. */
@@ -121,9 +126,12 @@ function useDiscordChannels(guildId: string) {
 
     load(true);
     const timer = window.setInterval(() => load(false), GUILD_RESOURCE_REFRESH_MS);
+    const onManualRefresh = () => load(false);
+    window.addEventListener(GUILD_RESOURCE_REFRESH_EVENT, onManualRefresh);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.removeEventListener(GUILD_RESOURCE_REFRESH_EVENT, onManualRefresh);
     };
   }, [guildId]);
 
@@ -160,9 +168,12 @@ function useDiscordRoles(guildId: string) {
 
     load(true);
     const timer = window.setInterval(() => load(false), GUILD_RESOURCE_REFRESH_MS);
+    const onManualRefresh = () => load(false);
+    window.addEventListener(GUILD_RESOURCE_REFRESH_EVENT, onManualRefresh);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.removeEventListener(GUILD_RESOURCE_REFRESH_EVENT, onManualRefresh);
     };
   }, [guildId]);
 

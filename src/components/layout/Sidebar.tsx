@@ -30,6 +30,7 @@ import {
   TrendingUpIcon,
   KeyRoundIcon,
   ShieldBanIcon,
+  FileJson2Icon,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -79,6 +80,7 @@ export default function Sidebar({
         { name: "Announcements", href: `/dashboard/${guildId}/announcements`, icon: Megaphone },
         { name: "Select Menu Roles", href: `/dashboard/${guildId}/reaction-roles`, icon: UserPlus },
         { name: "Channel Access", href: `/dashboard/${guildId}/channel-access`, icon: KeyRoundIcon },
+        { name: "Macro Import", href: `/dashboard/${guildId}/macro-import`, icon: FileJson2Icon },
       ],
     },
     {

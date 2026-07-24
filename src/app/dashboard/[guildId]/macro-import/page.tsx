@@ -5,20 +5,20 @@ import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
-import { ChannelSelect, ChannelMultiSelect } from "@/components/ui/discord-selects";
+import { ChannelMultiSelect } from "@/components/ui/discord-selects";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import { FileJson2Icon, RefreshCcwIcon } from "lucide-react";
 
 type MacroImportConfig = {
   enabled: boolean;
   channel_ids: string[];
-  storage_channel_id: string | null;
+  private_channel_ids: string[];
 };
 
 const DEFAULT_CONFIG: MacroImportConfig = {
   enabled: true,
   channel_ids: [],
-  storage_channel_id: null,
+  private_channel_ids: [],
 };
 
 export default function MacroImportPage({ params }: { params: Promise<{ guildId: string }> }) {
@@ -37,6 +37,7 @@ export default function MacroImportPage({ params }: { params: Promise<{ guildId:
         ...DEFAULT_CONFIG,
         ...cfg,
         channel_ids: Array.isArray(cfg?.channel_ids) ? cfg.channel_ids : [],
+        private_channel_ids: Array.isArray(cfg?.private_channel_ids) ? cfg.private_channel_ids : [],
       });
     } catch (err: any) {
       if (!silent) toast(`Failed to load macro import settings: ${err?.message || "Unknown error"}`, "error");
@@ -88,9 +89,10 @@ export default function MacroImportPage({ params }: { params: Promise<{ guildId:
       <DashboardPageHero
         icon={FileJson2Icon}
         title="Macro Import"
-        subtitle="When a member uploads a recognized macro .json file in one of these channels or forums, the bot replies with a Macro's File Import URL embed — the required units, the download link, and a button to re-host the file for a longer-lived link."
+        subtitle="When a member uploads a recognized macro .json file in one of these channels or forums, the bot replies with a Macro's File Import URL embed listing the required units and the download link."
         stats={[
-          { label: "Watched Channels", value: config.channel_ids.length },
+          { label: "Public Channels", value: config.channel_ids.length },
+          { label: "Private Channels", value: config.private_channel_ids.length },
           { label: "Status", value: config.enabled ? "Enabled" : "Disabled" },
         ]}
         actions={
@@ -124,37 +126,54 @@ export default function MacroImportPage({ params }: { params: Promise<{ guildId:
           </select>
         </label>
 
-        <label className="space-y-2 md:col-span-1 xl:col-span-2">
+        <label className="space-y-2 md:col-span-2 xl:col-span-3">
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">
-            Storage Channel <span className="normal-case text-[10px] text-discord-text-muted">(re-hosts the file when someone clicks &quot;Make Permanent&quot;)</span>
+            Watched Channels &amp; Forums (Public)
+            <span className="ml-1 normal-case text-[10px] text-discord-text-muted">
+              — everyone in the channel sees the full reply, including the Import URL
+            </span>
           </span>
-          <ChannelSelect
+          <ChannelMultiSelect
             guildId={guildId}
-            value={config.storage_channel_id || ""}
-            onChange={(val) => setConfig((prev) => ({ ...prev, storage_channel_id: val || null }))}
-            types={[0, 5]}
-            placeholder="No storage channel set..."
+            value={config.channel_ids}
+            onChange={(ids) =>
+              setConfig((prev) => ({
+                ...prev,
+                channel_ids: ids,
+                private_channel_ids: prev.private_channel_ids.filter((id) => !ids.includes(id)),
+              }))
+            }
+            types={[0, 5, 15]}
+            placeholder="Select channels or forums to watch for macro uploads..."
           />
         </label>
 
         <label className="space-y-2 md:col-span-2 xl:col-span-3">
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">
-            Watched Channels &amp; Forums
+            Watched Channels &amp; Forums (Private)
+            <span className="ml-1 normal-case text-[10px] text-discord-text-muted">
+              — everyone sees a teaser only; the uploader reveals their own Import URL via a button
+            </span>
           </span>
           <ChannelMultiSelect
             guildId={guildId}
-            value={config.channel_ids}
-            onChange={(ids) => setConfig((prev) => ({ ...prev, channel_ids: ids }))}
+            value={config.private_channel_ids}
+            onChange={(ids) =>
+              setConfig((prev) => ({
+                ...prev,
+                private_channel_ids: ids,
+                channel_ids: prev.channel_ids.filter((id) => !ids.includes(id)),
+              }))
+            }
             types={[0, 5, 15]}
-            placeholder="Select channels or forums to watch for macro uploads..."
+            placeholder="Select channels or forums where import links stay private..."
           />
         </label>
       </div>
 
       <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 text-xs text-discord-text-muted">
         Only files matching a known macro schema trigger a response — unrelated .json uploads in the same
-        channels are left alone. Set a Storage Channel so the &quot;Upload Macro (Make the Import-URL Permanent)&quot;
-        button has somewhere to re-post the file for a fresh link.
+        channels are left alone. A channel can be public or private, not both.
       </div>
     </div>
   );

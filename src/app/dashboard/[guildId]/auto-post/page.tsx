@@ -726,31 +726,19 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
                     </p>
                   </div>
                 ) : (
-                  <>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold text-slate-300">
-                        Plain Message Header / Role Pings (Optional)
-                      </label>
-                      <Input
-                        placeholder="Text to display above the embed card (e.g. @everyone or extra mentions)..."
-                        value={activePost.content || ""}
-                        onChange={(e) => updateActivePostField("content", e.target.value)}
-                      />
-                    </div>
-
-                    <AdvancedEmbedEditor
-                      config={{
-                        title: activePost.title,
-                        description: activePost.description,
-                        thumbnail_url: activePost.thumbnail_url,
-                        image_url: activePost.image_url,
-                        images: activePost.images,
-                        footer: activePost.footer,
-                        buttons: activePost.buttons,
-                      }}
-                      onChange={(key, val) => updateActivePostField(key, val)}
-                    />
-                  </>
+                  <AdvancedEmbedEditor
+                    config={{
+                      content: activePost.content,
+                      title: activePost.title,
+                      description: activePost.description,
+                      thumbnail_url: activePost.thumbnail_url,
+                      image_url: activePost.image_url,
+                      images: activePost.images,
+                      footer: activePost.footer,
+                      buttons: activePost.buttons,
+                    }}
+                    onChange={(key, val) => updateActivePostField(key, val)}
+                  />
                 )}
               </div>
             </>

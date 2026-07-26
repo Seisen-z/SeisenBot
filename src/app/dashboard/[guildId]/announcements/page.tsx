@@ -16,6 +16,8 @@ import {
   Trash2Icon,
   FolderIcon,
   EditIcon,
+  ClockIcon,
+  CheckCircle2Icon,
   SmileIcon,
 } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
@@ -36,6 +38,19 @@ type AnnouncementDraft = {
   buttons: AnnouncementButton[];
   auto_reactions: string[];
   [key: string]: any;
+};
+
+type AnnouncementHistoryEntry = {
+  id: string;
+  draft_name: string;
+  title: string;
+  channel_id: string;
+  channel_name: string;
+  message_id: string;
+  ping_role_id?: string | null;
+  posted_at: string;
+  auto_reactions: string[];
+  status: string;
 };
 
 const createEmptyDraft = (): AnnouncementDraft => ({
@@ -125,6 +140,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const [drafts, setDrafts] = useState<Record<string, AnnouncementDraft>>({});
   const [activeDraftKey, setActiveDraftKey] = useState<string>("");
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -222,7 +238,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
           payload: announcementPayload,
         }),
       });
-      toast("Announcement Published Successfully!");
+      toast("Announcement Posted Successfully!");
     } catch (err: any) {
       toast(`Error posting: ${err.message}`, "error");
     } finally {
@@ -342,7 +358,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     <div className="space-y-6 pb-12">
       <DashboardPageHero
         title="Announcement Studio"
-        subtitle="Design rich announcement embeds, configure auto-reaction emojis, and publish announcements instantly."
+        subtitle="Design rich announcement embeds, set auto-reaction emojis, publish instantly, and view execution history logs."
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">

@@ -16,8 +16,6 @@ import {
   Trash2Icon,
   FolderIcon,
   EditIcon,
-  ClockIcon,
-  CheckCircle2Icon,
   SmileIcon,
 } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
@@ -38,19 +36,6 @@ type AnnouncementDraft = {
   buttons: AnnouncementButton[];
   auto_reactions: string[];
   [key: string]: any;
-};
-
-type AnnouncementHistoryEntry = {
-  id: string;
-  draft_name: string;
-  title: string;
-  channel_id: string;
-  channel_name: string;
-  message_id: string;
-  ping_role_id?: string | null;
-  posted_at: string;
-  auto_reactions: string[];
-  status: string;
 };
 
 const createEmptyDraft = (): AnnouncementDraft => ({
@@ -140,11 +125,8 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const [drafts, setDrafts] = useState<Record<string, AnnouncementDraft>>({});
   const [activeDraftKey, setActiveDraftKey] = useState<string>("");
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
-  const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-
-  const [history, setHistory] = useState<AnnouncementHistoryEntry[]>([]);
 
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptConfig, setPromptConfig] = useState<{
@@ -159,15 +141,6 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     action: "category",
   });
 
-  const loadHistory = useCallback(async () => {
-    try {
-      const res = await fetchApi(`/guilds/${guildId}/announcements/history`);
-      if (Array.isArray(res)) {
-        setHistory(res);
-      }
-    } catch {}
-  }, [guildId]);
-
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/announcements`)
       .then((data) => {
@@ -178,9 +151,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
       })
       .catch(() => toast("Failed to load announcements", "error"))
       .finally(() => setInitialLoadComplete(true));
-
-    loadHistory();
-  }, [guildId, toast, loadHistory]);
+  }, [guildId, toast]);
 
   const persistDrafts = useCallback(
     async (nextDrafts: Record<string, AnnouncementDraft>) => {
@@ -251,24 +222,11 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
           payload: announcementPayload,
         }),
       });
-      toast("Announcement Posted Successfully!");
-      setTimeout(() => loadHistory(), 800);
+      toast("Announcement Published Successfully!");
     } catch (err: any) {
       toast(`Error posting: ${err.message}`, "error");
     } finally {
       setPosting(false);
-    }
-  };
-
-  const clearHistory = async () => {
-    try {
-      await fetchApi(`/guilds/${guildId}/announcements/history`, undefined, {
-        method: "DELETE",
-      });
-      setHistory([]);
-      toast("Announcement history cleared", "success");
-    } catch (err) {
-      toast("Failed to clear history", "error");
     }
   };
 
@@ -384,7 +342,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     <div className="space-y-6 pb-12">
       <DashboardPageHero
         title="Announcement Studio"
-        subtitle="Design rich announcement embeds, set auto-reaction emojis, publish instantly, and view execution history logs."
+        subtitle="Design rich announcement embeds, configure auto-reaction emojis, and publish announcements instantly."
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -604,75 +562,6 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                 <Button variant="outline" size="sm" onClick={addCategory}>
                   <PlusIcon className="w-4 h-4 mr-1" /> New Category
                 </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Execution History Log Section */}
-          <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6 shadow-md space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E1F22] pb-4">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <ClockIcon className="w-4 h-4 text-discord-blurple" /> Announcement Execution History
-                </h3>
-                <p className="text-xs text-discord-text-muted mt-0.5">
-                  Audit log of all announcements published from this dashboard.
-                </p>
-              </div>
-              {history.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs text-red-400 hover:bg-red-500/10"
-                  onClick={clearHistory}
-                >
-                  Clear History
-                </Button>
-              )}
-            </div>
-
-            {history.length === 0 ? (
-              <p className="text-xs text-discord-text-muted italic text-center py-6">
-                No announcement publication history recorded yet.
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                {history.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#1E1F22]/60 border border-white/5 p-3 text-xs"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">{entry.draft_name}</span>
-                        <span className="rounded bg-discord-blurple/20 px-2 py-0.5 text-[10px] text-discord-blurple font-semibold">
-                          #{entry.channel_name}
-                        </span>
-                        <span className="flex items-center gap-1 text-[10px] text-emerald-400">
-                          <CheckCircle2Icon className="w-3 h-3" /> Published
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-discord-text-muted">
-                        Message ID: <span className="font-mono text-slate-300">{entry.message_id}</span>
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-right">
-                      {entry.auto_reactions && entry.auto_reactions.length > 0 && (
-                        <div className="flex items-center gap-1 bg-black/30 rounded px-2 py-1">
-                          {entry.auto_reactions.map((r, i) => (
-                            <span key={i} className="text-sm">{r}</span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="text-right">
-                        <p className="text-[11px] font-medium text-slate-300">
-                          {new Date(entry.posted_at).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
           </div>

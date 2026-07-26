@@ -9,10 +9,19 @@ import { Input } from "@/components/ui/input";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
-import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon, FolderIcon, EditIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  Trash2Icon,
+  FolderIcon,
+  EditIcon,
+  ClockIcon,
+  CheckCircle2Icon,
+  SmileIcon,
+} from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
-// Draft key format: "Category/DraftName" — uncategorized uses "General/DraftName"
 const DEFAULT_CATEGORY = "General";
 
 type AnnouncementButton = { label: string; url: string };
@@ -27,7 +36,21 @@ type AnnouncementDraft = {
   channel_id: string;
   ping_role_id: string;
   buttons: AnnouncementButton[];
+  auto_reactions: string[];
   [key: string]: any;
+};
+
+type AnnouncementHistoryEntry = {
+  id: string;
+  draft_name: string;
+  title: string;
+  channel_id: string;
+  channel_name: string;
+  message_id: string;
+  ping_role_id?: string | null;
+  posted_at: string;
+  auto_reactions: string[];
+  status: string;
 };
 
 const createEmptyDraft = (): AnnouncementDraft => ({
@@ -40,6 +63,7 @@ const createEmptyDraft = (): AnnouncementDraft => ({
   channel_id: "",
   ping_role_id: "",
   buttons: [],
+  auto_reactions: [],
 });
 
 function normalizeDraft(input: any): AnnouncementDraft {
@@ -57,6 +81,13 @@ function normalizeDraft(input: any): AnnouncementDraft {
     nestedContent && typeof nestedContent === "object" && !Array.isArray(nestedContent)
       ? nestedContent
       : {};
+
+  let auto_reactions: string[] = [];
+  if (Array.isArray(source.auto_reactions)) {
+    auto_reactions = source.auto_reactions.filter((r: any) => typeof r === "string" && r.trim());
+  } else if (typeof source.auto_reactions === "string" && source.auto_reactions.trim()) {
+    auto_reactions = source.auto_reactions.split(",").map((r: string) => r.trim()).filter(Boolean);
+  }
 
   return {
     ...createEmptyDraft(),
@@ -78,21 +109,19 @@ function normalizeDraft(input: any): AnnouncementDraft {
           }))
           .slice(0, 5)
       : [],
+    auto_reactions,
   };
 }
 
 function normalizeDraftMap(rawDrafts: Record<string, any>): Record<string, AnnouncementDraft> {
   const normalized: Record<string, AnnouncementDraft> = {};
-
   for (const [key, value] of Object.entries(rawDrafts || {})) {
     normalized[key] = normalizeDraft(value);
   }
-
   return normalized;
 }
 
 function parseDrafts(drafts: Record<string, any>) {
-  // Returns { [category]: [draftKey, ...] }
   const map: Record<string, string[]> = {};
   for (const key of Object.keys(drafts)) {
     const parts = key.split("/");
@@ -112,14 +141,32 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const [activeDraftKey, setActiveDraftKey] = useState<string>("");
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [posting, setPosting] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
+  const [history, setHistory] = useState<AnnouncementHistoryEntry[]>([]);
+
   const [promptOpen, setPromptOpen] = useState(false);
-  const [promptConfig, setPromptConfig] = useState<{title: string; label: string; action: 'category' | 'draft' | 'rename'; cat?: string; draftKey?: string}>({
-    title: "", label: "", action: "category"
+  const [promptConfig, setPromptConfig] = useState<{
+    title: string;
+    label: string;
+    action: "category" | "draft" | "rename";
+    cat?: string;
+    draftKey?: string;
+  }>({
+    title: "",
+    label: "",
+    action: "category",
   });
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await fetchApi(`/guilds/${guildId}/announcements/history`);
+      if (Array.isArray(res)) {
+        setHistory(res);
+      }
+    } catch {}
+  }, [guildId]);
 
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/announcements`)
@@ -131,37 +178,28 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
       })
       .catch(() => toast("Failed to load announcements", "error"))
       .finally(() => setInitialLoadComplete(true));
-  }, [guildId, toast]);
 
-  const persistDrafts = useCallback(async (nextDrafts: Record<string, AnnouncementDraft>) => {
-    const payload = normalizeDraftMap(nextDrafts);
-    await fetchApi(`/guilds/${guildId}/announcements`, undefined, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
-    setLastSaved(new Date());
-  }, [guildId]);
+    loadHistory();
+  }, [guildId, toast, loadHistory]);
+
+  const persistDrafts = useCallback(
+    async (nextDrafts: Record<string, AnnouncementDraft>) => {
+      const payload = normalizeDraftMap(nextDrafts);
+      await fetchApi(`/guilds/${guildId}/announcements`, undefined, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    [guildId]
+  );
 
   useDebouncedAutoSave({
     value: drafts,
     enabled: initialLoadComplete,
-    contextKey: guildId,
-    delay: 1400,
+    delay: 1500,
     onSave: persistDrafts,
     onError: (err: any) => toast(err?.message || "Auto-save failed for announcements", "error"),
   });
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await persistDrafts(drafts);
-      toast("Drafts Saved Successfully!");
-    } catch (e: any) {
-        toast(e?.message || "Failed to save.", "error");
-      } finally {
-      setSaving(false);
-    }
-  };
 
   const currentDraft = drafts[activeDraftKey] || createEmptyDraft();
 
@@ -201,17 +239,20 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     try {
       const announcementPayload = {
         ...currentDraft,
+        name: activeDraftKey,
         ping_role_id: currentDraft.ping_role_id || null,
+        auto_reactions: currentDraft.auto_reactions || [],
       };
 
-      await fetchApi('/trigger/announcement', undefined, {
+      await fetchApi("/trigger/announcement", undefined, {
         method: "POST",
         body: JSON.stringify({
           guild_id: guildId,
           payload: announcementPayload,
-        })
+        }),
       });
       toast("Announcement Posted Successfully!");
+      setTimeout(() => loadHistory(), 800);
     } catch (err: any) {
       toast(`Error posting: ${err.message}`, "error");
     } finally {
@@ -219,262 +260,297 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     }
   };
 
+  const clearHistory = async () => {
+    try {
+      await fetchApi(`/guilds/${guildId}/announcements/history`, undefined, {
+        method: "DELETE",
+      });
+      setHistory([]);
+      toast("Announcement history cleared", "success");
+    } catch (err) {
+      toast("Failed to clear history", "error");
+    }
+  };
+
   const addCategory = () => {
-    setPromptConfig({ title: "New Category", label: "Category Name", action: "category" });
+    setPromptConfig({
+      title: "New Category",
+      label: "Category Name",
+      action: "category",
+    });
     setPromptOpen(true);
   };
 
-  const addDraftToCategory = (cat: string) => {
-    setPromptConfig({ title: "New Draft", label: "Draft Name", action: "draft", cat });
+  const addDraft = (cat: string) => {
+    setPromptConfig({
+      title: `New Draft in ${cat}`,
+      label: "Draft Name",
+      action: "draft",
+      cat,
+    });
     setPromptOpen(true);
   };
 
-  const renameDraft = (key: string) => {
-    const currentName = draftLabel(key);
-    setPromptConfig({ title: "Rename Draft", label: "Draft Name", action: "rename", draftKey: key });
+  const renameDraft = (draftKey: string) => {
+    setPromptConfig({
+      title: "Rename Draft",
+      label: "New Name",
+      action: "rename",
+      draftKey,
+    });
     setPromptOpen(true);
   };
 
-  const handlePromptConfirm = (value: string) => {
+  const deleteDraft = async (draftKey: string) => {
+    if (!draftKey) return;
+    const isConfirmed = window.confirm(`Are you sure you want to delete "${draftLabel(draftKey)}"?`);
+    if (!isConfirmed) return;
+
+    try {
+      await fetchApi(`/guilds/${guildId}/announcements/${encodeURIComponent(draftKey)}`, undefined, {
+        method: "DELETE",
+      });
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[draftKey];
+        const keys = Object.keys(next);
+        if (activeDraftKey === draftKey) {
+          setActiveDraftKey(keys.length > 0 ? keys[0] : "");
+        }
+        return next;
+      });
+      toast("Draft Deleted");
+    } catch {
+      toast("Failed to delete draft", "error");
+    }
+  };
+
+  const handlePromptConfirm = async (val: string) => {
+    const trimmed = val.trim();
+    if (!trimmed) return;
+
     if (promptConfig.action === "category") {
-      const key = `${value}/${value} Draft 1`;
-      if (!drafts[key]) {
-        setDrafts(prev => ({ ...prev, [key]: createEmptyDraft() }));
-        setActiveDraftKey(key);
-      }
+      const draftKey = `${trimmed}/Welcome`;
+      const next = { ...drafts, [draftKey]: createEmptyDraft() };
+      setDrafts(next);
+      setActiveDraftKey(draftKey);
+      await persistDrafts(next);
     } else if (promptConfig.action === "draft" && promptConfig.cat) {
-      const cat = promptConfig.cat;
-      const key = `${cat}/${value}`;
-      if (drafts[key]) {
-        toast("A draft with that name already exists.", "error");
-      } else {
-        setDrafts(prev => ({ ...prev, [key]: createEmptyDraft() }));
-        setActiveDraftKey(key);
-      }
+      const draftKey = `${promptConfig.cat}/${trimmed}`;
+      const next = { ...drafts, [draftKey]: createEmptyDraft() };
+      setDrafts(next);
+      setActiveDraftKey(draftKey);
+      await persistDrafts(next);
     } else if (promptConfig.action === "rename" && promptConfig.draftKey) {
       const oldKey = promptConfig.draftKey;
-      const category = oldKey.split("/")[0];
-      const newKey = `${category}/${value}`;
-      
-      if (newKey === oldKey) {
-        // No change needed
-      } else if (drafts[newKey]) {
-        toast("A draft with that name already exists.", "error");
+      const parts = oldKey.split("/");
+      const cat = parts.length > 1 ? parts[0] : DEFAULT_CATEGORY;
+      const newKey = `${cat}/${trimmed}`;
+
+      if (oldKey === newKey) {
+        setPromptOpen(false);
         return;
-      } else {
-        // Rename the draft
-        const oldKeySafe = encodeURIComponent(oldKey);
-        fetchApi(`/guilds/${guildId}/announcements/${oldKeySafe}/rename`, undefined, {
+      }
+
+      try {
+        await fetchApi(`/guilds/${guildId}/announcements/${encodeURIComponent(oldKey)}/rename`, undefined, {
           method: "POST",
           body: JSON.stringify({ new_name: newKey }),
-        }).catch(e => console.error("Rename failed", e));
-        
-        const updated = { ...drafts };
-        updated[newKey] = updated[oldKey];
-        delete updated[oldKey];
-        setDrafts(updated);
-        setActiveDraftKey(newKey);
-        toast("Draft renamed successfully!");
+        });
+        setDrafts((prev) => {
+          const next = { ...prev };
+          const existingData = next[oldKey] || createEmptyDraft();
+          delete next[oldKey];
+          next[newKey] = existingData;
+          if (activeDraftKey === oldKey) setActiveDraftKey(newKey);
+          return next;
+        });
+        toast(`Renamed to ${trimmed}`);
+      } catch {
+        toast("Failed to rename draft", "error");
       }
     }
     setPromptOpen(false);
   };
 
-  const deleteDraft = (key: string) => {
-    const keySafe = encodeURIComponent(key);
-    fetchApi(`/guilds/${guildId}/announcements/${keySafe}`, undefined, {
-      method: "DELETE",
-    }).catch(e => console.error("Delete failed", e));
-    
-    const updated = { ...drafts };
-    delete updated[key];
-    setDrafts(updated);
-    setActiveDraftKey(Object.keys(updated)[0] || "");
-  };
-
-  const toggleCategory = (cat: string) => {
-    setCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
-  };
-
-  const categorized = parseDrafts(drafts);
-
-  // Draft display name (strip category prefix)
   const draftLabel = (key: string) => {
     const parts = key.split("/");
     return parts.length > 1 ? parts.slice(1).join("/") : key;
   };
 
-  const categoryCount = Object.keys(categorized).length;
-  const draftCount = Object.keys(drafts).length;
-  const activeCategory = activeDraftKey ? activeDraftKey.split("/")[0] : "None";
+  const categories = parseDrafts(drafts);
 
   return (
-    <div className="glass-card flex flex-col gap-6 rounded-3xl p-4 sm:p-6">
+    <div className="space-y-6 pb-12">
       <DashboardPageHero
-        icon={FolderIcon}
-        title="Announcements Manager"
-        subtitle="Organize announcement drafts by category, edit rich embeds, and post instantly when ready."
-        stats={[
-          { label: "Categories", value: categoryCount },
-          { label: "Total Drafts", value: draftCount },
-          { label: "Active Category", value: activeCategory },
-          { label: "Ready To Post", value: currentDraft.channel_id ? "Yes" : "No" },
-        ]}
-        actions={
-          <div className="flex items-center gap-3">
-            {lastSaved && !saving && (
-              <span className="text-xs text-green-400">
-                Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
-              </span>
-            )}
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save Drafts"}
-            </Button>
-          </div>
-        }
+        title="Announcement Studio"
+        subtitle="Design rich announcement embeds, set auto-reaction emojis, publish instantly, and view execution history logs."
       />
 
-      <div className="flex gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Sidebar */}
-        <div className="w-60 shrink-0 flex flex-col gap-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-3 h-fit">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs font-bold text-discord-text-muted uppercase tracking-wider">Drafts</span>
-            <button
-              title="New Category"
-              onClick={addCategory}
-              className="flex items-center gap-1 text-xs text-discord-text-muted hover:text-white bg-[#1E1F22] hover:bg-discord-blurple rounded-md px-2 py-1 transition"
-            >
-              <PlusIcon className="w-3 h-3" /> Category
-            </button>
-          </div>
-
-          {Object.keys(categorized).length === 0 && (
-            <p className="text-xs text-discord-text-muted px-2 py-3 text-center opacity-60">No drafts yet. Add a category!</p>
-          )}
-
-          {Object.entries(categorized).map(([cat, keys]) => (
-            <div key={cat} className="mb-1">
-              {/* Category header */}
-              <div className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-[#383A40] group">
-                <button
-                  className="flex items-center gap-1.5 flex-1 text-left"
-                  onClick={() => toggleCategory(cat)}
-                >
-                  {collapsedCats[cat]
-                    ? <ChevronRightIcon className="w-3.5 h-3.5 text-discord-text-muted shrink-0" />
-                    : <ChevronDownIcon className="w-3.5 h-3.5 text-discord-text-muted shrink-0" />}
-                  <FolderIcon className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                  <span className="text-sm font-semibold text-discord-text truncate">{cat}</span>
-                </button>
-                <button
-                  title={`Add draft to ${cat}`}
-                  onClick={() => addDraftToCategory(cat)}
-                  className="opacity-0 group-hover:opacity-100 text-discord-text-muted hover:text-white bg-[#313338] hover:bg-discord-blurple rounded p-0.5 transition"
-                >
-                  <PlusIcon className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Drafts in this category */}
-              {!collapsedCats[cat] && (
-                <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-[#1E1F22] pl-2">
-                  {keys.map(key => (
-                    <div key={key} className="flex items-center group/item">
-                      <button
-                        onClick={() => setActiveDraftKey(key)}
-                        className={`flex-1 text-left text-sm px-2 py-1.5 rounded-md transition-colors truncate ${
-                          activeDraftKey === key
-                            ? 'bg-discord-blurple text-white font-medium'
-                            : 'text-discord-text hover:bg-[#383A40]'
-                        }`}
-                      >
-                        {draftLabel(key)}
-                      </button>
-                      <button
-                        onClick={() => renameDraft(key)}
-                        className="opacity-0 group-hover/item:opacity-100 ml-1 text-yellow-400 hover:text-yellow-300 shrink-0 p-0.5 rounded"
-                        title="Rename draft"
-                      >
-                        <EditIcon className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => deleteDraft(key)}
-                        className="opacity-0 group-hover/item:opacity-100 ml-1 text-red-400 hover:text-red-300 shrink-0 p-0.5 rounded"
-                        title="Delete draft"
-                      >
-                        <Trash2Icon className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                  {keys.length === 0 && (
-                    <span className="text-xs text-discord-text-muted px-2 py-1 opacity-50">Empty</span>
-                  )}
-                </div>
-              )}
+        <div className="lg:col-span-4 xl:col-span-3 space-y-4">
+          <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-4 shadow-md">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-bold text-discord-text-muted uppercase tracking-wider">Categories</span>
+              <Button size="sm" variant="ghost" onClick={addCategory} className="h-7 text-xs text-discord-blurple">
+                <PlusIcon className="w-3.5 h-3.5 mr-1" /> Category
+              </Button>
             </div>
-          ))}
+
+            <div className="space-y-2">
+              {Object.keys(categories).length === 0 && (
+                <p className="text-xs text-discord-text-muted italic text-center py-4">No categories created yet.</p>
+              )}
+
+              {Object.entries(categories).map(([cat, keys]) => {
+                const isCollapsed = collapsedCats[cat];
+                return (
+                  <div key={cat} className="rounded-lg bg-[#1E1F22]/50 border border-white/5">
+                    <div className="flex items-center justify-between p-2">
+                      <button
+                        onClick={() => setCollapsedCats((prev) => ({ ...prev, [cat]: !prev[cat] }))}
+                        className="flex items-center gap-1.5 text-xs font-bold text-white hover:text-discord-blurple transition-colors"
+                      >
+                        {isCollapsed ? <ChevronRightIcon className="w-3.5 h-3.5" /> : <ChevronDownIcon className="w-3.5 h-3.5" />}
+                        <FolderIcon className="w-3.5 h-3.5 text-discord-blurple" />
+                        <span>{cat}</span>
+                        <span className="text-[10px] text-discord-text-muted font-normal">({keys.length})</span>
+                      </button>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-discord-text-muted hover:text-white"
+                        onClick={() => addDraft(cat)}
+                        title="Add draft"
+                      >
+                        <PlusIcon className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+
+                    {!isCollapsed && (
+                      <div className="pl-4 pr-2 pb-2 space-y-1">
+                        {keys.map((key) => {
+                          const isActive = activeDraftKey === key;
+                          return (
+                            <div
+                              key={key}
+                              className={`group flex items-center justify-between rounded px-2.5 py-1.5 text-xs transition-colors cursor-pointer ${
+                                isActive
+                                  ? "bg-discord-blurple text-white font-semibold"
+                                  : "text-discord-text-muted hover:bg-white/5 hover:text-white"
+                              }`}
+                              onClick={() => setActiveDraftKey(key)}
+                            >
+                              <span className="truncate">{draftLabel(key)}</span>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  className="p-1 hover:text-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    renameDraft(key);
+                                  }}
+                                  title="Rename"
+                                >
+                                  <EditIcon className="w-3 h-3" />
+                                </button>
+                                <button
+                                  className="p-1 hover:text-red-400"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteDraft(key);
+                                  }}
+                                  title="Delete"
+                                >
+                                  <Trash2Icon className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Editor Panel */}
-        <div className="flex-1">
-          <div className="flex-1 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6 relative h-full">
-            {activeDraftKey ? (
-              <div className="flex flex-col gap-4 h-full">
-                <div className="flex justify-between items-center mb-2">
+        {/* Main Workspace */}
+        <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+          <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6 shadow-md">
+            {activeDraftKey && currentDraft ? (
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1E1F22] pb-4">
                   <div>
-                    <p className="text-xs text-discord-text-muted">{activeDraftKey.split("/")[0]}</p>
-                    <h2 className="text-xl font-bold text-white">{draftLabel(activeDraftKey)}</h2>
+                    <h2 className="text-lg font-bold text-white">{draftLabel(activeDraftKey)}</h2>
+                    <p className="text-xs text-discord-text-muted">Category: {activeDraftKey.split("/")[0]}</p>
                   </div>
-                  <Button variant="discord" onClick={handlePostNow} disabled={posting} size="sm">
-                    {posting ? "Posting..." : "🚀 Post Now"}
+                  <Button
+                    onClick={handlePostNow}
+                    disabled={posting || !currentDraft.channel_id}
+                    className="bg-discord-blurple hover:bg-discord-blurple/80 text-white font-semibold"
+                  >
+                    {posting ? "Publishing..." : "Publish Announcement"}
                   </Button>
                 </div>
 
                 <AdvancedEmbedEditor
-                  config={currentDraft}
-                  onChange={updateDraft}
+                  config={{
+                    content: currentDraft.content,
+                    title: currentDraft.title,
+                    description: currentDraft.description,
+                    thumbnail_url: currentDraft.thumbnail_url,
+                    image_url: currentDraft.image_url,
+                    images: currentDraft.images,
+                    footer: currentDraft.footer,
+                  }}
+                  onChange={(k, v) => updateDraft(k, v)}
                   bottomChildren={
-                    <div className="mt-2 pt-4 border-t border-[#1E1F22]">
-                      <h3 className="mb-1 text-sm font-bold text-discord-text-muted uppercase tracking-wide">Link Buttons (Max 5)</h3>
-                      <p className="mb-4 text-xs text-discord-text-muted opacity-70">Clickable buttons shown below the message, e.g. "Buy Key", "Redeem Key".</p>
-                      <div className="space-y-2">
-                        {(currentDraft.buttons || []).map((btn, idx) => (
-                          <div key={idx} className="flex gap-2">
-                            <Input
-                              value={btn.label || ""}
-                              placeholder="Button Label"
-                              onChange={(e) => updateButton(idx, "label", e.target.value)}
-                              className="flex-1"
-                            />
-                            <Input
-                              value={btn.url || ""}
-                              placeholder="https://..."
-                              onChange={(e) => updateButton(idx, "url", e.target.value)}
-                              className="flex-[2]"
-                            />
+                    <div className="space-y-4 pt-4 border-t border-[#1E1F22]">
+                      <div>
+                        <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Buttons (Up to 5 Link Buttons)</label>
+                        <div className="space-y-2">
+                          {(currentDraft.buttons || []).map((btn, idx) => (
+                            <div key={idx} className="flex gap-2">
+                              <Input
+                                value={btn.label || ""}
+                                placeholder="Button Label"
+                                onChange={(e) => updateButton(idx, "label", e.target.value)}
+                                className="flex-1"
+                              />
+                              <Input
+                                value={btn.url || ""}
+                                placeholder="https://..."
+                                onChange={(e) => updateButton(idx, "url", e.target.value)}
+                                className="flex-[2]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeButton(idx)}
+                                className="px-3 py-2 bg-[#DA373C] hover:bg-[#A12828] transition-colors rounded text-white text-xs font-medium"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                          {(currentDraft.buttons || []).length < 5 && (
                             <button
                               type="button"
-                              onClick={() => removeButton(idx)}
-                              className="px-3 py-2 bg-[#DA373C] hover:bg-[#A12828] transition-colors rounded text-white text-xs font-medium"
+                              onClick={addButton}
+                              className="w-full px-3 py-2 bg-[#1b1d22] border border-white/15 rounded text-xs font-semibold text-discord-text-muted hover:bg-[#252831] transition-colors"
                             >
-                              Remove
+                              + Add Button
                             </button>
-                          </div>
-                        ))}
-                        {(currentDraft.buttons || []).length < 5 && (
-                          <button
-                            type="button"
-                            onClick={addButton}
-                            className="w-full px-3 py-2 bg-[#1b1d22] border border-white/15 rounded text-xs font-semibold text-discord-text-muted hover:bg-[#252831] transition-colors"
-                          >
-                            + Add Button
-                          </button>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   }
                 >
-                  <div className="grid grid-cols-2 gap-4 border-b border-[#1E1F22] pb-6 mb-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-[#1E1F22] pb-6 mb-2">
                     <div>
                       <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Target Channel</label>
                       <ChannelSelect
@@ -491,6 +567,21 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                         value={currentDraft.ping_role_id || ""}
                         onChange={(id) => updateDraft("ping_role_id", id)}
                         placeholder="No ping..."
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="mb-2 block text-xs font-semibold text-discord-text-muted flex items-center gap-1.5">
+                        <SmileIcon className="w-3.5 h-3.5 text-discord-blurple" /> Auto-Reaction Emojis (Optional)
+                      </label>
+                      <Input
+                        value={Array.isArray(currentDraft.auto_reactions) ? currentDraft.auto_reactions.join(", ") : currentDraft.auto_reactions || ""}
+                        placeholder="e.g. 🎉, 👍, 🔥 (Comma-separated emojis automatically added to published announcements)"
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const arr = raw.split(",").map((r) => r.trim()).filter(Boolean);
+                          updateDraft("auto_reactions", arr);
+                        }}
                       />
                     </div>
                   </div>
@@ -513,6 +604,75 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                 <Button variant="outline" size="sm" onClick={addCategory}>
                   <PlusIcon className="w-4 h-4 mr-1" /> New Category
                 </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Execution History Log Section */}
+          <div className="rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6 shadow-md space-y-4">
+            <div className="flex items-center justify-between border-b border-[#1E1F22] pb-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <ClockIcon className="w-4 h-4 text-discord-blurple" /> Announcement Execution History
+                </h3>
+                <p className="text-xs text-discord-text-muted mt-0.5">
+                  Audit log of all announcements published from this dashboard.
+                </p>
+              </div>
+              {history.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs text-red-400 hover:bg-red-500/10"
+                  onClick={clearHistory}
+                >
+                  Clear History
+                </Button>
+              )}
+            </div>
+
+            {history.length === 0 ? (
+              <p className="text-xs text-discord-text-muted italic text-center py-6">
+                No announcement publication history recorded yet.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {history.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#1E1F22]/60 border border-white/5 p-3 text-xs"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{entry.draft_name}</span>
+                        <span className="rounded bg-discord-blurple/20 px-2 py-0.5 text-[10px] text-discord-blurple font-semibold">
+                          #{entry.channel_name}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+                          <CheckCircle2Icon className="w-3 h-3" /> Published
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-discord-text-muted">
+                        Message ID: <span className="font-mono text-slate-300">{entry.message_id}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-right">
+                      {entry.auto_reactions && entry.auto_reactions.length > 0 && (
+                        <div className="flex items-center gap-1 bg-black/30 rounded px-2 py-1">
+                          {entry.auto_reactions.map((r, i) => (
+                            <span key={i} className="text-sm">{r}</span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-right">
+                        <p className="text-[11px] font-medium text-slate-300">
+                          {new Date(entry.posted_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

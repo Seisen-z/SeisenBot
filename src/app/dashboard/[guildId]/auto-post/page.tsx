@@ -150,15 +150,15 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
       }
       setPosts(normalized);
       const keys = Object.keys(normalized);
-      if (keys.length > 0 && !activeKey) {
-        setActiveKey(keys[0]);
+      if (keys.length > 0) {
+        setActiveKey((prev) => (prev && normalized[prev] ? prev : keys[0]));
       }
     } catch (err) {
       toast("Failed to load auto-posts", "error");
     } finally {
       setInitialLoaded(true);
     }
-  }, [guildId, activeKey, toast]);
+  }, [guildId, toast]);
 
   useEffect(() => {
     loadPosts();
@@ -250,6 +250,7 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
       const nextPosts = { ...posts, [key]: newPost };
       setPosts(nextPosts);
       setActiveKey(key);
+      await savePosts(nextPosts);
       toast(`Created auto-post "${trimmed}"`, "success");
     } else if (promptState.actionType === "new_cat") {
       const key = `${trimmed}/New Auto-Post`;
@@ -261,6 +262,7 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
       const nextPosts = { ...posts, [key]: newPost };
       setPosts(nextPosts);
       setActiveKey(key);
+      await savePosts(nextPosts);
       toast(`Created category "${trimmed}"`, "success");
     } else if (promptState.actionType === "rename_post" && promptState.targetKey) {
       const oldKey = promptState.targetKey;

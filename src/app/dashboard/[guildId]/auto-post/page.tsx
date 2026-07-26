@@ -214,7 +214,10 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
       const result = await fetchApi(
         `/guilds/${guildId}/auto_posts/${encodeURIComponent(activeKey)}/post_now`,
         undefined,
-        { method: "POST" }
+        {
+          method: "POST",
+          body: JSON.stringify(post),
+        }
       );
       toast("Message posted successfully!", "success");
       if (result.message_id || result.last_posted_at) {

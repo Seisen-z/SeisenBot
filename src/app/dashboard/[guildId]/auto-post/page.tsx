@@ -715,9 +715,9 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
                       Plain Text Message Body <span className="text-rose-400">*</span>
                     </label>
                     <Textarea
-                      rows={6}
+                      rows={14}
                       placeholder="Type your plain text auto-post message here... (Supports multiline formatting, custom emojis, URLs, and role mentions)"
-                      className="bg-black/40 text-xs text-white placeholder:text-slate-500 font-mono"
+                      className="bg-black/40 text-xs text-white placeholder:text-slate-500 font-mono min-h-[260px] resize-y"
                       value={activePost.content || ""}
                       onChange={(e) => updateActivePostField("content", e.target.value)}
                     />

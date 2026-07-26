@@ -100,8 +100,8 @@ function normalizePost(input: any): AutoPostConfig {
           }))
           .slice(0, 5)
       : [],
-    last_posted_at: typeof source.last_posted_at === "string" ? source.last_posted_at : null,
-    last_message_id: typeof source.last_message_id === "string" ? source.last_message_id : null,
+    last_posted_at: source.last_posted_at ? String(source.last_posted_at) : null,
+    last_message_id: source.last_message_id ? String(source.last_message_id) : null,
   };
 }
 

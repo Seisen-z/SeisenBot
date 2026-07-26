@@ -32,7 +32,18 @@ import {
   ShieldBanIcon,
   FileJson2Icon,
   RotateCw,
+  History,
 } from "lucide-react";
+
+interface SidebarProps {
+  guildId: string;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+  onNavigate?: () => void;
+  userDisplayName?: string;
+  userSubtext?: string;
+  userAvatarUrl?: string | null;
+}
 
 export default function Sidebar({
   guildId,
@@ -42,15 +53,7 @@ export default function Sidebar({
   userDisplayName = "Guest",
   userSubtext = "N/A",
   userAvatarUrl = null,
-}: {
-  guildId: string;
-  collapsed?: boolean;
-  onToggleCollapsed?: () => void;
-  onNavigate?: () => void;
-  userDisplayName?: string;
-  userSubtext?: string;
-  userAvatarUrl?: string | null;
-}) {
+}: SidebarProps) {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -67,6 +70,7 @@ export default function Sidebar({
       label: "Core",
       items: [
         { name: "Home", href: `/dashboard/${guildId}`, icon: SparklesIcon, exact: true },
+        { name: "Audit Logs", href: `/dashboard/${guildId}/audit-logs`, icon: History },
       ],
     },
     {

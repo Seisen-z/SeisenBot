@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUploader } from "@/components/ui/image-uploader";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
@@ -24,6 +25,7 @@ import {
   PlayIcon,
   FileTextIcon,
   SparklesIcon,
+  ImageIcon,
 } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
@@ -715,20 +717,66 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
                 </div>
 
                 {activePost.post_type === "plain" ? (
-                  <div className="space-y-3">
-                    <label className="block text-xs font-semibold text-slate-300">
-                      Plain Text Message Body <span className="text-rose-400">*</span>
-                    </label>
-                    <Textarea
-                      rows={14}
-                      placeholder="Type your plain text auto-post message here... (Supports multiline formatting, custom emojis, URLs, and role mentions)"
-                      className="bg-black/40 text-xs text-white placeholder:text-slate-500 font-mono min-h-[260px] resize-y"
-                      value={activePost.content || ""}
-                      onChange={(e) => updateActivePostField("content", e.target.value)}
-                    />
-                    <p className="text-[11px] text-slate-500">
-                      In Plain Text mode, your post is sent directly without any surrounding Discord embed card box.
-                    </p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-300">
+                        Plain Text Message Body <span className="text-rose-400">*</span>
+                      </label>
+                      <Textarea
+                        rows={14}
+                        placeholder="Type your plain text auto-post message here... (Supports multiline formatting, custom emojis, URLs, and role mentions)"
+                        className="bg-black/40 text-xs text-white placeholder:text-slate-500 font-mono min-h-[260px] resize-y"
+                        value={activePost.content || ""}
+                        onChange={(e) => updateActivePostField("content", e.target.value)}
+                      />
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        In Plain Text mode, your post is sent directly without any surrounding Discord embed card box.
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/5 space-y-3">
+                      <ImageUploader
+                        onApplyImage={(url) => updateActivePostField("image_url", url)}
+                        onAddMultiImage={(url) => updateActivePostField("images", [...(activePost.images || []), url])}
+                      />
+                    </div>
+
+                    {(activePost.image_url || (activePost.images && activePost.images.length > 0)) && (
+                      <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                          <ImageIcon className="h-3.5 w-3.5 text-blue-400" /> Attached Image URLs
+                        </label>
+                        {activePost.image_url && (
+                          <div className="flex items-center justify-between gap-2 rounded bg-white/5 p-2 text-xs text-slate-300">
+                            <span className="truncate text-slate-400 font-mono text-[11px]">Main Image: {activePost.image_url}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-[11px]"
+                              onClick={() => updateActivePostField("image_url", "")}
+                            >
+                              Remove Main
+                            </Button>
+                          </div>
+                        )}
+                        {(activePost.images || []).map((imgUrl, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 rounded bg-white/5 p-2 text-xs text-slate-300">
+                            <span className="truncate text-slate-400 font-mono text-[11px]">Image #{idx + 1}: {imgUrl}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-[11px]"
+                              onClick={() => {
+                                const nextImgs = (activePost.images || []).filter((_, i) => i !== idx);
+                                updateActivePostField("images", nextImgs);
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <AdvancedEmbedEditor

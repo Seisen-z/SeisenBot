@@ -6,6 +6,7 @@ import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
@@ -21,6 +22,8 @@ import {
   SendIcon,
   PauseIcon,
   PlayIcon,
+  FileTextIcon,
+  SparklesIcon,
 } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
@@ -34,6 +37,7 @@ type AutoPostConfig = {
   channel_id: string;
   enabled: boolean;
   interval_minutes: number;
+  post_type: "embed" | "plain";
   title: string;
   description: string;
   content: string;
@@ -54,6 +58,7 @@ const createEmptyPost = (name: string = "New Auto-Post", category: string = DEFA
   channel_id: "",
   enabled: true,
   interval_minutes: 60,
+  post_type: "embed",
   title: "",
   description: "",
   content: "",
@@ -77,6 +82,7 @@ function normalizePost(input: any): AutoPostConfig {
     channel_id: typeof source.channel_id === "string" ? source.channel_id : "",
     enabled: typeof source.enabled === "boolean" ? source.enabled : true,
     interval_minutes: typeof source.interval_minutes === "number" && source.interval_minutes > 0 ? source.interval_minutes : 60,
+    post_type: source.post_type === "plain" ? "plain" : "embed",
     title: typeof source.title === "string" ? source.title : "",
     description: typeof source.description === "string" ? source.description : "",
     content: typeof source.content === "string" ? source.content : "",
@@ -667,33 +673,85 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
                 </div>
               </div>
 
-              {/* Message Content & Embed Editor */}
+              {/* Message Format Mode Selector & Content Editor */}
               <div className="rounded-xl border border-white/10 bg-black/40 p-5 backdrop-blur-md space-y-4">
-                <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Message & Embed Design</h3>
-                
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-300">
-                    Plain Message Content (Optional)
-                  </label>
-                  <Input
-                    placeholder="Message text or extra user mentions to send alongside the embed..."
-                    value={activePost.content || ""}
-                    onChange={(e) => updateActivePostField("content", e.target.value)}
-                  />
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Message Content & Format</h3>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      Choose whether to send your auto-post as plain text or as a rich Discord embed card.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/40 p-1">
+                    <button
+                      type="button"
+                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                        activePost.post_type === "plain"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                      onClick={() => updateActivePostField("post_type", "plain")}
+                    >
+                      <FileTextIcon className="h-3.5 w-3.5" /> Plain Text
+                    </button>
+                    <button
+                      type="button"
+                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                        activePost.post_type === "embed"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                      onClick={() => updateActivePostField("post_type", "embed")}
+                    >
+                      <SparklesIcon className="h-3.5 w-3.5" /> Rich Embed Card
+                    </button>
+                  </div>
                 </div>
 
-                <AdvancedEmbedEditor
-                  config={{
-                    title: activePost.title,
-                    description: activePost.description,
-                    thumbnail_url: activePost.thumbnail_url,
-                    image_url: activePost.image_url,
-                    images: activePost.images,
-                    footer: activePost.footer,
-                    buttons: activePost.buttons,
-                  }}
-                  onChange={(key, val) => updateActivePostField(key, val)}
-                />
+                {activePost.post_type === "plain" ? (
+                  <div className="space-y-3">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Plain Text Message Body <span className="text-rose-400">*</span>
+                    </label>
+                    <Textarea
+                      rows={6}
+                      placeholder="Type your plain text auto-post message here... (Supports multiline formatting, custom emojis, URLs, and role mentions)"
+                      className="bg-black/40 text-xs text-white placeholder:text-slate-500 font-mono"
+                      value={activePost.content || ""}
+                      onChange={(e) => updateActivePostField("content", e.target.value)}
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      In Plain Text mode, your post is sent directly without any surrounding Discord embed card box.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-300">
+                        Plain Message Header / Role Pings (Optional)
+                      </label>
+                      <Input
+                        placeholder="Text to display above the embed card (e.g. @everyone or extra mentions)..."
+                        value={activePost.content || ""}
+                        onChange={(e) => updateActivePostField("content", e.target.value)}
+                      />
+                    </div>
+
+                    <AdvancedEmbedEditor
+                      config={{
+                        title: activePost.title,
+                        description: activePost.description,
+                        thumbnail_url: activePost.thumbnail_url,
+                        image_url: activePost.image_url,
+                        images: activePost.images,
+                        footer: activePost.footer,
+                        buttons: activePost.buttons,
+                      }}
+                      onChange={(key, val) => updateActivePostField(key, val)}
+                    />
+                  </>
+                )}
               </div>
             </>
           )}

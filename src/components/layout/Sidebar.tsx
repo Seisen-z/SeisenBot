@@ -31,6 +31,7 @@ import {
   KeyRoundIcon,
   ShieldBanIcon,
   FileJson2Icon,
+  RotateCw,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -78,6 +79,7 @@ export default function Sidebar({
         { name: "Auto Reply", href: `/dashboard/${guildId}/autoreply`, icon: MessageSquareReply },
         { name: "AI Help", href: `/dashboard/${guildId}/ai-help`, icon: Bot },
         { name: "Announcements", href: `/dashboard/${guildId}/announcements`, icon: Megaphone },
+        { name: "Auto-Post", href: `/dashboard/${guildId}/auto-post`, icon: RotateCw },
         { name: "Select Menu Roles", href: `/dashboard/${guildId}/reaction-roles`, icon: UserPlus },
         { name: "Channel Access", href: `/dashboard/${guildId}/channel-access`, icon: KeyRoundIcon },
         { name: "Macro Import", href: `/dashboard/${guildId}/macro-import`, icon: FileJson2Icon },

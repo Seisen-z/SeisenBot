@@ -1,0 +1,713 @@
+"use client";
+
+import { useCallback, useEffect, useState, use } from "react";
+import { Button } from "@/components/ui/button";
+import { fetchApi } from "@/lib/api";
+import { useToast } from "@/components/ui/toast";
+import { ChannelSelect, RoleSelect } from "@/components/ui/discord-selects";
+import { Input } from "@/components/ui/input";
+import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
+import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  Trash2Icon,
+  FolderIcon,
+  EditIcon,
+  RotateCwIcon,
+  ClockIcon,
+  SendIcon,
+  PauseIcon,
+  PlayIcon,
+} from "lucide-react";
+import { PromptModal } from "@/components/ui/prompt-modal";
+
+const DEFAULT_CATEGORY = "General";
+
+type AutoPostButton = { label: string; url: string };
+
+type AutoPostConfig = {
+  name: string;
+  category: string;
+  channel_id: string;
+  enabled: boolean;
+  interval_minutes: number;
+  title: string;
+  description: string;
+  content: string;
+  thumbnail_url: string;
+  image_url: string;
+  images: string[];
+  footer: string;
+  ping_role_id: string;
+  buttons: AutoPostButton[];
+  last_posted_at?: string | null;
+  last_message_id?: string | null;
+  [key: string]: any;
+};
+
+const createEmptyPost = (name: string = "New Auto-Post", category: string = DEFAULT_CATEGORY): AutoPostConfig => ({
+  name,
+  category,
+  channel_id: "",
+  enabled: true,
+  interval_minutes: 60,
+  title: "",
+  description: "",
+  content: "",
+  thumbnail_url: "",
+  image_url: "",
+  images: [],
+  footer: "",
+  ping_role_id: "",
+  buttons: [],
+  last_posted_at: null,
+  last_message_id: null,
+});
+
+function normalizePost(input: any): AutoPostConfig {
+  const source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  return {
+    ...createEmptyPost(),
+    ...source,
+    name: typeof source.name === "string" ? source.name : "Auto-Post",
+    category: typeof source.category === "string" ? source.category : DEFAULT_CATEGORY,
+    channel_id: typeof source.channel_id === "string" ? source.channel_id : "",
+    enabled: typeof source.enabled === "boolean" ? source.enabled : true,
+    interval_minutes: typeof source.interval_minutes === "number" && source.interval_minutes > 0 ? source.interval_minutes : 60,
+    title: typeof source.title === "string" ? source.title : "",
+    description: typeof source.description === "string" ? source.description : "",
+    content: typeof source.content === "string" ? source.content : "",
+    thumbnail_url: typeof source.thumbnail_url === "string" ? source.thumbnail_url : "",
+    image_url: typeof source.image_url === "string" ? source.image_url : "",
+    images: Array.isArray(source.images) ? source.images.filter((i: any) => typeof i === "string") : [],
+    footer: typeof source.footer === "string" ? source.footer : "",
+    ping_role_id: typeof source.ping_role_id === "string" ? source.ping_role_id : "",
+    buttons: Array.isArray(source.buttons)
+      ? source.buttons
+          .filter((b: any) => b && typeof b === "object")
+          .map((b: any) => ({
+            label: typeof b.label === "string" ? b.label : "",
+            url: typeof b.url === "string" ? b.url : "",
+          }))
+          .slice(0, 5)
+      : [],
+    last_posted_at: typeof source.last_posted_at === "string" ? source.last_posted_at : null,
+    last_message_id: typeof source.last_message_id === "string" ? source.last_message_id : null,
+  };
+}
+
+function parsePosts(posts: Record<string, AutoPostConfig>) {
+  const map: Record<string, string[]> = {};
+  for (const key of Object.keys(posts)) {
+    const parts = key.split("/");
+    const cat = parts.length > 1 ? parts[0] : DEFAULT_CATEGORY;
+    if (!map[cat]) map[cat] = [];
+    map[cat].push(key);
+  }
+  return map;
+}
+
+export default function AutoPostPage({ params }: { params: Promise<{ guildId: string }> }) {
+  const { guildId } = use(params);
+  const { toast } = useToast();
+
+  const [posts, setPosts] = useState<Record<string, AutoPostConfig>>({});
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [postingNow, setPostingNow] = useState(false);
+
+  const [promptState, setPromptState] = useState<{
+    open: boolean;
+    title: string;
+    label?: string;
+    defaultValue?: string;
+    actionType: "new_post" | "new_cat" | "rename_post" | "delete_post";
+    targetKey?: string;
+    targetCat?: string;
+  }>({
+    open: false,
+    title: "",
+    actionType: "new_post",
+  });
+
+  // Load Auto-Posts
+  const loadPosts = useCallback(async () => {
+    try {
+      const raw = await fetchApi(`/guilds/${guildId}/auto_posts`);
+      const normalized: Record<string, AutoPostConfig> = {};
+      for (const [k, v] of Object.entries(raw || {})) {
+        normalized[k] = normalizePost(v);
+      }
+      setPosts(normalized);
+      const keys = Object.keys(normalized);
+      if (keys.length > 0 && !activeKey) {
+        setActiveKey(keys[0]);
+      }
+    } catch (err) {
+      toast("Failed to load auto-posts", "error");
+    } finally {
+      setInitialLoaded(true);
+    }
+  }, [guildId, activeKey, toast]);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  // Auto-Save callback
+  const savePosts = useCallback(
+    async (dataToSave: Record<string, AutoPostConfig>) => {
+      try {
+        await fetchApi(`/guilds/${guildId}/auto_posts`, undefined, {
+          method: "PUT",
+          body: JSON.stringify(dataToSave),
+        });
+      } catch (err) {
+        toast("Error auto-saving auto-post configuration", "error");
+      }
+    },
+    [guildId, toast]
+  );
+
+  useDebouncedAutoSave({
+    value: posts,
+    enabled: initialLoaded,
+    delay: 1200,
+    onSave: savePosts,
+    onError: () => toast("Auto-save failed", "error"),
+  });
+
+  const updateActivePostField = (field: string, val: any) => {
+    if (!activeKey) return;
+    setPosts((prev) => {
+      const current = prev[activeKey] || createEmptyPost();
+      return {
+        ...prev,
+        [activeKey]: {
+          ...current,
+          [field]: val,
+        },
+      };
+    });
+  };
+
+  // Immediate Post Now
+  const handlePostNow = async () => {
+    if (!activeKey) return;
+    const post = posts[activeKey];
+    if (!post || !post.channel_id) {
+      toast("Please select a target channel before posting.", "error");
+      return;
+    }
+    setPostingNow(true);
+    try {
+      const result = await fetchApi(
+        `/guilds/${guildId}/auto_posts/${encodeURIComponent(activeKey)}/post_now`,
+        undefined,
+        { method: "POST" }
+      );
+      toast("Message posted successfully!", "success");
+      if (result.message_id || result.last_posted_at) {
+        setPosts((prev) => ({
+          ...prev,
+          [activeKey]: {
+            ...prev[activeKey],
+            last_message_id: result.message_id || prev[activeKey].last_message_id,
+            last_posted_at: result.last_posted_at || new Date().toISOString(),
+          },
+        }));
+      }
+    } catch (err: any) {
+      toast(`Error posting message: ${err.message}`, "error");
+    } finally {
+      setPostingNow(false);
+    }
+  };
+
+  // Modal actions
+  const handlePromptConfirm = async (inputVal: string) => {
+    const trimmed = inputVal.trim();
+    if (!trimmed) return;
+
+    if (promptState.actionType === "new_post") {
+      const cat = promptState.targetCat || DEFAULT_CATEGORY;
+      const key = `${cat}/${trimmed}`;
+      if (posts[key]) {
+        toast("A post with this name already exists in this category.", "error");
+        return;
+      }
+      const newPost = createEmptyPost(trimmed, cat);
+      const nextPosts = { ...posts, [key]: newPost };
+      setPosts(nextPosts);
+      setActiveKey(key);
+      toast(`Created auto-post "${trimmed}"`, "success");
+    } else if (promptState.actionType === "new_cat") {
+      const key = `${trimmed}/New Auto-Post`;
+      if (posts[key]) {
+        toast("Category already exists.", "error");
+        return;
+      }
+      const newPost = createEmptyPost("New Auto-Post", trimmed);
+      const nextPosts = { ...posts, [key]: newPost };
+      setPosts(nextPosts);
+      setActiveKey(key);
+      toast(`Created category "${trimmed}"`, "success");
+    } else if (promptState.actionType === "rename_post" && promptState.targetKey) {
+      const oldKey = promptState.targetKey;
+      const cat = oldKey.split("/")[0] || DEFAULT_CATEGORY;
+      const newKey = `${cat}/${trimmed}`;
+
+      if (posts[newKey] && newKey !== oldKey) {
+        toast("A post with this name already exists.", "error");
+        return;
+      }
+
+      try {
+        await fetchApi(`/guilds/${guildId}/auto_posts/${encodeURIComponent(oldKey)}/rename`, undefined, {
+          method: "POST",
+          body: JSON.stringify({ new_name: newKey }),
+        });
+        const nextPosts = { ...posts };
+        const row = nextPosts[oldKey];
+        delete nextPosts[oldKey];
+        row.name = trimmed;
+        nextPosts[newKey] = row;
+        setPosts(nextPosts);
+        if (activeKey === oldKey) setActiveKey(newKey);
+        toast(`Renamed to "${trimmed}"`, "success");
+      } catch (err) {
+        toast("Error renaming auto-post", "error");
+      }
+    } else if (promptState.actionType === "delete_post" && promptState.targetKey) {
+      const keyToDelete = promptState.targetKey;
+      try {
+        await fetchApi(`/guilds/${guildId}/auto_posts/${encodeURIComponent(keyToDelete)}`, undefined, {
+          method: "DELETE",
+        });
+        const nextPosts = { ...posts };
+        delete nextPosts[keyToDelete];
+        setPosts(nextPosts);
+        const keys = Object.keys(nextPosts);
+        if (activeKey === keyToDelete) {
+          setActiveKey(keys.length > 0 ? keys[0] : null);
+        }
+        toast("Auto-post deleted", "success");
+      } catch (err) {
+        toast("Error deleting auto-post", "error");
+      }
+    }
+    setPromptState((prev) => ({ ...prev, open: false }));
+  };
+
+  const categories = parsePosts(posts);
+  const activePost = activeKey ? posts[activeKey] : null;
+
+  const getScheduleStatusText = (post: AutoPostConfig) => {
+    if (!post.enabled) return { label: "Paused", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" };
+    if (!post.channel_id) return { label: "Needs Channel", color: "bg-rose-500/10 text-rose-400 border-rose-500/20" };
+    return { label: "Active Schedule", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" };
+  };
+
+  const formatInterval = (minutes: number) => {
+    if (minutes === 60) return "1 Hour";
+    if (minutes === 600) return "10 Hours";
+    if (minutes === 1440) return "24 Hours";
+    if (minutes % 60 === 0) return `${minutes / 60} Hours`;
+    return `${minutes} Minutes`;
+  };
+
+  return (
+    <div className="space-y-6 pb-12">
+      <DashboardPageHero
+        title="Auto-Post System"
+        subtitle="Configure scheduled recurring messages that automatically repost and delete the previous message on set intervals."
+        icon={RotateCwIcon}
+      />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Left Navigation: Categories & Draft Posts */}
+        <div className="lg:col-span-4 xl:col-span-3">
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-md">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Post Categories</h3>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-xs text-blue-400 hover:bg-blue-500/10"
+                  onClick={() =>
+                    setPromptState({
+                      open: true,
+                      title: "Create Category",
+                      label: "Category Name",
+                      actionType: "new_cat",
+                    })
+                  }
+                >
+                  <PlusIcon className="mr-1 h-3.5 w-3.5" /> Category
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {Object.keys(categories).length === 0 && (
+                <div className="p-4 text-center text-xs text-slate-500">
+                  No auto-posts configured. Click below to add your first post.
+                </div>
+              )}
+
+              {Object.entries(categories).map(([categoryName, postKeys]) => {
+                const isCollapsed = collapsedCats[categoryName];
+                return (
+                  <div key={categoryName} className="rounded-lg border border-white/5 bg-white/[0.02]">
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <button
+                        onClick={() =>
+                          setCollapsedCats((prev) => ({ ...prev, [categoryName]: !prev[categoryName] }))
+                        }
+                        className="flex flex-1 items-center gap-2 text-left text-xs font-semibold text-slate-300 transition hover:text-white"
+                      >
+                        {isCollapsed ? (
+                          <ChevronRightIcon className="h-3.5 w-3.5 text-slate-500" />
+                        ) : (
+                          <ChevronDownIcon className="h-3.5 w-3.5 text-slate-500" />
+                        )}
+                        <FolderIcon className="h-3.5 w-3.5 text-blue-400" />
+                        <span className="truncate">{categoryName}</span>
+                        <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-slate-400">
+                          {postKeys.length}
+                        </span>
+                      </button>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-white hover:bg-white/10"
+                        title="Add post to category"
+                        onClick={() =>
+                          setPromptState({
+                            open: true,
+                            title: `Add Post to ${categoryName}`,
+                            label: "Post Title",
+                            targetCat: categoryName,
+                            actionType: "new_post",
+                          })
+                        }
+                      >
+                        <PlusIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+
+                    {!isCollapsed && (
+                      <div className="space-y-1 p-1.5 pt-0">
+                        {postKeys.map((key) => {
+                          const post = posts[key];
+                          const isActive = activeKey === key;
+                          const name = key.split("/")[1] || key;
+                          return (
+                            <div
+                              key={key}
+                              className={`group flex items-center justify-between rounded-md px-2.5 py-2 text-xs transition cursor-pointer ${
+                                isActive
+                                  ? "bg-blue-600/20 font-medium text-blue-400 border border-blue-500/30"
+                                  : "text-slate-300 hover:bg-white/5 hover:text-white"
+                              }`}
+                              onClick={() => setActiveKey(key)}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className={`h-2 w-2 rounded-full ${
+                                    post?.enabled && post?.channel_id ? "bg-emerald-400" : "bg-slate-600"
+                                  }`}
+                                />
+                                <span className="truncate">{name}</span>
+                              </div>
+
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <button
+                                  className="p-1 text-slate-400 hover:text-white"
+                                  title="Rename"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPromptState({
+                                      open: true,
+                                      title: "Rename Post",
+                                      label: "New Name",
+                                      defaultValue: name,
+                                      targetKey: key,
+                                      actionType: "rename_post",
+                                    });
+                                  }}
+                                >
+                                  <EditIcon className="h-3 w-3" />
+                                </button>
+                                <button
+                                  className="p-1 text-slate-400 hover:text-rose-400"
+                                  title="Delete"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPromptState({
+                                      open: true,
+                                      title: "Delete Post",
+                                      label: `Type "${name}" to confirm deletion:`,
+                                      defaultValue: name,
+                                      targetKey: key,
+                                      actionType: "delete_post",
+                                    });
+                                  }}
+                                >
+                                  <Trash2Icon className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <Button
+                variant="outline"
+                className="w-full justify-center border-dashed border-white/20 py-2 text-xs text-slate-400 hover:border-blue-500 hover:text-blue-400"
+                onClick={() =>
+                  setPromptState({
+                    open: true,
+                    title: "Create Auto-Post",
+                    label: "Post Title",
+                    targetCat: DEFAULT_CATEGORY,
+                    actionType: "new_post",
+                  })
+                }
+              >
+                <PlusIcon className="mr-1.5 h-3.5 w-3.5" /> Add New Auto-Post
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Panel: Auto-Post Settings & Editor */}
+        <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+          {!activePost ? (
+            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-white/10 bg-black/40 text-center backdrop-blur-md">
+              <RotateCwIcon className="mb-3 h-10 w-10 text-slate-600 animate-spin-slow" />
+              <h3 className="text-base font-medium text-slate-300">No Auto-Post Selected</h3>
+              <p className="mt-1 text-xs text-slate-500">Select an existing post from the sidebar or create a new one.</p>
+            </div>
+          ) : (
+            <>
+              {/* Header Status & Control Bar */}
+              <div className="rounded-xl border border-white/10 bg-black/40 p-5 backdrop-blur-md space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-lg font-bold text-white">{activePost.name}</h2>
+                      <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-slate-300">
+                        {activePost.category}
+                      </span>
+                      {(() => {
+                        const status = getScheduleStatusText(activePost);
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${status.color}`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            {status.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Configure interval schedules, channel targets, and message embeds.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={activePost.enabled ? "outline" : "default"}
+                      size="sm"
+                      className={
+                        activePost.enabled
+                          ? "border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                          : "bg-emerald-600 text-white hover:bg-emerald-500"
+                      }
+                      onClick={() => updateActivePostField("enabled", !activePost.enabled)}
+                    >
+                      {activePost.enabled ? (
+                        <>
+                          <PauseIcon className="mr-1.5 h-3.5 w-3.5" /> Pause Schedule
+                        </>
+                      ) : (
+                        <>
+                          <PlayIcon className="mr-1.5 h-3.5 w-3.5" /> Enable Schedule
+                        </>
+                      )}
+                    </Button>
+
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="bg-blue-600 text-white hover:bg-blue-500"
+                      disabled={postingNow || !activePost.channel_id}
+                      onClick={handlePostNow}
+                    >
+                      {postingNow ? (
+                        <>
+                          <RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Posting...
+                        </>
+                      ) : (
+                        <>
+                          <SendIcon className="mr-1.5 h-3.5 w-3.5" /> Post Now & Reset Timer
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Target Channel & Interval Configuration */}
+                <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-300">
+                      Target Channel <span className="text-rose-400">*</span>
+                    </label>
+                    <ChannelSelect
+                      guildId={guildId}
+                      value={activePost.channel_id}
+                      onChange={(val) => updateActivePostField("channel_id", val)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-300">
+                      Mention Role (Optional)
+                    </label>
+                    <RoleSelect
+                      guildId={guildId}
+                      value={activePost.ping_role_id}
+                      onChange={(val) => updateActivePostField("ping_role_id", val)}
+                    />
+                  </div>
+                </div>
+
+                {/* Repost Interval Selector */}
+                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
+                      <ClockIcon className="h-4 w-4 text-blue-400" /> Auto-Repost & Deletion Interval
+                    </div>
+                    <span className="text-xs text-blue-400 font-medium">
+                      Current: {formatInterval(activePost.interval_minutes)}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { label: "1 Hour (1h)", mins: 60 },
+                      { label: "10 Hours (10h)", mins: 600 },
+                      { label: "24 Hours (24h)", mins: 1440 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.mins}
+                        type="button"
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                          activePost.interval_minutes === preset.mins
+                            ? "border-blue-500 bg-blue-500/20 text-blue-300"
+                            : "border-white/10 bg-black/20 text-slate-400 hover:border-white/20 hover:text-white"
+                        }`}
+                        onClick={() => updateActivePostField("interval_minutes", preset.mins)}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-1">
+                    <label className="text-xs text-slate-400 whitespace-nowrap">Custom Interval (Minutes):</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      className="h-8 w-28 text-xs bg-black/40"
+                      value={activePost.interval_minutes || 60}
+                      onChange={(e) => {
+                        const val = Math.max(1, parseInt(e.target.value) || 60);
+                        updateActivePostField("interval_minutes", val);
+                      }}
+                    />
+                    <span className="text-[11px] text-slate-500">
+                      (Minimum 1 minute. The bot deletes the previous post and sends a fresh message.)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Execution State Metadata */}
+                <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400 border-t border-white/5 pt-3">
+                  <div>
+                    <span className="text-slate-500">Last Posted:</span>{" "}
+                    {activePost.last_posted_at ? (
+                      <span className="text-slate-300 font-medium">
+                        {new Date(activePost.last_posted_at).toLocaleString()}
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 italic">Never</span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Last Message ID:</span>{" "}
+                    {activePost.last_message_id ? (
+                      <span className="text-slate-300 font-mono">{activePost.last_message_id}</span>
+                    ) : (
+                      <span className="text-slate-500 italic">N/A</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Message Content & Embed Editor */}
+              <div className="rounded-xl border border-white/10 bg-black/40 p-5 backdrop-blur-md space-y-4">
+                <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Message & Embed Design</h3>
+                
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-300">
+                    Plain Message Content (Optional)
+                  </label>
+                  <Input
+                    placeholder="Message text or extra user mentions to send alongside the embed..."
+                    value={activePost.content || ""}
+                    onChange={(e) => updateActivePostField("content", e.target.value)}
+                  />
+                </div>
+
+                <AdvancedEmbedEditor
+                  config={{
+                    title: activePost.title,
+                    description: activePost.description,
+                    thumbnail_url: activePost.thumbnail_url,
+                    image_url: activePost.image_url,
+                    images: activePost.images,
+                    footer: activePost.footer,
+                    buttons: activePost.buttons,
+                  }}
+                  onChange={(key, val) => updateActivePostField(key, val)}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <PromptModal
+        open={promptState.open}
+        title={promptState.title}
+        label={promptState.label}
+        defaultValue={promptState.defaultValue}
+        onCancel={() => setPromptState((prev) => ({ ...prev, open: false }))}
+        onConfirm={handlePromptConfirm}
+      />
+    </div>
+  );
+}

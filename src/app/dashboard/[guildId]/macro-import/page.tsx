@@ -150,9 +150,9 @@ export default function MacroImportPage({ params }: { params: Promise<{ guildId:
 
         <label className="space-y-2 md:col-span-2 xl:col-span-3">
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-discord-text-muted">
-            Watched Channels &amp; Forums (Private)
+            Watched Channels &amp; Forums (Private / /import-only)
             <span className="ml-1 normal-case text-[10px] text-discord-text-muted">
-              — everyone sees a teaser only; the uploader reveals their own Import URL via a button
+              — direct posts get deleted; members must use /import, whose reply is a real Discord ephemeral message
             </span>
           </span>
           <ChannelMultiSelect
@@ -166,14 +166,17 @@ export default function MacroImportPage({ params }: { params: Promise<{ guildId:
               }))
             }
             types={[0, 5, 15]}
-            placeholder="Select channels or forums where import links stay private..."
+            placeholder="Select channels or forums where /import is required..."
           />
         </label>
       </div>
 
       <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 text-xs text-discord-text-muted">
-        Only files matching a known macro schema trigger a response — unrelated .json uploads in the same
-        channels are left alone. A channel can be public or private, not both.
+        Public channels: only files matching a known macro schema trigger a reply — unrelated .json uploads are
+        deleted along with anything else that isn&apos;t a valid macro. Private channels: posting directly is not
+        allowed at all (everything gets deleted) — members must run <code>/import</code> and attach their file to
+        the command itself, which replies ephemerally (only they can see it, exactly like a normal Discord
+        ephemeral command response). A channel can be public or private, not both.
       </div>
     </div>
   );

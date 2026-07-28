@@ -23,7 +23,6 @@ export function useDebouncedAutoSave<T>({
   const contextRef = useRef<string | number>(contextKey);
   const onSaveRef = useRef(onSave);
   const onErrorRef = useRef(onError);
-  const lastFailedSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     onSaveRef.current = onSave;
@@ -33,19 +32,10 @@ export function useDebouncedAutoSave<T>({
     onErrorRef.current = onError;
   }, [onError]);
 
-  const getSignature = (nextValue: T) => {
-    try {
-      return JSON.stringify(nextValue);
-    } catch {
-      return "__unserializable__";
-    }
-  };
-
   useEffect(() => {
     if (contextRef.current !== contextKey) {
       contextRef.current = contextKey;
       isFirstRunRef.current = true;
-      lastFailedSignatureRef.current = null;
     }
   }, [contextKey]);
 
@@ -57,16 +47,8 @@ export function useDebouncedAutoSave<T>({
       return;
     }
 
-    const signature = getSignature(value);
-    if (signature === lastFailedSignatureRef.current) {
-      return;
-    }
-
     const timeoutId = window.setTimeout(() => {
-      Promise.resolve(onSaveRef.current(value)).then(() => {
-        lastFailedSignatureRef.current = null;
-      }).catch((error) => {
-        lastFailedSignatureRef.current = signature;
+      Promise.resolve(onSaveRef.current(value)).catch((error) => {
         if (onErrorRef.current) onErrorRef.current(error);
       });
     }, delay);

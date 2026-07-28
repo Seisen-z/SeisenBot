@@ -26,6 +26,7 @@ import {
   FileTextIcon,
   SparklesIcon,
   ImageIcon,
+  SaveIcon,
 } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
@@ -127,6 +128,7 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [postingNow, setPostingNow] = useState(false);
+  const [savingManual, setSavingManual] = useState(false);
 
   const [promptState, setPromptState] = useState<{
     open: boolean;
@@ -201,6 +203,21 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
         },
       };
     });
+  };
+
+  const handleManualSave = async () => {
+    setSavingManual(true);
+    try {
+      await fetchApi(`/guilds/${guildId}/auto_posts`, undefined, {
+        method: "PUT",
+        body: JSON.stringify(posts),
+      });
+      toast("Auto-posts saved successfully!", "success");
+    } catch (err: any) {
+      toast(`Save failed: ${err.message || err}`, "error");
+    } finally {
+      setSavingManual(false);
+    }
   };
 
   // Immediate Post Now
@@ -541,6 +558,24 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold"
+                      disabled={savingManual}
+                      onClick={handleManualSave}
+                    >
+                      {savingManual ? (
+                        <>
+                          <RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Saving...
+                        </>
+                      ) : (
+                        <>
+                          <SaveIcon className="mr-1.5 h-3.5 w-3.5" /> Save Configuration
+                        </>
+                      )}
+                    </Button>
+
                     <Button
                       variant={activePost.enabled ? "outline" : "default"}
                       size="sm"

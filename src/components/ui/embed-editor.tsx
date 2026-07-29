@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { UploadIcon } from "lucide-react";
 import { Input } from "./input";
 import { Textarea } from "./textarea";
-import { Copy, Eye, FileJson, Layout, Upload } from "lucide-react";
+import { Copy, Eye, FileJson, Sparkles, UploadIcon, Trash2Icon, PlusIcon } from "lucide-react";
 import { DiscordMessagePreview } from "./discord-message";
 import { ImageUploader } from "./image-uploader";
 
@@ -18,7 +17,7 @@ export interface EmbedConfig {
   images?: string[];
   footer?: string;
   buttons?: { label?: string; url?: string }[];
-  [key: string]: any; // Allow other properties
+  [key: string]: any;
 }
 
 export function AdvancedEmbedEditor({
@@ -252,34 +251,59 @@ export function AdvancedEmbedEditor({
 
   return (
     <div className="flex flex-col">
-      {/* Top Navigation */}
-      <div className="flex overflow-hidden rounded-t-2xl border border-white/12 border-b-0 bg-[#121317]">
-        {["visual", "raw", "preview"].map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t as any)}
-            className={`flex-1 border-t-2 py-3 text-[12px] font-bold uppercase tracking-[0.14em] transition ${tab === t ? 'border-white/40 bg-[#1b1c22] text-white' : 'border-transparent bg-[#14151a] text-discord-text-muted hover:bg-[#1c1d24] hover:text-white'}`}
-          >
-            {t}
-          </button>
-        ))}
+      {/* Top Navigation Bar with Icons & Pill Container */}
+      <div className="flex overflow-hidden rounded-t-2xl border border-white/10 border-b-0 bg-slate-950/80 backdrop-blur-xl p-1.5 gap-1.5">
+        <button
+          type="button"
+          onClick={() => setTab("visual")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer ${
+            tab === "visual"
+              ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/20"
+              : "text-slate-400 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5" /> Visual Editor
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("raw")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer ${
+            tab === "raw"
+              ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/20"
+              : "text-slate-400 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <FileJson className="h-3.5 w-3.5" /> Raw JSON
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("preview")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer ${
+            tab === "preview"
+              ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/20"
+              : "text-slate-400 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <Eye className="h-3.5 w-3.5" /> Live Preview
+        </button>
       </div>
 
-      <div className="glass-card min-h-[450px] rounded-b-2xl border border-t-0 border-white/12 bg-[linear-gradient(165deg,rgba(24,24,27,0.92),rgba(16,16,18,0.94))] p-6">
+      <div className="glass-card min-h-[450px] rounded-b-2xl border border-white/10 bg-slate-950/60 p-6 backdrop-blur-xl shadow-2xl">
         {tab === "visual" && (
           <div className="flex flex-col gap-5">
             {children}
             <div>
-              <label className="mb-2 block text-sm font-medium text-discord-text-muted">Message Content / Outside Text</label>
+              <label className="mb-2 block text-xs font-semibold text-slate-300">Message Content / Outside Text</label>
               <Input
                 value={config.content || ""}
                 onChange={(e) => onChange("content", e.target.value)}
-                placeholder="Text printed above the embed... (e.g. pinging everyone)"
+                placeholder="Text printed above the embed... (e.g. role pings or main message text)"
+                className="bg-black/50 border-white/10 text-xs text-white"
               />
             </div>
 
-            <div className="mt-2 pt-4 border-t border-[#1E1F22]">
-              <h3 className="mb-4 text-sm font-bold text-discord-text-muted uppercase tracking-wide">Embed Configuration</h3>
+            <div className="pt-4 border-t border-white/10 space-y-5">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Embed Card Configuration</h3>
               <div className="flex flex-col gap-5">
                 <ImageUploader 
                   onApplyImage={(url) => onChange("image_url", url)}
@@ -287,41 +311,86 @@ export function AdvancedEmbedEditor({
                   onAddMultiImage={(url) => onChange("images", [...(config.images || []), url])}
                 />
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Embed Title</label>
-                  <Input value={config.title || ""} onChange={(e) => onChange("title", e.target.value)} />
+                  <label className="mb-2 block text-xs font-semibold text-slate-300">Embed Title</label>
+                  <Input
+                    value={config.title || ""}
+                    onChange={(e) => onChange("title", e.target.value)}
+                    placeholder="Enter embed title..."
+                    className="bg-black/50 border-white/10 text-xs text-white"
+                  />
                 </div>
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Description</label>
-                  <Textarea className="h-40 font-mono text-sm" value={config.description || ""} onChange={(e) => onChange("description", e.target.value)} />
+                  <label className="mb-2 block text-xs font-semibold text-slate-300">Description</label>
+                  <Textarea
+                    className="h-40 font-mono text-xs bg-black/50 border-white/10 text-white"
+                    value={config.description || ""}
+                    onChange={(e) => onChange("description", e.target.value)}
+                    placeholder="Enter embed body description (supports markdown, emojis, URLs)..."
+                  />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Embed Color</label>
-                    <div className="flex items-center gap-3">
-                      <Input value={config.color || ""} placeholder="#A3A7B0 or Decimal" onChange={(e) => onChange("color", e.target.value)} />
+                    <label className="mb-2 block text-xs font-semibold text-slate-300">Embed Color Accent</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={
+                          typeof config.color === "string" && config.color.startsWith("#")
+                            ? config.color
+                            : typeof config.color === "number"
+                            ? `#${config.color.toString(16).padStart(6, "0")}`
+                            : "#5865F2"
+                        }
+                        onChange={(e) => onChange("color", e.target.value)}
+                        className="h-9 w-10 cursor-pointer rounded-lg border border-white/10 bg-black/40 p-0.5 shrink-0"
+                        title="Pick Accent Color"
+                      />
+                      <Input
+                        value={config.color || ""}
+                        placeholder="#5865F2 or Decimal"
+                        onChange={(e) => onChange("color", e.target.value)}
+                        className="bg-black/50 border-white/10 text-xs text-white"
+                      />
                     </div>
                   </div>
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Thumbnail URL</label>
-                    <Input value={config.thumbnail_url || ""} placeholder="https://..." onChange={(e) => onChange("thumbnail_url", e.target.value)} />
+                    <label className="mb-2 block text-xs font-semibold text-slate-300">Thumbnail URL (Top Right Icon)</label>
+                    <Input
+                      value={config.thumbnail_url || ""}
+                      placeholder="https://..."
+                      onChange={(e) => onChange("thumbnail_url", e.target.value)}
+                      className="bg-black/50 border-white/10 text-xs text-white"
+                    />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Image URL (Large Body Image)</label>
-                    <Input value={config.image_url || ""} placeholder="https://..." onChange={(e) => onChange("image_url", e.target.value)} />
+                    <label className="mb-2 block text-xs font-semibold text-slate-300">Image URL (Large Body Banner)</label>
+                    <Input
+                      value={config.image_url || ""}
+                      placeholder="https://..."
+                      onChange={(e) => onChange("image_url", e.target.value)}
+                      className="bg-black/50 border-white/10 text-xs text-white"
+                    />
                   </div>
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Footer Text</label>
-                    <Input value={config.footer || ""} onChange={(e) => onChange("footer", e.target.value)} />
+                    <label className="mb-2 block text-xs font-semibold text-slate-300">Footer Text</label>
+                    <Input
+                      value={config.footer || ""}
+                      placeholder="Enter footer text..."
+                      onChange={(e) => onChange("footer", e.target.value)}
+                      className="bg-black/50 border-white/10 text-xs text-white"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-discord-text-muted">Multiple Images (Gallery outside of embed)</label>
+                  <label className="mb-2 block text-xs font-semibold text-slate-300">Gallery Image URLs (Outside Embed Grid)</label>
                   <div className="space-y-2">
                     {(config.images || []).map((url, idx) => (
-                      <div key={idx} className="flex gap-2">
+                      <div key={idx} className="flex gap-2 items-center">
                         <Input 
                           value={url} 
                           placeholder="https://..."
@@ -330,27 +399,31 @@ export function AdvancedEmbedEditor({
                             newImages[idx] = e.target.value;
                             onChange("images", newImages);
                           }}
-                          className="flex-1"
+                          className="flex-1 bg-black/50 border-white/10 text-xs"
                         />
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             const newImages = (config.images || []).filter((_, i) => i !== idx);
                             onChange("images", newImages);
                           }}
-                          className="px-3 py-2 bg-[#DA373C] hover:bg-[#A12828] transition-colors rounded text-white text-xs font-medium"
+                          className="h-8 px-2.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs font-semibold"
                         >
-                          Remove
-                        </button>
+                          <Trash2Icon className="h-3.5 w-3.5 mr-1" /> Remove
+                        </Button>
                       </div>
                     ))}
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => onChange("images", [...(config.images || []), ""])}
-                      className="w-full px-3 py-2 bg-[#1b1d22] border border-white/15 rounded text-xs font-semibold text-discord-text-muted hover:bg-[#252831] transition-colors"
+                      className="w-full justify-center border-dashed border-white/20 text-xs text-slate-300 hover:border-blue-500 hover:text-blue-400 rounded-lg"
                     >
-                      + Add Target Image URL
-                    </button>
+                      <PlusIcon className="h-3.5 w-3.5 mr-1.5" /> Add Gallery Image URL
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -361,11 +434,11 @@ export function AdvancedEmbedEditor({
         )}
 
         {tab === "raw" && (
-          <div className="flex flex-col h-full space-y-3">
+          <div className="flex flex-col h-full space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h4 className="text-white text-md font-bold">Raw JSON Source</h4>
-                <p className="text-xs text-discord-text-muted">Paste or upload JSON exported from Discohook, Sapphire, or Carl-bot. This template applies automatically across supported modules.</p>
+                <h4 className="text-white text-sm font-bold uppercase tracking-wider">Raw JSON Source Payload</h4>
+                <p className="text-xs text-slate-400 mt-0.5">Paste or upload JSON payload exported from Discohook, Sapphire, or Carl-bot. Changes auto-sync instantly.</p>
               </div>
 
               <div className="shrink-0">
@@ -376,21 +449,22 @@ export function AdvancedEmbedEditor({
                   className="hidden"
                   onChange={handleTemplateFileUpload}
                 />
-                <button
+                <Button
                   type="button"
+                  size="sm"
+                  variant="outline"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/15 bg-[#1b1d22] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-discord-text transition hover:border-white/35 hover:bg-[#252831]"
+                  className="border-white/20 text-xs font-semibold text-slate-300 hover:border-blue-500 hover:text-blue-400"
                 >
-                  <UploadIcon className="h-3.5 w-3.5" />
-                  Upload JSON
-                </button>
+                  <UploadIcon className="h-3.5 w-3.5 mr-1.5" /> Upload JSON
+                </Button>
               </div>
             </div>
 
-            {rawError && <p className="text-xs text-discord-red">{rawError}</p>}
+            {rawError && <p className="text-xs text-rose-400 font-medium">{rawError}</p>}
 
             <Textarea
-              className="min-h-[400px] flex-1 border-white/10 bg-[#111216] font-mono text-[13px] leading-relaxed text-[#DBDEE1]"
+              className="min-h-[400px] flex-1 border-white/10 bg-black/60 font-mono text-xs leading-relaxed text-slate-200 focus:border-blue-500"
               value={rawText}
               onChange={(e) => handleRawChange(e.target.value)}
               placeholder="{...}"
@@ -400,8 +474,13 @@ export function AdvancedEmbedEditor({
         )}
 
         {tab === "preview" && (
-          <div className="min-h-[400px] rounded-xl border border-white/12 bg-[#101116] p-8 shadow-inner">
-            <div className="w-full max-w-[500px]">
+          <div className="min-h-[420px] rounded-2xl border border-white/10 bg-[#313338] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 border-b border-white/10 pb-3 text-slate-400 text-xs font-semibold">
+              <span className="text-slate-500 font-bold text-sm">#</span>
+              <span>preview-channel</span>
+              <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-mono text-slate-300 ml-auto">LIVE DISCORD SIMULATOR</span>
+            </div>
+            <div className="w-full max-w-[540px]">
               <DiscordMessagePreview
                 message={{
                   content: config.content,
@@ -412,7 +491,9 @@ export function AdvancedEmbedEditor({
                       ? parseInt(config.color.replace("#", ""), 16) 
                       : parseInt(String(config.color)) || 5814783,
                     thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : undefined,
-                    image: config.image_url ? { url: config.image_url } : undefined,                      images: Array.isArray(config.images) && config.images.length > 0 ? config.images.map(url => ({ url })) : undefined,                    footer: config.footer ? { text: config.footer } : undefined,
+                    image: config.image_url ? { url: config.image_url } : undefined,
+                    images: Array.isArray(config.images) && config.images.length > 0 ? config.images.map(url => ({ url })) : undefined,
+                    footer: config.footer ? { text: config.footer } : undefined,
                     fields: config.fields || []
                   }],
                   components: Array.isArray(config.components) && config.components.length > 0

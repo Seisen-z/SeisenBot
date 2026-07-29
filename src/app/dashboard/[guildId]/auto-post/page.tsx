@@ -152,17 +152,15 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
   });
 
   // Load Auto-Posts
+  // Load Auto-Posts
   const loadPosts = useCallback(async () => {
     try {
       const raw = await fetchApi(`/guilds/${guildId}/auto_posts`);
-      const normalized: Record<string, AutoPostConfig> = {};
-      for (const [k, v] of Object.entries(raw || {})) {
-        normalized[k] = normalizePost(k, v);
-      }
-      setPosts(normalized);
-      const keys = Object.keys(normalized);
+      const data = raw || {};
+      setPosts(data);
+      const keys = Object.keys(data);
       if (keys.length > 0) {
-        setActiveKey((prev) => (prev && normalized[prev] ? prev : keys[0]));
+        setActiveKey((prev) => (prev && data[prev] ? prev : keys[0]));
       }
     } catch (err) {
       toast("Failed to load auto-posts", "error");
@@ -201,7 +199,7 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
   const updateActivePostField = (field: string, val: any) => {
     if (!activeKey) return;
     setPosts((prev) => {
-      const current = prev[activeKey] || createEmptyPost();
+      const current = prev[activeKey] || {};
       return {
         ...prev,
         [activeKey]: {

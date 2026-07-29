@@ -159,14 +159,11 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const loadDrafts = useCallback(async () => {
     try {
       const raw = await fetchApi(`/guilds/${guildId}/announcements`);
-      const normalized: Record<string, AnnouncementDraft> = {};
-      for (const [k, v] of Object.entries(raw || {})) {
-        normalized[k] = normalizeDraft(k, v);
-      }
-      setDrafts(normalized);
-      const keys = Object.keys(normalized);
+      const data = raw || {};
+      setDrafts(data);
+      const keys = Object.keys(data);
       if (keys.length > 0) {
-        setActiveKey((prev) => (prev && normalized[prev] ? prev : keys[0]));
+        setActiveKey((prev) => (prev && data[prev] ? prev : keys[0]));
       }
     } catch (err) {
       toast("Failed to load announcement drafts", "error");
@@ -205,7 +202,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const updateActiveDraftField = (field: string, val: any) => {
     if (!activeKey) return;
     setDrafts((prev) => {
-      const current = prev[activeKey] || createEmptyDraft();
+      const current = prev[activeKey] || {};
       return {
         ...prev,
         [activeKey]: {

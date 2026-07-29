@@ -559,24 +559,6 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
 
                   <div className="flex items-center gap-2">
                     <Button
-                      variant="default"
-                      size="sm"
-                      className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold"
-                      disabled={savingManual}
-                      onClick={handleManualSave}
-                    >
-                      {savingManual ? (
-                        <>
-                          <RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Saving...
-                        </>
-                      ) : (
-                        <>
-                          <SaveIcon className="mr-1.5 h-3.5 w-3.5" /> Save Configuration
-                        </>
-                      )}
-                    </Button>
-
-                    <Button
                       variant={activePost.enabled ? "outline" : "default"}
                       size="sm"
                       className={

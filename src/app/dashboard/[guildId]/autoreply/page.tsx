@@ -431,24 +431,6 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                     Set triggering keywords, target channel filters, delete delay timer, and message template.
                   </p>
                 </div>
-
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold"
-                  disabled={saving}
-                  onClick={handleManualSave}
-                >
-                  {saving ? (
-                    <>
-                      <RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Saving...
-                    </>
-                  ) : (
-                    <>
-                      <SaveIcon className="mr-1.5 h-3.5 w-3.5" /> Save Rules
-                    </>
-                  )}
-                </Button>
               </div>
 
               {/* Rule Name & Settings */}

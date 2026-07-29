@@ -30,6 +30,7 @@ import {
 import { PromptModal } from "@/components/ui/prompt-modal";
 
 const DEFAULT_CATEGORY = "General";
+const PRESET_EMOJIS = ["🎉", "👍", "❤️", "🔥", "✅", "⭐", "🚀", "💡", "📌", "📢", "💬", "🎁", "🏆", "👏", "💯", "🙌", "❓", "❌"];
 
 type AnnouncementButton = { label: string; url: string };
 
@@ -562,24 +563,6 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                     <Button
                       variant="default"
                       size="sm"
-                      className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold"
-                      disabled={savingManual}
-                      onClick={handleManualSave}
-                    >
-                      {savingManual ? (
-                        <>
-                          <RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Saving...
-                        </>
-                      ) : (
-                        <>
-                          <SaveIcon className="mr-1.5 h-3.5 w-3.5" /> Save Draft
-                        </>
-                      )}
-                    </Button>
-
-                    <Button
-                      variant="default"
-                      size="sm"
                       className="bg-blue-600 text-white hover:bg-blue-500 font-semibold"
                       disabled={posting || !activeDraft.channel_id}
                       onClick={handlePublishNow}
@@ -623,27 +606,65 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                 </div>
 
                 {/* Auto-Reaction Emojis Configuration */}
-                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4 space-y-2">
-                  <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                    <SmileIcon className="h-4 w-4 text-blue-400" /> Auto-Reaction Emojis (Optional)
-                  </label>
-                  <Input
-                    className="bg-black/40 text-xs text-white placeholder:text-slate-500"
-                    placeholder="e.g. 🎉, 👍, 🔥 (Comma-separated emojis automatically reacted to published message)"
-                    value={
-                      Array.isArray(activeDraft.auto_reactions)
-                        ? activeDraft.auto_reactions.join(", ")
-                        : activeDraft.auto_reactions || ""
-                    }
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const arr = raw.split(",").map((r) => r.trim()).filter(Boolean);
-                      updateActiveDraftField("auto_reactions", arr);
-                    }}
-                  />
-                  <p className="text-[11px] text-slate-500">
-                    The bot will automatically add these reaction options to the announcement message once published.
-                  </p>
+                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                      <SmileIcon className="h-4 w-4 text-blue-400" /> Auto-Reaction Emojis Selection
+                    </label>
+                    {activeDraft.auto_reactions && activeDraft.auto_reactions.length > 0 && (
+                      <span className="text-[11px] text-blue-400 font-medium">
+                        Selected ({activeDraft.auto_reactions.length}): {activeDraft.auto_reactions.join(" ")}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {PRESET_EMOJIS.map((emoji) => {
+                      const isSelected = (activeDraft.auto_reactions || []).includes(emoji);
+                      return (
+                        <button
+                          key={emoji}
+                          type="button"
+                          className={`h-9 w-9 rounded-lg border text-base flex items-center justify-center transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-500/20 text-white ring-1 ring-blue-500/50"
+                              : "border-white/10 bg-black/40 text-slate-300 hover:border-white/20 hover:bg-white/5"
+                          }`}
+                          onClick={() => {
+                            const current = activeDraft.auto_reactions || [];
+                            const next = isSelected
+                              ? current.filter((e) => e !== emoji)
+                              : [...current, emoji];
+                            updateActiveDraftField("auto_reactions", next);
+                          }}
+                          title={isSelected ? `Remove ${emoji}` : `Add ${emoji}`}
+                        >
+                          {emoji}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <Input
+                      className="h-8 text-xs bg-black/40 text-white placeholder:text-slate-500 max-w-xs"
+                      placeholder="Type custom emoji or server emoji & press Enter..."
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                          e.preventDefault();
+                          const custom = e.currentTarget.value.trim();
+                          const current = activeDraft.auto_reactions || [];
+                          if (!current.includes(custom)) {
+                            updateActiveDraftField("auto_reactions", [...current, custom]);
+                          }
+                          e.currentTarget.value = "";
+                        }
+                      }}
+                    />
+                    <span className="text-[11px] text-slate-500">
+                      (Click preset emojis to select/deselect, or type a custom emoji and press Enter)
+                    </span>
+                  </div>
                 </div>
 
                 {/* Execution Metadata */}

@@ -77,7 +77,10 @@ const createEmptyPost = (name: string = "New Auto-Post", category: string = DEFA
 });
 
 function normalizePost(key: string, input: any): AutoPostConfig {
-  const source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  let source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  if (source.content && typeof source.content === "object" && !Array.isArray(source.content)) {
+    source = { ...source.content, name: source.name || source.content.name };
+  }
   const parts = key.split("/");
   const keyCategory = parts.length > 1 ? parts[0] : DEFAULT_CATEGORY;
   const keyName = parts.length > 1 ? parts.slice(1).join("/") : key;

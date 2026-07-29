@@ -23,7 +23,6 @@ import {
   FileTextIcon,
   SparklesIcon,
   ImageIcon,
-  SaveIcon,
   SmileIcon,
   MegaphoneIcon,
 } from "lucide-react";
@@ -132,7 +131,6 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [savingManual, setSavingManual] = useState(false);
 
   const [promptState, setPromptState] = useState<{
     open: boolean;
@@ -207,21 +205,6 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
         },
       };
     });
-  };
-
-  const handleManualSave = async () => {
-    setSavingManual(true);
-    try {
-      await fetchApi(`/guilds/${guildId}/announcements`, undefined, {
-        method: "PUT",
-        body: JSON.stringify(drafts),
-      });
-      toast("Announcement drafts saved successfully!", "success");
-    } catch (err: any) {
-      toast(`Save failed: ${err.message || err}`, "error");
-    } finally {
-      setSavingManual(false);
-    }
   };
 
   // Publish Announcement Now
@@ -346,48 +329,42 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const categories = parseDrafts(drafts);
   const activeDraft = activeKey ? drafts[activeKey] : null;
 
-  const getDraftStatusText = (draft: AnnouncementDraft) => {
-    if (!draft.channel_id) return { label: "Needs Channel", color: "bg-rose-500/10 text-rose-400 border-rose-500/20" };
-    if (draft.last_posted_at) return { label: "Published", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" };
-    return { label: "Ready to Publish", color: "bg-blue-500/10 text-blue-400 border-blue-500/20" };
-  };
-
   return (
     <div className="space-y-6 pb-12">
       <DashboardPageHero
         title="Announcement Studio"
-        subtitle="Design rich announcement embeds, configure target channels, set auto-reaction emojis, and publish to Discord."
+        subtitle="Design rich announcement embeds, configure target channels, set auto-reaction emojis, and publish instantly to Discord."
         icon={MegaphoneIcon}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left Navigation: Categories & Announcement Drafts */}
         <div className="lg:col-span-4 xl:col-span-3">
-          <div className="rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-md">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Announcement Categories</h3>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 px-2 text-xs text-blue-400 hover:bg-blue-500/10"
-                  onClick={() =>
-                    setPromptState({
-                      open: true,
-                      title: "Create Category",
-                      label: "Category Name",
-                      actionType: "new_cat",
-                    })
-                  }
-                >
-                  <PlusIcon className="mr-1 h-3.5 w-3.5" /> Category
-                </Button>
-              </div>
+          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4.5 backdrop-blur-xl shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-slate-200 via-slate-400 to-slate-200 bg-clip-text text-transparent">
+                Announcement Categories
+              </h3>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2.5 text-xs text-blue-400 hover:bg-blue-500/10 transition-all duration-200 rounded-lg font-medium"
+                onClick={() =>
+                  setPromptState({
+                    open: true,
+                    title: "Create Category",
+                    label: "Category Name",
+                    actionType: "new_cat",
+                  })
+                }
+              >
+                <PlusIcon className="mr-1 h-3.5 w-3.5" /> Category
+              </Button>
             </div>
 
             <div className="space-y-3">
               {Object.keys(categories).length === 0 && (
-                <div className="p-4 text-center text-xs text-slate-500">
+                <div className="p-4 text-center text-xs text-slate-500 rounded-xl border border-white/5 bg-white/[0.01]">
                   No announcement drafts configured. Click below to add your first draft.
                 </div>
               )}
@@ -395,22 +372,25 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
               {Object.entries(categories).map(([categoryName, draftKeys]) => {
                 const isCollapsed = collapsedCats[categoryName];
                 return (
-                  <div key={categoryName} className="rounded-lg border border-white/5 bg-white/[0.02]">
-                    <div className="flex items-center justify-between px-3 py-2">
+                  <div
+                    key={categoryName}
+                    className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-200 hover:border-white/20"
+                  >
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-white/[0.02]">
                       <button
                         onClick={() =>
                           setCollapsedCats((prev) => ({ ...prev, [categoryName]: !prev[categoryName] }))
                         }
-                        className="flex flex-1 items-center gap-2 text-left text-xs font-semibold text-slate-300 transition hover:text-white"
+                        className="flex flex-1 items-center gap-2 text-left text-xs font-semibold text-slate-200 transition hover:text-white"
                       >
                         {isCollapsed ? (
-                          <ChevronRightIcon className="h-3.5 w-3.5 text-slate-500" />
+                          <ChevronRightIcon className="h-3.5 w-3.5 text-slate-400" />
                         ) : (
-                          <ChevronDownIcon className="h-3.5 w-3.5 text-slate-500" />
+                          <ChevronDownIcon className="h-3.5 w-3.5 text-slate-400" />
                         )}
-                        <FolderIcon className="h-3.5 w-3.5 text-blue-400" />
+                        <FolderIcon className="h-3.5 w-3.5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                         <span className="truncate">{categoryName}</span>
-                        <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-slate-400">
+                        <span className="rounded-full bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[10px] font-semibold text-blue-300">
                           {draftKeys.length}
                         </span>
                       </button>
@@ -418,7 +398,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 w-7 p-0 text-slate-400 hover:text-white hover:bg-white/10"
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition"
                         title="Add draft to category"
                         onClick={() =>
                           setPromptState({
@@ -435,7 +415,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                     </div>
 
                     {!isCollapsed && (
-                      <div className="space-y-1 p-1.5 pt-0">
+                      <div className="space-y-1 p-1.5 pt-1">
                         {draftKeys.map((key) => {
                           const draft = drafts[key];
                           const isActive = activeKey === key;
@@ -443,25 +423,28 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                           return (
                             <div
                               key={key}
-                              className={`group flex items-center justify-between rounded-md px-2.5 py-2 text-xs transition cursor-pointer ${
+                              className={`group flex items-center justify-between rounded-lg px-3 py-2 text-xs transition-all duration-200 cursor-pointer ${
                                 isActive
-                                  ? "bg-blue-600/20 font-medium text-blue-400 border border-blue-500/30"
-                                  : "text-slate-300 hover:bg-white/5 hover:text-white"
+                                  ? "bg-gradient-to-r from-blue-600/25 to-indigo-600/15 font-semibold text-blue-300 border border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.2)] transform translate-x-0.5"
+                                  : "text-slate-300 hover:bg-white/[0.04] hover:text-white hover:translate-x-0.5"
                               }`}
                               onClick={() => setActiveKey(key)}
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span
-                                  className={`h-2 w-2 rounded-full ${
-                                    draft?.channel_id ? "bg-emerald-400" : "bg-slate-600"
-                                  }`}
-                                />
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {draft?.channel_id ? (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                  </span>
+                                ) : (
+                                  <span className="h-2 w-2 rounded-full bg-rose-500/60 shrink-0" />
+                                )}
                                 <span className="truncate">{name}</span>
                               </div>
 
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
-                                  className="p-1 text-slate-400 hover:text-white"
+                                  className="p-1 text-slate-400 hover:text-white transition"
                                   title="Rename"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -478,7 +461,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                                   <EditIcon className="h-3 w-3" />
                                 </button>
                                 <button
-                                  className="p-1 text-slate-400 hover:text-rose-400"
+                                  className="p-1 text-slate-400 hover:text-rose-400 transition"
                                   title="Delete"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -506,7 +489,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
 
               <Button
                 variant="outline"
-                className="w-full justify-center border-dashed border-white/20 py-2 text-xs text-slate-400 hover:border-blue-500 hover:text-blue-400"
+                className="w-full justify-center border-dashed border-white/20 py-2.5 text-xs font-semibold text-slate-300 hover:border-blue-500 hover:text-blue-400 transition-all duration-200 rounded-xl"
                 onClick={() =>
                   setPromptState({
                     open: true,
@@ -526,30 +509,51 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
         {/* Right Panel: Announcement Settings & Editor */}
         <div className="lg:col-span-8 xl:col-span-9 space-y-6">
           {!activeDraft ? (
-            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-white/10 bg-black/40 text-center backdrop-blur-md">
-              <MegaphoneIcon className="mb-3 h-10 w-10 text-slate-600" />
-              <h3 className="text-base font-medium text-slate-300">No Draft Selected</h3>
+            <div className="flex h-72 flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-center backdrop-blur-xl shadow-2xl">
+              <MegaphoneIcon className="mb-3 h-12 w-12 text-slate-600 animate-pulse" />
+              <h3 className="text-base font-semibold text-slate-300">No Draft Selected</h3>
               <p className="mt-1 text-xs text-slate-500">Select an existing draft from the sidebar or create a new one.</p>
             </div>
           ) : (
             <>
               {/* Header Status & Control Bar */}
-              <div className="rounded-xl border border-white/10 bg-black/40 p-5 backdrop-blur-md space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 backdrop-blur-xl shadow-2xl space-y-5 relative overflow-hidden">
+                <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+
+                <div className="flex flex-wrap items-center justify-between gap-4 relative z-10">
                   <div>
                     <div className="flex items-center gap-3">
-                      <h2 className="text-lg font-bold text-white">{activeDraft.name}</h2>
-                      <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-slate-300">
+                      <h2 className="text-xl font-extrabold text-white tracking-tight">{activeDraft.name}</h2>
+                      <span className="rounded-md bg-white/10 border border-white/10 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
                         {activeDraft.category}
                       </span>
                       {(() => {
-                        const status = getDraftStatusText(activeDraft);
+                        if (!activeDraft.channel_id) {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-400">
+                              <span className="h-2 w-2 rounded-full bg-rose-500" />
+                              Needs Channel
+                            </span>
+                          );
+                        }
+                        if (activeDraft.last_posted_at) {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              </span>
+                              Published
+                            </span>
+                          );
+                        }
                         return (
-                          <span
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${status.color}`}
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                            {status.label}
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)]">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                            </span>
+                            Ready to Publish
                           </span>
                         );
                       })()}
@@ -563,7 +567,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                     <Button
                       variant="default"
                       size="sm"
-                      className="bg-blue-600 text-white hover:bg-blue-500 font-semibold"
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold shadow-lg shadow-blue-600/25 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                       disabled={posting || !activeDraft.channel_id}
                       onClick={handlePublishNow}
                     >
@@ -605,14 +609,14 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                   </div>
                 </div>
 
-                {/* Auto-Reaction Emojis Configuration */}
-                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                {/* Interactive Emoji Selection Grid */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <SmileIcon className="h-4 w-4 text-blue-400" /> Auto-Reaction Emojis Selection
+                      <SmileIcon className="h-4 w-4 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" /> Auto-Reaction Emojis Selection
                     </label>
                     {activeDraft.auto_reactions && activeDraft.auto_reactions.length > 0 && (
-                      <span className="text-[11px] text-blue-400 font-medium">
+                      <span className="text-[11px] text-blue-400 font-bold tracking-wide">
                         Selected ({activeDraft.auto_reactions.length}): {activeDraft.auto_reactions.join(" ")}
                       </span>
                     )}
@@ -625,11 +629,11 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                         <button
                           key={emoji}
                           type="button"
-                          className={`h-9 w-9 rounded-lg border text-base flex items-center justify-center transition cursor-pointer ${
+                          className={
                             isSelected
-                              ? "border-blue-500 bg-blue-500/20 text-white ring-1 ring-blue-500/50"
-                              : "border-white/10 bg-black/40 text-slate-300 hover:border-white/20 hover:bg-white/5"
-                          }`}
+                              ? "h-10 w-10 rounded-xl border border-blue-500/80 bg-gradient-to-b from-blue-500/30 to-indigo-500/20 text-lg flex items-center justify-center transition-all duration-150 transform scale-105 shadow-[0_0_15px_rgba(59,130,246,0.35)] ring-2 ring-blue-400/50 cursor-pointer"
+                              : "h-10 w-10 rounded-xl border border-white/10 bg-black/40 text-lg flex items-center justify-center transition-all duration-150 hover:scale-110 active:scale-95 hover:border-white/30 hover:bg-white/10 cursor-pointer"
+                          }
                           onClick={() => {
                             const current = activeDraft.auto_reactions || [];
                             const next = isSelected
@@ -647,8 +651,8 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
 
                   <div className="flex items-center gap-2 pt-1">
                     <Input
-                      className="h-8 text-xs bg-black/40 text-white placeholder:text-slate-500 max-w-xs"
-                      placeholder="Type custom emoji or server emoji & press Enter..."
+                      className="h-8 text-xs bg-black/40 text-white placeholder:text-slate-500 max-w-xs border-white/10 focus:border-blue-500"
+                      placeholder="Type custom emoji & press Enter..."
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && e.currentTarget.value.trim()) {
                           e.preventDefault();
@@ -691,21 +695,21 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
               </div>
 
               {/* Message Format Mode Selector & Content Editor */}
-              <div className="rounded-xl border border-white/10 bg-black/40 p-5 backdrop-blur-md space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 backdrop-blur-xl shadow-2xl space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Message Content & Format</h3>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Message Content & Format</h3>
                     <p className="mt-0.5 text-xs text-slate-400">
                       Choose whether to send your announcement as plain text or as a rich Discord embed card.
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/40 p-1">
+                  <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/60 p-1">
                     <button
                       type="button"
-                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                      className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-all duration-200 cursor-pointer ${
                         activeDraft.post_type === "plain"
-                          ? "bg-blue-600 text-white shadow-sm"
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
                           : "text-slate-400 hover:text-white"
                       }`}
                       onClick={() => updateActiveDraftField("post_type", "plain")}
@@ -714,9 +718,9 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                     </button>
                     <button
                       type="button"
-                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                      className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-all duration-200 cursor-pointer ${
                         activeDraft.post_type === "embed"
-                          ? "bg-blue-600 text-white shadow-sm"
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
                           : "text-slate-400 hover:text-white"
                       }`}
                       onClick={() => updateActiveDraftField("post_type", "embed")}
@@ -735,7 +739,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                       <Textarea
                         rows={14}
                         placeholder="Type your plain text announcement message here... (Supports multiline formatting, custom emojis, URLs, and role mentions)"
-                        className="bg-black/40 text-xs text-white placeholder:text-slate-500 font-mono min-h-[260px] resize-y"
+                        className="bg-black/40 text-xs text-white placeholder:text-slate-500 font-mono min-h-[260px] resize-y border-white/10 focus:border-blue-500"
                         value={activeDraft.content || ""}
                         onChange={(e) => updateActiveDraftField("content", e.target.value)}
                       />
@@ -752,12 +756,12 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                     </div>
 
                     {(activeDraft.image_url || (activeDraft.images && activeDraft.images.length > 0)) && (
-                      <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
+                      <div className="rounded-xl border border-white/10 bg-black/20 p-3.5 space-y-2">
                         <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                           <ImageIcon className="h-3.5 w-3.5 text-blue-400" /> Attached Image URLs
                         </label>
                         {activeDraft.image_url && (
-                          <div className="flex items-center justify-between gap-2 rounded bg-white/5 p-2 text-xs text-slate-300">
+                          <div className="flex items-center justify-between gap-2 rounded-lg bg-white/5 p-2.5 text-xs text-slate-300">
                             <span className="truncate text-slate-400 font-mono text-[11px]">Main Image: {activeDraft.image_url}</span>
                             <Button
                               size="sm"
@@ -770,7 +774,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                           </div>
                         )}
                         {(activeDraft.images || []).map((imgUrl, idx) => (
-                          <div key={idx} className="flex items-center justify-between gap-2 rounded bg-white/5 p-2 text-xs text-slate-300">
+                          <div key={idx} className="flex items-center justify-between gap-2 rounded-lg bg-white/5 p-2.5 text-xs text-slate-300">
                             <span className="truncate text-slate-400 font-mono text-[11px]">Image #{idx + 1}: {imgUrl}</span>
                             <Button
                               size="sm"
@@ -815,7 +819,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                                   nextButtons[idx] = { ...nextButtons[idx], label: e.target.value };
                                   updateActiveDraftField("buttons", nextButtons);
                                 }}
-                                className="flex-1 bg-black/40 text-xs"
+                                className="flex-1 bg-black/40 text-xs border-white/10"
                               />
                               <Input
                                 placeholder="URL (https://...)"
@@ -825,7 +829,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                                   nextButtons[idx] = { ...nextButtons[idx], url: e.target.value };
                                   updateActiveDraftField("buttons", nextButtons);
                                 }}
-                                className="flex-[2] bg-black/40 text-xs"
+                                className="flex-[2] bg-black/40 text-xs border-white/10"
                               />
                               <Button
                                 size="sm"
@@ -844,7 +848,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-fit border-dashed border-white/20 text-xs text-slate-300 hover:border-blue-500 hover:text-blue-400"
+                              className="w-fit border-dashed border-white/20 text-xs text-slate-300 hover:border-blue-500 hover:text-blue-400 rounded-lg"
                               onClick={() => {
                                 const nextButtons = [...(activeDraft.buttons || []), { label: "Learn More", url: "https://" }];
                                 updateActiveDraftField("buttons", nextButtons);
@@ -871,7 +875,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 text-xs font-semibold"
+                    className="text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 text-xs font-semibold rounded-lg"
                     onClick={() =>
                       setPromptState({
                         open: true,

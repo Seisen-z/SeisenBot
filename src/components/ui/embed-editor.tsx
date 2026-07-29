@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { Button } from "./button";
 import { Input } from "./input";
 import { Textarea } from "./textarea";
 import { Copy, Eye, FileJson, Sparkles, UploadIcon, Trash2Icon, PlusIcon } from "lucide-react";

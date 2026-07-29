@@ -76,13 +76,17 @@ const createEmptyPost = (name: string = "New Auto-Post", category: string = DEFA
   last_message_id: null,
 });
 
-function normalizePost(input: any): AutoPostConfig {
+function normalizePost(key: string, input: any): AutoPostConfig {
   const source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const parts = key.split("/");
+  const keyCategory = parts.length > 1 ? parts[0] : DEFAULT_CATEGORY;
+  const keyName = parts.length > 1 ? parts.slice(1).join("/") : key;
+
   return {
-    ...createEmptyPost(),
+    ...createEmptyPost(keyName, keyCategory),
     ...source,
-    name: typeof source.name === "string" ? source.name : "Auto-Post",
-    category: typeof source.category === "string" ? source.category : DEFAULT_CATEGORY,
+    name: typeof source.name === "string" && source.name.trim() ? source.name : keyName,
+    category: typeof source.category === "string" && source.category.trim() ? source.category : keyCategory,
     channel_id: typeof source.channel_id === "string" ? source.channel_id : "",
     enabled: typeof source.enabled === "boolean" ? source.enabled : true,
     interval_minutes: typeof source.interval_minutes === "number" && source.interval_minutes > 0 ? source.interval_minutes : 60,
@@ -150,7 +154,7 @@ export default function AutoPostPage({ params }: { params: Promise<{ guildId: st
       const raw = await fetchApi(`/guilds/${guildId}/auto_posts`);
       const normalized: Record<string, AutoPostConfig> = {};
       for (const [k, v] of Object.entries(raw || {})) {
-        normalized[k] = normalizePost(v);
+        normalized[k] = normalizePost(k, v);
       }
       setPosts(normalized);
       const keys = Object.keys(normalized);

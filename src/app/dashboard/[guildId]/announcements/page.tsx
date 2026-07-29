@@ -74,8 +74,12 @@ const createEmptyDraft = (name: string = "New Announcement", category: string = 
   last_message_id: null,
 });
 
-function normalizeDraft(input: any): AnnouncementDraft {
+function normalizeDraft(key: string, input: any): AnnouncementDraft {
   const source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const parts = key.split("/");
+  const keyCategory = parts.length > 1 ? parts[0] : DEFAULT_CATEGORY;
+  const keyName = parts.length > 1 ? parts.slice(1).join("/") : key;
+
   let auto_reactions: string[] = [];
   if (Array.isArray(source.auto_reactions)) {
     auto_reactions = source.auto_reactions.filter((r: any) => typeof r === "string" && r.trim());
@@ -84,10 +88,10 @@ function normalizeDraft(input: any): AnnouncementDraft {
   }
 
   return {
-    ...createEmptyDraft(),
+    ...createEmptyDraft(keyName, keyCategory),
     ...source,
-    name: typeof source.name === "string" ? source.name : "Announcement Draft",
-    category: typeof source.category === "string" ? source.category : DEFAULT_CATEGORY,
+    name: typeof source.name === "string" && source.name.trim() ? source.name : keyName,
+    category: typeof source.category === "string" && source.category.trim() ? source.category : keyCategory,
     post_type: source.post_type === "plain" ? "plain" : "embed",
     title: typeof source.title === "string" ? source.title : "",
     description: typeof source.description === "string" ? source.description : "",
@@ -154,7 +158,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
       const raw = await fetchApi(`/guilds/${guildId}/announcements`);
       const normalized: Record<string, AnnouncementDraft> = {};
       for (const [k, v] of Object.entries(raw || {})) {
-        normalized[k] = normalizeDraft(v);
+        normalized[k] = normalizeDraft(k, v);
       }
       setDrafts(normalized);
       const keys = Object.keys(normalized);

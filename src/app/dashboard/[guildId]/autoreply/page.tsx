@@ -19,6 +19,9 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   EditIcon,
+  RotateCwIcon,
+  CheckCircle2Icon,
+  SaveIcon,
 } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
@@ -103,11 +106,11 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
     [guildId]
   );
 
-  useDebouncedAutoSave({
+  const { isSaving, lastSaved, triggerSaveNow } = useDebouncedAutoSave({
     value: rules,
     enabled: initialLoadComplete,
     contextKey: guildId,
-    delay: 1400,
+    delay: 600,
     onSave: persistRules,
     onError: (err: any) => toast(err?.message || "Auto-save failed for auto replies", "error"),
   });
@@ -429,6 +432,52 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                   <p className="mt-1 text-xs text-slate-400">
                     Set triggering keywords, target channel filters, delete delay timer, and message template.
                   </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-white/10 bg-black/40">
+                    {isSaving ? (
+                      <>
+                        <RotateCwIcon className="h-3.5 w-3.5 text-blue-400 animate-spin" />
+                        <span className="text-blue-300 font-medium">Saving...</span>
+                      </>
+                    ) : lastSaved ? (
+                      <>
+                        <CheckCircle2Icon className="h-3.5 w-3.5 text-emerald-400" />
+                        <span className="text-emerald-300 font-medium">Auto-saved</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2Icon className="h-3.5 w-3.5 text-slate-400" />
+                        <span className="text-slate-400">Ready</span>
+                      </>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold rounded-lg transition cursor-pointer"
+                    disabled={isSaving}
+                    onClick={async () => {
+                      try {
+                        await triggerSaveNow();
+                        toast("Saved rules successfully!", "success");
+                      } catch (err: any) {
+                        toast(`Save failed: ${err.message || err}`, "error");
+                      }
+                    }}
+                  >
+                    {isSaving ? (
+                      <>
+                        <RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Saving...
+                      </>
+                    ) : (
+                      <>
+                        <SaveIcon className="mr-1.5 h-3.5 w-3.5" /> Save Rules
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
 

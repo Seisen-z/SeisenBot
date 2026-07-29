@@ -25,6 +25,8 @@ import {
   ImageIcon,
   SmileIcon,
   MegaphoneIcon,
+  CheckCircle2Icon,
+  SaveIcon,
 } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
@@ -185,10 +187,10 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
     [guildId, toast]
   );
 
-  useDebouncedAutoSave({
+  const { isSaving, lastSaved, triggerSaveNow } = useDebouncedAutoSave({
     value: drafts,
     enabled: initialLoaded,
-    delay: 1200,
+    delay: 600,
     onSave: saveDrafts,
     onError: () => toast("Auto-save failed", "error"),
   });
@@ -564,6 +566,49 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-white/10 bg-black/40">
+                      {isSaving ? (
+                        <>
+                          <RotateCwIcon className="h-3.5 w-3.5 text-blue-400 animate-spin" />
+                          <span className="text-blue-300 font-medium">Saving...</span>
+                        </>
+                      ) : lastSaved ? (
+                        <>
+                          <CheckCircle2Icon className="h-3.5 w-3.5 text-emerald-400" />
+                          <span className="text-emerald-300 font-medium">Auto-saved</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2Icon className="h-3.5 w-3.5 text-slate-400" />
+                          <span className="text-slate-400">Ready</span>
+                        </>
+                      )}
+                    </div>
+
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold rounded-lg transition cursor-pointer"
+                      disabled={isSaving}
+                      onClick={async () => {
+                        try {
+                          await triggerSaveNow();
+                          toast("Saved draft successfully!", "success");
+                        } catch (err: any) {
+                          toast(`Save failed: ${err.message || err}`, "error");
+                        }
+                      }}
+                    >
+                      {isSaving ? (
+                        <>
+                          <RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Saving...
+                        </>
+                      ) : (
+                        <>
+                          <SaveIcon className="mr-1.5 h-3.5 w-3.5" /> Save Draft
+                        </>
+                      )}
+                    </Button>
                     <Button
                       variant="default"
                       size="sm"

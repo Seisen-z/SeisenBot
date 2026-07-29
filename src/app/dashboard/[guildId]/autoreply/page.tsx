@@ -19,8 +19,6 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   EditIcon,
-  SaveIcon,
-  RotateCwIcon,
 } from "lucide-react";
 import { PromptModal } from "@/components/ui/prompt-modal";
 
@@ -47,7 +45,6 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
   const [rules, setRules] = useState<any[]>([]);
   const [activeIdx, setActiveIdx] = useState<number>(-1);
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
-  const [saving, setSaving] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [loadError, setLoadError] = useState<DashboardErrorState | null>(null);
 
@@ -114,18 +111,6 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
     onSave: persistRules,
     onError: (err: any) => toast(err?.message || "Auto-save failed for auto replies", "error"),
   });
-
-  const handleManualSave = async () => {
-    setSaving(true);
-    try {
-      await persistRules(rules);
-      toast("Auto Reply rules saved successfully!", "success");
-    } catch (e: any) {
-      toast(e?.message || "Failed to save auto replies.", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const updateRule = (field: string, value: any) => {
     if (activeIdx < 0 || activeIdx >= rules.length) return;
@@ -233,13 +218,15 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left Sidebar: Categories & Auto Reply Rules */}
         <div className="lg:col-span-4 xl:col-span-3">
-          <div className="rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-md">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Rule Categories</h3>
+          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4.5 backdrop-blur-xl shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-slate-200 via-slate-400 to-slate-200 bg-clip-text text-transparent">
+                Rule Categories
+              </h3>
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-8 px-2 text-xs text-blue-400 hover:bg-blue-500/10"
+                className="h-7 px-2.5 text-xs text-blue-400 hover:bg-blue-500/10 transition-all duration-200 rounded-lg font-medium"
                 onClick={() =>
                   setPromptState({
                     open: true,
@@ -255,7 +242,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
 
             <div className="space-y-3">
               {Object.keys(categories).length === 0 && (
-                <div className="p-4 text-center text-xs text-slate-500">
+                <div className="p-4 text-center text-xs text-slate-500 rounded-xl border border-white/5 bg-white/[0.01]">
                   No auto-reply rules set up. Click below to add your first rule.
                 </div>
               )}
@@ -263,22 +250,25 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
               {Object.entries(categories).map(([categoryName, ruleIndices]) => {
                 const isCollapsed = collapsedCats[categoryName];
                 return (
-                  <div key={categoryName} className="rounded-lg border border-white/5 bg-white/[0.02]">
-                    <div className="flex items-center justify-between px-3 py-2">
+                  <div
+                    key={categoryName}
+                    className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden transition-all duration-200 hover:border-white/20"
+                  >
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-white/[0.02]">
                       <button
                         onClick={() =>
                           setCollapsedCats((prev) => ({ ...prev, [categoryName]: !prev[categoryName] }))
                         }
-                        className="flex flex-1 items-center gap-2 text-left text-xs font-semibold text-slate-300 transition hover:text-white"
+                        className="flex flex-1 items-center gap-2 text-left text-xs font-semibold text-slate-200 transition hover:text-white"
                       >
                         {isCollapsed ? (
-                          <ChevronRightIcon className="h-3.5 w-3.5 text-slate-500" />
+                          <ChevronRightIcon className="h-3.5 w-3.5 text-slate-400" />
                         ) : (
-                          <ChevronDownIcon className="h-3.5 w-3.5 text-slate-500" />
+                          <ChevronDownIcon className="h-3.5 w-3.5 text-slate-400" />
                         )}
-                        <FolderIcon className="h-3.5 w-3.5 text-blue-400" />
+                        <FolderIcon className="h-3.5 w-3.5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                         <span className="truncate">{categoryName}</span>
-                        <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-slate-400">
+                        <span className="rounded-full bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[10px] font-semibold text-blue-300">
                           {ruleIndices.length}
                         </span>
                       </button>
@@ -286,7 +276,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 w-7 p-0 text-slate-400 hover:text-white hover:bg-white/10"
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition"
                         title="Add rule to category"
                         onClick={() =>
                           setPromptState({
@@ -303,7 +293,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                     </div>
 
                     {!isCollapsed && (
-                      <div className="space-y-1 p-1.5 pt-0">
+                      <div className="space-y-1 p-1.5 pt-1">
                         {ruleIndices.map((idx) => {
                           const rule = rules[idx];
                           const isActive = activeIdx === idx;
@@ -316,25 +306,28 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                           return (
                             <div
                               key={idx}
-                              className={`group flex items-center justify-between rounded-md px-2.5 py-2 text-xs transition cursor-pointer ${
+                              className={`group flex items-center justify-between rounded-lg px-3 py-2 text-xs transition-all duration-200 cursor-pointer ${
                                 isActive
-                                  ? "bg-blue-600/20 font-medium text-blue-400 border border-blue-500/30"
-                                  : "text-slate-300 hover:bg-white/5 hover:text-white"
+                                  ? "bg-gradient-to-r from-blue-600/25 to-indigo-600/15 font-semibold text-blue-300 border border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.2)] transform translate-x-0.5"
+                                  : "text-slate-300 hover:bg-white/[0.04] hover:text-white hover:translate-x-0.5"
                               }`}
                               onClick={() => setActiveIdx(idx)}
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span
-                                  className={`h-2 w-2 rounded-full ${
-                                    rule.keywords?.length ? "bg-emerald-400" : "bg-slate-600"
-                                  }`}
-                                />
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {rule.keywords?.length ? (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                  </span>
+                                ) : (
+                                  <span className="h-2 w-2 rounded-full bg-amber-500/70 shrink-0" />
+                                )}
                                 <span className="truncate">{displayName}</span>
                               </div>
 
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
-                                  className="p-1 text-slate-400 hover:text-white"
+                                  className="p-1 text-slate-400 hover:text-white transition"
                                   title="Rename"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -351,7 +344,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                                   <EditIcon className="h-3 w-3" />
                                 </button>
                                 <button
-                                  className="p-1 text-slate-400 hover:text-rose-400"
+                                  className="p-1 text-slate-400 hover:text-rose-400 transition"
                                   title="Delete"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -379,7 +372,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
 
               <Button
                 variant="outline"
-                className="w-full justify-center border-dashed border-white/20 py-2 text-xs text-slate-400 hover:border-blue-500 hover:text-blue-400"
+                className="w-full justify-center border-dashed border-white/20 py-2.5 text-xs font-semibold text-slate-300 hover:border-blue-500 hover:text-blue-400 transition-all duration-200 rounded-xl"
                 onClick={() =>
                   setPromptState({
                     open: true,
@@ -399,33 +392,39 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
         {/* Right Workspace: Auto Reply Rule Editor */}
         <div className="lg:col-span-8 xl:col-span-9 space-y-6">
           {!activeRule ? (
-            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-white/10 bg-black/40 text-center backdrop-blur-md">
-              <MessageSquareIcon className="mb-3 h-10 w-10 text-slate-600" />
-              <h3 className="text-base font-medium text-slate-300">No Rule Selected</h3>
+            <div className="flex h-72 flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-center backdrop-blur-xl shadow-2xl">
+              <MessageSquareIcon className="mb-3 h-12 w-12 text-slate-600 animate-pulse" />
+              <h3 className="text-base font-semibold text-slate-300">No Rule Selected</h3>
               <p className="mt-1 text-xs text-slate-500">Select an existing auto-reply rule from the sidebar or create a new one.</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-black/40 p-5 backdrop-blur-md space-y-6">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 backdrop-blur-xl shadow-2xl space-y-6 relative overflow-hidden">
+              <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+
               {/* Header Status & Control Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4 relative z-10">
                 <div>
                   <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-bold text-white">
+                    <h2 className="text-xl font-extrabold text-white tracking-tight">
                       {activeRule.name || "Rule Configuration"}
                     </h2>
-                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-slate-300">
+                    <span className="rounded-md bg-white/10 border border-white/10 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
                       {activeRule.category || DEFAULT_CATEGORY}
                     </span>
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                        activeRule.keywords?.length
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                      }`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      {activeRule.keywords?.length ? "Active Rule" : "Needs Keywords"}
-                    </span>
+                    {activeRule.keywords?.length ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Active Rule
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-400">
+                        <span className="h-2 w-2 rounded-full bg-amber-500" />
+                        Needs Keywords
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-slate-400">
                     Set triggering keywords, target channel filters, delete delay timer, and message template.
@@ -440,7 +439,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                   value={activeRule.name || ""}
                   onChange={(e) => updateRule("name", e.target.value)}
                   placeholder="e.g. Welcome Message"
-                  className="bg-black/40 text-xs text-white"
+                  className="bg-black/40 text-xs text-white border-white/10 focus:border-blue-500"
                 />
               </div>
 
@@ -471,13 +470,13 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                             placeholder="Button Label"
                             value={btn.label || ""}
                             onChange={(e) => updateButton(btnIdx, "label", e.target.value)}
-                            className="bg-black/40 text-xs"
+                            className="bg-black/40 text-xs border-white/10"
                           />
                           <Input
                             placeholder="URL (https://...)"
                             value={btn.url || ""}
                             onChange={(e) => updateButton(btnIdx, "url", e.target.value)}
-                            className="bg-black/40 text-xs"
+                            className="bg-black/40 text-xs border-white/10"
                           />
                           <Button
                             size="sm"
@@ -493,7 +492,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-fit border-dashed border-white/20 text-xs text-slate-300 hover:border-blue-500 hover:text-blue-400"
+                          className="w-fit border-dashed border-white/20 text-xs text-slate-300 hover:border-blue-500 hover:text-blue-400 rounded-lg"
                           onClick={() => {
                             const newRules = [...rules];
                             newRules[activeIdx] = { ...newRules[activeIdx] };
@@ -521,7 +520,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                         )
                       }
                       placeholder="e.g. help, support, ticket"
-                      className="bg-black/40 text-xs"
+                      className="bg-black/40 text-xs border-white/10 focus:border-blue-500"
                     />
                   </div>
                   <div>
@@ -542,7 +541,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                       value={activeRule.delete_after || ""}
                       onChange={(e) => updateRule("delete_after", parseInt(e.target.value) || null)}
                       placeholder="Leave blank to keep"
-                      className="bg-black/40 text-xs"
+                      className="bg-black/40 text-xs border-white/10 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -552,7 +551,7 @@ export default function AutoReplyPage({ params }: { params: Promise<{ guildId: s
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 text-xs font-semibold"
+                  className="text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 text-xs font-semibold rounded-lg"
                   onClick={() =>
                     setPromptState({
                       open: true,

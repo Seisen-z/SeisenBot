@@ -70,7 +70,7 @@ function useDropdownPortal(isOpen: boolean) {
   return { containerRef, portalReady, panelStyle };
 }
 
-interface Channel {
+export interface Channel {
   id: string;
   name: string;
   type: number;
@@ -97,7 +97,7 @@ export const GUILD_RESOURCE_REFRESH_EVENT = "seisen:refresh-guild-resources";
 /** Shared fetch + background-refresh for a guild's channel list. Every ChannelSelect
  * / ChannelMultiSelect instance uses this, so "new channel shows up" is handled once,
  * globally, instead of per-page. */
-function useDiscordChannels(guildId: string) {
+export function useDiscordChannels(guildId: string) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

@@ -33,6 +33,7 @@ import {
   FileJson2Icon,
   RotateCw,
   History,
+  PenLine,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -86,6 +87,7 @@ export default function Sidebar({
         { name: "Auto-Post", href: `/dashboard/${guildId}/auto-post`, icon: RotateCw },
         { name: "Select Menu Roles", href: `/dashboard/${guildId}/reaction-roles`, icon: UserPlus },
         { name: "Channel Access", href: `/dashboard/${guildId}/channel-access`, icon: KeyRoundIcon },
+        { name: "Channel Renamer", href: `/dashboard/${guildId}/rename-channels`, icon: PenLine },
         { name: "Macro Import", href: `/dashboard/${guildId}/macro-import`, icon: FileJson2Icon },
       ],
     },

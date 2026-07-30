@@ -27,6 +27,7 @@ import {
   ListFilterIcon,
   RotateCwIcon,
   Edit2Icon,
+  ChevronsUpDownIcon,
 } from "lucide-react";
 
 type RenameState = "unchanged" | "modified" | "pending" | "processing" | "success" | "rate-limited" | "error";
@@ -150,7 +151,6 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
       const items = catMap.get(catIdStr) || [];
       const catMatchesSearch = query ? (cat.name || "").toLowerCase().includes(query) : false;
 
-      // Include group if it contains matching channels or matches search
       if (items.length > 0 || catMatchesSearch || (!query && filterType !== "text" && filterType !== "voice")) {
         result.push({ category: cat, channels: items });
       }
@@ -214,6 +214,16 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
       ...prev,
       [catId]: !prev[catId],
     }));
+  };
+
+  const toggleAllCollapse = () => {
+    const allCollapsed = categoryList.every((cat) => collapsedCategories[String(cat.id)]);
+    const next: Record<string, boolean> = {};
+    categoryList.forEach((cat) => {
+      next[String(cat.id)] = !allCollapsed;
+    });
+    next["uncategorized"] = !allCollapsed;
+    setCollapsedCategories(next);
   };
 
   const toggleCategoryRenameInput = (catId: string) => {
@@ -423,7 +433,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     return (
       <div
         key={chanIdStr}
-        className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
+        className={`shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
           isSubItem ? "bg-[#111216] hover:bg-[#16181d]" : "bg-[#14151a] hover:bg-[#191b22]"
         } ${
           isChanModified
@@ -608,31 +618,45 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
 
         {/* View Mode Toggle */}
         <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10 w-fit">
-            <button
-              type="button"
-              onClick={() => setViewMode("grouped")}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${
-                viewMode === "grouped"
-                  ? "bg-white/15 text-white shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <LayersIcon className="h-3.5 w-3.5" />
-              Grouped by Category
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("flat")}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${
-                viewMode === "flat"
-                  ? "bg-white/15 text-white shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <ListFilterIcon className="h-3.5 w-3.5" />
-              Flat List
-            </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10 w-fit">
+              <button
+                type="button"
+                onClick={() => setViewMode("grouped")}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${
+                  viewMode === "grouped"
+                    ? "bg-white/15 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <LayersIcon className="h-3.5 w-3.5" />
+                Grouped by Category
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("flat")}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${
+                  viewMode === "flat"
+                    ? "bg-white/15 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <ListFilterIcon className="h-3.5 w-3.5" />
+                Flat List
+              </button>
+            </div>
+
+            {viewMode === "grouped" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleAllCollapse}
+                className="h-8 text-xs text-slate-400 hover:text-slate-200 hover:bg-white/5 rounded-xl border border-white/5"
+              >
+                <ChevronsUpDownIcon className="mr-1.5 h-3.5 w-3.5" />
+                Collapse / Expand All
+              </Button>
+            )}
           </div>
 
           <span className="text-xs text-slate-400">
@@ -642,7 +666,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
       </div>
 
       {/* Channels List Container */}
-      <div className="flex flex-col gap-4 max-h-[650px] overflow-y-auto pr-1">
+      <div className="flex flex-col gap-4 min-h-[300px] overflow-y-auto pr-1">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12 text-slate-400">
             <Loader2Icon className="h-8 w-8 animate-spin mb-2 text-indigo-400" />
@@ -674,7 +698,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
             return (
               <div
                 key={catIdStr}
-                className="flex flex-col rounded-2xl border border-white/10 bg-[#0d0e12] overflow-hidden"
+                className="shrink-0 flex flex-col rounded-2xl border border-white/10 bg-[#0d0e12] overflow-hidden"
               >
                 {/* Category Header Bar */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[#17181f] px-4 py-3 border-b border-white/8">
@@ -682,7 +706,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
                     <button
                       type="button"
                       onClick={() => toggleCategoryCollapse(catIdStr)}
-                      className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/10"
+                      className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/10 shrink-0"
                       title={isCollapsed ? "Expand category" : "Collapse category"}
                     >
                       {isCollapsed ? (
@@ -698,7 +722,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
                       <span className="text-xs font-bold uppercase tracking-wider text-amber-400 truncate">
                         {catName}
                       </span>
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-slate-300">
+                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-slate-300 shrink-0">
                         {group.channels.length} {group.channels.length === 1 ? "channel" : "channels"}
                       </span>
                       {cat && renderStatusBadge(cat)}

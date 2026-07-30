@@ -25,6 +25,7 @@ import {
   ChevronRightIcon,
   LayersIcon,
   ListFilterIcon,
+  RotateCwIcon,
 } from "lucide-react";
 
 type RenameState = "unchanged" | "modified" | "pending" | "processing" | "success" | "rate-limited" | "error";
@@ -118,7 +119,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     categoryList.forEach((cat) => catMap.set(cat.id, []));
 
     filteredChannels.forEach((chan) => {
-      if (chan.type === 4) return; // Categories will be rendered as section headers
+      if (chan.type === 4) return;
 
       if (chan.parent_id && catMap.has(chan.parent_id)) {
         catMap.get(chan.parent_id)!.push(chan);
@@ -209,7 +210,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     setCountdown(0);
   };
 
-  // Sequential rename queue runner
+  // Sequential rename queue runner with automatic retries on rate limits / errors
   const handleRename = async () => {
     if (running) return;
     if (modifiedChannels.length === 0) {
@@ -227,56 +228,95 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     setStatuses(initialStatuses);
 
     const abortController = new AbortController();
+    const maxRetriesPerChannel = 10;
 
     try {
       for (let i = 0; i < modifiedChannels.length; i++) {
         const channel = modifiedChannels[i];
         setCurrentIdx(i);
 
-        setStatuses((prev) => ({
-          ...prev,
-          [channel.id]: { state: "processing" },
-        }));
+        let success = false;
+        let attempt = 0;
 
-        const newName = edits[channel.id];
+        while (!success && attempt < maxRetriesPerChannel) {
+          attempt++;
 
-        try {
-          await fetchApi(`/guilds/${guildId}/channels/${channel.id}`, undefined, {
-            method: "PATCH",
-            body: JSON.stringify({ name: newName }),
-          });
-
-          setStatuses((prev) => ({
-            ...prev,
-            [channel.id]: { state: "success" },
-          }));
-
-          setEdits((prev) => {
-            const next = { ...prev };
-            delete next[channel.id];
-            return next;
-          });
-        } catch (err: any) {
-          const isRateLimit = err?.status === 429;
-          const errorMsg = err?.message || "Failed to rename channel";
-          
           setStatuses((prev) => ({
             ...prev,
             [channel.id]: {
-              state: isRateLimit ? "rate-limited" : "error",
-              errorMsg,
+              state: "processing",
+              errorMsg: attempt > 1 ? `Retrying attempt ${attempt}/${maxRetriesPerChannel}...` : undefined,
             },
           }));
 
-          toast(`Error renaming ${channel.name}: ${errorMsg}`, "error");
-          
-          if (!isRateLimit) {
-            toast("Rename batch paused due to error. Please check permissions and try again.", "error");
-            break;
+          const newName = edits[channel.id];
+
+          try {
+            await fetchApi(`/guilds/${guildId}/channels/${channel.id}`, undefined, {
+              method: "PATCH",
+              body: JSON.stringify({ name: newName }),
+            });
+
+            // Mark successful!
+            success = true;
+
+            setStatuses((prev) => ({
+              ...prev,
+              [channel.id]: { state: "success" },
+            }));
+
+            // Remove from edits map so it is no longer marked modified
+            setEdits((prev) => {
+              const next = { ...prev };
+              delete next[channel.id];
+              return next;
+            });
+          } catch (err: any) {
+            const isRateLimit = err?.status === 429 || /rate limit/i.test(err?.message || "");
+            
+            // Try to extract exact retry_after from error message if provided by API (e.g. "retry after 5.0s")
+            let waitSeconds = cooldown;
+            const match = err?.message?.match(/retry after ([\d.]+)s/i);
+            if (match && match[1]) {
+              const parsed = parseFloat(match[1]);
+              if (!isNaN(parsed) && parsed > 0) {
+                waitSeconds = Math.ceil(parsed);
+              }
+            }
+
+            if (attempt < maxRetriesPerChannel) {
+              setStatuses((prev) => ({
+                ...prev,
+                [channel.id]: {
+                  state: "rate-limited",
+                  errorMsg: `Rate limited / Retry in ${waitSeconds}s (Attempt ${attempt}/${maxRetriesPerChannel})`,
+                },
+              }));
+
+              toast(
+                `Rate limit on "${channel.name}". Retrying in ${waitSeconds}s (Attempt ${attempt}/${maxRetriesPerChannel})...`,
+                "error"
+              );
+
+              // Wait countdown before retrying the same channel
+              await waitWithCountdown(waitSeconds, abortController.signal);
+            } else {
+              // Exceeded maximum retries
+              setStatuses((prev) => ({
+                ...prev,
+                [channel.id]: {
+                  state: "error",
+                  errorMsg: `Failed after ${maxRetriesPerChannel} attempts: ${err?.message || "Error"}`,
+                },
+              }));
+              toast(`Stopped retrying "${channel.name}" after ${maxRetriesPerChannel} failed attempts.`, "error");
+              break;
+            }
           }
         }
 
-        if (i < modifiedChannels.length - 1) {
+        // Wait cooldown before proceeding to next channel if current channel succeeded
+        if (i < modifiedChannels.length - 1 && success) {
           await waitWithCountdown(cooldown, abortController.signal);
         }
       }
@@ -317,9 +357,9 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
         );
       case "processing":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-400" title={errorMsg}>
             <Loader2Icon className="h-3 w-3 animate-spin text-blue-400" />
-            Renaming...
+            {errorMsg || "Renaming..."}
           </span>
         );
       case "success":
@@ -332,8 +372,8 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
       case "rate-limited":
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-400" title={errorMsg}>
-            <AlertTriangleIcon className="h-3.5 w-3.5 text-amber-400" />
-            Rate Limited
+            <RotateCwIcon className="h-3.5 w-3.5 animate-spin text-amber-400" />
+            {errorMsg || "Rate Limited (Retrying)"}
           </span>
         );
       case "error":
@@ -420,7 +460,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
       <DashboardPageHero
         icon={PenLineIcon}
         title="Channel Renamer"
-        subtitle="Batch rename multiple Discord channels organized by category. Renames run sequentially with a protective cooldown to automatically prevent rate limits."
+        subtitle="Batch rename multiple Discord channels organized by category. Renames run sequentially with a protective cooldown and auto-retry on rate limits."
         stats={[
           { label: "Total Channels", value: loading ? "..." : channels.length },
           { label: "Categories", value: categoryList.length },
@@ -475,7 +515,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
           {countdown > 0 && (
             <div className="text-xs text-slate-400 flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
-              Waiting {countdown} seconds cooldown before next rename...
+              Waiting {countdown} seconds cooldown before retry / next rename...
             </div>
           )}
         </div>

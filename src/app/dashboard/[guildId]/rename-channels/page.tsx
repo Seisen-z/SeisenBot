@@ -26,6 +26,7 @@ import {
   LayersIcon,
   ListFilterIcon,
   RotateCwIcon,
+  Edit2Icon,
 } from "lucide-react";
 
 type RenameState = "unchanged" | "modified" | "pending" | "processing" | "success" | "rate-limited" | "error";
@@ -39,7 +40,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
   const { guildId } = use(params);
   const { toast } = useToast();
   
-  // Channels hooks
+  // Channels hook
   const { channels, loading, errorMsg } = useDiscordChannels(guildId);
   
   // Local state
@@ -48,6 +49,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grouped" | "flat">("grouped");
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [editingCategoryIds, setEditingCategoryIds] = useState<Record<string, boolean>>({});
   
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [cooldown, setCooldown] = useState<number>(5);
@@ -61,15 +63,15 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     switch (type) {
       case 2: // Voice
       case 13: // Stage
-        return <Volume2Icon className="h-4 w-4 text-sky-400" />;
+        return <Volume2Icon className="h-4 w-4 text-sky-400 shrink-0" />;
       case 4: // Category
-        return <FolderIcon className="h-4 w-4 text-amber-400" />;
+        return <FolderIcon className="h-4 w-4 text-amber-400 shrink-0" />;
       case 15: // Forum
-        return <MessageSquareIcon className="h-4 w-4 text-emerald-400" />;
+        return <MessageSquareIcon className="h-4 w-4 text-emerald-400 shrink-0" />;
       case 0: // Text
       case 5: // Announcement
       default:
-        return <HashIcon className="h-4 w-4 text-slate-400" />;
+        return <HashIcon className="h-4 w-4 text-slate-400 shrink-0" />;
     }
   };
 
@@ -84,8 +86,11 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
   // Filter channels
   const filteredChannels = useMemo(() => {
     if (!channels) return [];
+    const query = search.trim().toLowerCase();
+
     return channels.filter((c) => {
-      const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase());
+      const chanName = (c.name || "").toLowerCase();
+      const matchesSearch = !query || chanName.includes(query);
       
       let matchesType = true;
       if (filterType === "text") {
@@ -101,7 +106,9 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
         if (selectedCategoryId === "uncategorized") {
           matchesCategory = !c.parent_id && c.type !== 4;
         } else {
-          matchesCategory = c.parent_id === selectedCategoryId || c.id === selectedCategoryId;
+          const catId = String(selectedCategoryId);
+          const parentId = c.parent_id ? String(c.parent_id) : null;
+          matchesCategory = parentId === catId || String(c.id) === catId;
         }
       }
 
@@ -115,14 +122,17 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     
     const catMap = new Map<string, Channel[]>();
     const uncategorized: Channel[] = [];
+    const query = search.trim().toLowerCase();
 
-    categoryList.forEach((cat) => catMap.set(cat.id, []));
+    categoryList.forEach((cat) => catMap.set(String(cat.id), []));
 
     filteredChannels.forEach((chan) => {
-      if (chan.type === 4) return;
+      if (chan.type === 4) return; // Categories handled as group headers
 
-      if (chan.parent_id && catMap.has(chan.parent_id)) {
-        catMap.get(chan.parent_id)!.push(chan);
+      const parentId = chan.parent_id ? String(chan.parent_id) : null;
+
+      if (parentId && catMap.has(parentId)) {
+        catMap.get(parentId)!.push(chan);
       } else {
         uncategorized.push(chan);
       }
@@ -134,52 +144,59 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     const result: Array<{ category: Channel | null; channels: Channel[] }> = [];
 
     categoryList.forEach((cat) => {
-      if (selectedCategoryId !== "all" && selectedCategoryId !== cat.id) return;
-      const items = catMap.get(cat.id) || [];
-      const catMatchesSearch = cat.name.toLowerCase().includes(search.toLowerCase());
-      if (items.length > 0 || catMatchesSearch || !search) {
+      const catIdStr = String(cat.id);
+      if (selectedCategoryId !== "all" && selectedCategoryId !== catIdStr) return;
+      
+      const items = catMap.get(catIdStr) || [];
+      const catMatchesSearch = query ? (cat.name || "").toLowerCase().includes(query) : false;
+
+      // Include group if it contains matching channels or matches search
+      if (items.length > 0 || catMatchesSearch || (!query && filterType !== "text" && filterType !== "voice")) {
         result.push({ category: cat, channels: items });
       }
     });
 
     if (
       (selectedCategoryId === "all" || selectedCategoryId === "uncategorized") &&
-      uncategorized.length > 0
+      uncategorized.length > 0 &&
+      filterType !== "category"
     ) {
       result.push({ category: null, channels: uncategorized });
     }
 
     return result;
-  }, [channels, categoryList, filteredChannels, selectedCategoryId, search]);
+  }, [channels, categoryList, filteredChannels, selectedCategoryId, filterType, search]);
 
   // Track modified count
   const modifiedChannels = useMemo(() => {
     return (channels || []).filter((c) => {
-      const editedName = edits[c.id];
+      const editedName = edits[String(c.id)];
       return editedName !== undefined && editedName !== c.name && editedName.trim() !== "";
     });
   }, [channels, edits]);
 
   // Handle name edits
-  const handleEdit = (channelId: string, newName: string) => {
+  const handleEdit = (channelId: string | number, newName: string) => {
     if (running) return;
+    const key = String(channelId);
     setEdits((prev) => ({
       ...prev,
-      [channelId]: newName,
+      [key]: newName,
     }));
   };
 
   // Revert single channel edit
-  const handleResetChannel = (channelId: string) => {
+  const handleResetChannel = (channelId: string | number) => {
     if (running) return;
+    const key = String(channelId);
     setEdits((prev) => {
       const next = { ...prev };
-      delete next[channelId];
+      delete next[key];
       return next;
     });
     setStatuses((prev) => {
       const next = { ...prev };
-      delete next[channelId];
+      delete next[key];
       return next;
     });
   };
@@ -194,6 +211,13 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
 
   const toggleCategoryCollapse = (catId: string) => {
     setCollapsedCategories((prev) => ({
+      ...prev,
+      [catId]: !prev[catId],
+    }));
+  };
+
+  const toggleCategoryRenameInput = (catId: string) => {
+    setEditingCategoryIds((prev) => ({
       ...prev,
       [catId]: !prev[catId],
     }));
@@ -223,7 +247,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     // Set all modified channels to pending status
     const initialStatuses: Record<string, ChannelStatus> = {};
     modifiedChannels.forEach((c) => {
-      initialStatuses[c.id] = { state: "pending" };
+      initialStatuses[String(c.id)] = { state: "pending" };
     });
     setStatuses(initialStatuses);
 
@@ -233,6 +257,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     try {
       for (let i = 0; i < modifiedChannels.length; i++) {
         const channel = modifiedChannels[i];
+        const chanIdStr = String(channel.id);
         setCurrentIdx(i);
 
         let success = false;
@@ -243,38 +268,35 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
 
           setStatuses((prev) => ({
             ...prev,
-            [channel.id]: {
+            [chanIdStr]: {
               state: "processing",
               errorMsg: attempt > 1 ? `Retrying attempt ${attempt}/${maxRetriesPerChannel}...` : undefined,
             },
           }));
 
-          const newName = edits[channel.id];
+          const newName = edits[chanIdStr];
 
           try {
-            await fetchApi(`/guilds/${guildId}/channels/${channel.id}`, undefined, {
+            await fetchApi(`/guilds/${guildId}/channels/${chanIdStr}`, undefined, {
               method: "PATCH",
               body: JSON.stringify({ name: newName }),
             });
 
-            // Mark successful!
             success = true;
 
             setStatuses((prev) => ({
               ...prev,
-              [channel.id]: { state: "success" },
+              [chanIdStr]: { state: "success" },
             }));
 
-            // Remove from edits map so it is no longer marked modified
             setEdits((prev) => {
               const next = { ...prev };
-              delete next[channel.id];
+              delete next[chanIdStr];
               return next;
             });
           } catch (err: any) {
             const isRateLimit = err?.status === 429 || /rate limit/i.test(err?.message || "");
             
-            // Try to extract exact retry_after from error message if provided by API (e.g. "retry after 5.0s")
             let waitSeconds = cooldown;
             const match = err?.message?.match(/retry after ([\d.]+)s/i);
             if (match && match[1]) {
@@ -287,7 +309,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
             if (attempt < maxRetriesPerChannel) {
               setStatuses((prev) => ({
                 ...prev,
-                [channel.id]: {
+                [chanIdStr]: {
                   state: "rate-limited",
                   errorMsg: `Rate limited / Retry in ${waitSeconds}s (Attempt ${attempt}/${maxRetriesPerChannel})`,
                 },
@@ -298,13 +320,11 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
                 "error"
               );
 
-              // Wait countdown before retrying the same channel
               await waitWithCountdown(waitSeconds, abortController.signal);
             } else {
-              // Exceeded maximum retries
               setStatuses((prev) => ({
                 ...prev,
-                [channel.id]: {
+                [chanIdStr]: {
                   state: "error",
                   errorMsg: `Failed after ${maxRetriesPerChannel} attempts: ${err?.message || "Error"}`,
                 },
@@ -315,7 +335,6 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
           }
         }
 
-        // Wait cooldown before proceeding to next channel if current channel succeeded
         if (i < modifiedChannels.length - 1 && success) {
           await waitWithCountdown(cooldown, abortController.signal);
         }
@@ -334,8 +353,9 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
 
   // Determine inline status badge
   const renderStatusBadge = (channel: Channel) => {
-    const isChanModified = edits[channel.id] !== undefined && edits[channel.id] !== channel.name;
-    const status = statuses[channel.id];
+    const chanIdStr = String(channel.id);
+    const isChanModified = edits[chanIdStr] !== undefined && edits[chanIdStr] !== channel.name;
+    const status = statuses[chanIdStr];
 
     if (!isChanModified && !status) return null;
 
@@ -350,35 +370,35 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     switch (state) {
       case "pending":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-500/10 px-2 py-1 text-xs font-medium text-slate-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-500/15 px-2 py-0.5 text-[11px] font-medium text-slate-300 border border-slate-500/30">
             <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
             Pending
           </span>
         );
       case "processing":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-400" title={errorMsg}>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[11px] font-medium text-blue-300 border border-blue-500/30">
             <Loader2Icon className="h-3 w-3 animate-spin text-blue-400" />
             {errorMsg || "Renaming..."}
           </span>
         );
       case "success":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2 py-1 text-xs font-medium text-green-400">
-            <CheckCircle2Icon className="h-3.5 w-3.5 text-green-400" />
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-medium text-emerald-300 border border-emerald-500/30">
+            <CheckCircle2Icon className="h-3.5 w-3.5 text-emerald-400" />
             Saved
           </span>
         );
       case "rate-limited":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-400" title={errorMsg}>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-300 border border-amber-500/30" title={errorMsg}>
             <RotateCwIcon className="h-3.5 w-3.5 animate-spin text-amber-400" />
             {errorMsg || "Rate Limited (Retrying)"}
           </span>
         );
       case "error":
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-2 py-1 text-xs font-medium text-rose-400" title={errorMsg}>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/15 px-2.5 py-0.5 text-[11px] font-medium text-rose-300 border border-rose-500/30" title={errorMsg}>
             <XCircleIcon className="h-3.5 w-3.5 text-rose-400" />
             Failed
           </span>
@@ -386,7 +406,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
       case "modified":
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 px-2 py-1 text-xs font-medium text-indigo-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[11px] font-medium text-indigo-300 border border-indigo-500/30">
             <span className="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
             Modified
           </span>
@@ -394,60 +414,61 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
     }
   };
 
-  // Render a single channel row component
+  // Render a single channel row
   const renderChannelRow = (channel: Channel, isSubItem = false) => {
-    const isChanModified = edits[channel.id] !== undefined && edits[channel.id] !== channel.name;
-    const currentVal = edits[channel.id] ?? channel.name;
+    const chanIdStr = String(channel.id);
+    const isChanModified = edits[chanIdStr] !== undefined && edits[chanIdStr] !== channel.name;
+    const currentVal = edits[chanIdStr] ?? channel.name;
 
     return (
       <div
-        key={channel.id}
-        className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all ${
-          isSubItem ? "bg-black/30" : "bg-black/20"
+        key={chanIdStr}
+        className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
+          isSubItem ? "bg-[#111216] hover:bg-[#16181d]" : "bg-[#14151a] hover:bg-[#191b22]"
         } ${
           isChanModified
-            ? "bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-            : "border-white/5 hover:border-white/12"
+            ? "border-indigo-500/40 bg-indigo-950/20 shadow-[0_0_12px_rgba(99,102,241,0.12)]"
+            : "border-white/8 hover:border-white/15"
         }`}
       >
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 border border-white/5">
             {getChannelIcon(channel.type)}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-medium text-white">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="truncate text-sm font-semibold text-slate-100">
                 {channel.name}
               </span>
               {renderStatusBadge(channel)}
             </div>
             {isChanModified && (
-              <span className="text-[10px] text-slate-400 truncate block">
+              <span className="text-[11px] text-slate-400 truncate block">
                 Original: {channel.name}
               </span>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
           <Input
             value={currentVal}
-            onChange={(e) => handleEdit(channel.id, e.target.value)}
+            onChange={(e) => handleEdit(chanIdStr, e.target.value)}
             disabled={running}
-            className="w-full sm:w-60 bg-black/40 text-sm border-white/10 focus:border-indigo-500/50"
-            placeholder="New name..."
+            className="w-full sm:w-64 bg-[#090a0d] text-sm text-slate-100 border-white/12 focus:border-indigo-500/60 placeholder:text-slate-500"
+            placeholder="New channel name..."
           />
 
           {isChanModified && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-9 px-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl"
-              onClick={() => handleResetChannel(channel.id)}
+              className="h-9 px-2.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg shrink-0"
+              onClick={() => handleResetChannel(chanIdStr)}
               disabled={running}
               title="Revert changes"
             >
-              <RefreshCcwIcon className="h-3.5 w-3.5" />
+              <RefreshCcwIcon className="h-4 w-4" />
             </Button>
           )}
         </div>
@@ -470,16 +491,16 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {modifiedChannels.length > 0 && !running && (
-              <Button variant="outline" className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300" onClick={handleResetAll}>
+              <Button variant="outline" className="border-rose-500/40 text-rose-300 hover:bg-rose-500/10" onClick={handleResetAll}>
                 <XIcon className="mr-2 h-4 w-4" />
-                Discard All
+                Discard All ({modifiedChannels.length})
               </Button>
             )}
             <Button variant="discord" onClick={handleRename} disabled={running || modifiedChannels.length === 0}>
               {running ? (
                 <>
                   <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                  Renaming... ({currentIdx + 1}/{modifiedChannels.length})
+                  Renaming ({currentIdx + 1}/{modifiedChannels.length})
                 </>
               ) : (
                 <>
@@ -494,18 +515,18 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
 
       {/* Progress queue banner */}
       {running && (
-        <div className="w-full rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 flex flex-col gap-3">
+        <div className="w-full rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4 flex flex-col gap-3">
           <div className="flex justify-between items-center text-sm">
-            <span className="font-semibold text-blue-400 flex items-center gap-2">
-              <Loader2Icon className="h-4 w-4 animate-spin" />
-              Batch renaming in progress
+            <span className="font-semibold text-blue-300 flex items-center gap-2">
+              <Loader2Icon className="h-4 w-4 animate-spin text-blue-400" />
+              Batch renaming in progress...
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-300 font-medium">
               Renamed {currentIdx} of {modifiedChannels.length} channels
             </span>
           </div>
           
-          <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+          <div className="h-2 w-full rounded-full bg-slate-900 overflow-hidden">
             <div
               className="h-full bg-blue-500 transition-all duration-500"
               style={{ width: `${(currentIdx / modifiedChannels.length) * 100}%` }}
@@ -513,9 +534,9 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
           </div>
 
           {countdown > 0 && (
-            <div className="text-xs text-slate-400 flex items-center gap-1.5">
+            <div className="text-xs text-amber-300 font-medium flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
-              Waiting {countdown} seconds cooldown before retry / next rename...
+              Waiting {countdown}s cooldown before retry / next rename...
             </div>
           )}
         </div>
@@ -531,7 +552,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
               placeholder="Search channel or category..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
+              className="pl-10 text-slate-100 bg-[#090a0d] border-white/12"
               disabled={running}
             />
           </div>
@@ -541,13 +562,13 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
             <select
               value={selectedCategoryId}
               onChange={(e) => setSelectedCategoryId(e.target.value)}
-              className="h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 text-sm outline-none transition focus:border-white/30 text-discord-text"
+              className="h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 text-sm text-slate-200 outline-none transition focus:border-white/30"
               disabled={running}
             >
               <option value="all">📁 All Categories ({categoryList.length})</option>
               <option value="uncategorized">Uncategorized</option>
               {categoryList.map((cat) => (
-                <option key={cat.id} value={cat.id}>
+                <option key={String(cat.id)} value={String(cat.id)}>
                   📁 {cat.name}
                 </option>
               ))}
@@ -559,7 +580,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 text-sm outline-none transition focus:border-white/30 text-discord-text"
+              className="h-10 w-full rounded-xl border border-white/14 bg-[rgba(24,24,27,0.92)] px-3 text-sm text-slate-200 outline-none transition focus:border-white/30"
               disabled={running}
             >
               <option value="all">All Channel Types</option>
@@ -579,7 +600,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
               value={cooldown}
               onChange={(e) => setCooldown(Math.max(1, parseInt(e.target.value) || 1))}
               disabled={running}
-              className="w-full"
+              className="w-full bg-[#090a0d] text-slate-100 border-white/12"
             />
             <span className="text-xs text-slate-400 shrink-0">sec</span>
           </div>
@@ -620,11 +641,11 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
         </div>
       </div>
 
-      {/* Channels List */}
+      {/* Channels List Container */}
       <div className="flex flex-col gap-4 max-h-[650px] overflow-y-auto pr-1">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-            <Loader2Icon className="h-8 w-8 animate-spin mb-2" />
+            <Loader2Icon className="h-8 w-8 animate-spin mb-2 text-indigo-400" />
             <p className="text-sm">Loading channels from Discord...</p>
           </div>
         ) : errorMsg ? (
@@ -643,24 +664,26 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
           </div>
         ) : (
           /* Grouped by category view */
-          groupedChannels.map((group, groupIdx) => {
+          groupedChannels.map((group) => {
             const cat = group.category;
-            const catId = cat ? cat.id : "uncategorized";
+            const catIdStr = cat ? String(cat.id) : "uncategorized";
             const catName = cat ? cat.name : "Uncategorized";
-            const isCollapsed = Boolean(collapsedCategories[catId]);
+            const isCollapsed = Boolean(collapsedCategories[catIdStr]);
+            const isEditingCategoryName = Boolean(editingCategoryIds[catIdStr]);
 
             return (
               <div
-                key={catId}
-                className="flex flex-col rounded-2xl border border-white/8 bg-black/20 overflow-hidden"
+                key={catIdStr}
+                className="flex flex-col rounded-2xl border border-white/10 bg-[#0d0e12] overflow-hidden"
               >
-                {/* Category Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/5 px-4 py-3 border-b border-white/8">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {/* Category Header Bar */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[#17181f] px-4 py-3 border-b border-white/8">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <button
                       type="button"
-                      onClick={() => toggleCategoryCollapse(catId)}
-                      className="text-slate-400 hover:text-white transition p-0.5 rounded-lg hover:bg-white/10"
+                      onClick={() => toggleCategoryCollapse(catIdStr)}
+                      className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/10"
+                      title={isCollapsed ? "Expand category" : "Collapse category"}
                     >
                       {isCollapsed ? (
                         <ChevronRightIcon className="h-4 w-4" />
@@ -671,8 +694,8 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
                     
                     <FolderIcon className="h-4 w-4 text-amber-400 shrink-0" />
                     
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-xs font-bold uppercase tracking-wider text-amber-400/90 truncate">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-400 truncate">
                         {catName}
                       </span>
                       <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-slate-300">
@@ -682,26 +705,50 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
                     </div>
                   </div>
 
-                  {/* Allow renaming category itself if it exists */}
+                  {/* Renaming Category itself */}
                   {cat && (
-                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-                      <Input
-                        value={edits[cat.id] ?? cat.name}
-                        onChange={(e) => handleEdit(cat.id, e.target.value)}
-                        disabled={running}
-                        className="w-full sm:w-56 bg-black/40 text-xs border-white/10 focus:border-amber-500/50"
-                        placeholder="Edit category name..."
-                      />
-                      {edits[cat.id] !== undefined && edits[cat.id] !== cat.name && (
+                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
+                      {isEditingCategoryName ? (
+                        <>
+                          <Input
+                            value={edits[catIdStr] ?? cat.name}
+                            onChange={(e) => handleEdit(catIdStr, e.target.value)}
+                            disabled={running}
+                            className="w-full sm:w-56 bg-[#090a0d] text-xs text-slate-100 border-white/14 focus:border-amber-500/60"
+                            placeholder="Edit category name..."
+                          />
+                          {edits[catIdStr] !== undefined && edits[catIdStr] !== cat.name && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg"
+                              onClick={() => handleResetChannel(catIdStr)}
+                              disabled={running}
+                              title="Revert category name"
+                            >
+                              <RefreshCcwIcon className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-slate-400 hover:text-slate-200"
+                            onClick={() => toggleCategoryRenameInput(catIdStr)}
+                            title="Done editing category name"
+                          >
+                            <XIcon className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      ) : (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 px-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg"
-                          onClick={() => handleResetChannel(cat.id)}
+                          className="h-8 px-2.5 text-xs text-slate-400 hover:text-slate-200 hover:bg-white/10 rounded-lg border border-white/5"
+                          onClick={() => toggleCategoryRenameInput(catIdStr)}
                           disabled={running}
-                          title="Revert category name"
                         >
-                          <RefreshCcwIcon className="h-3 w-3" />
+                          <Edit2Icon className="mr-1.5 h-3 w-3" />
+                          Rename Category
                         </Button>
                       )}
                     </div>
@@ -713,7 +760,7 @@ export default function ChannelRenamerPage({ params }: { params: Promise<{ guild
                   <div className="flex flex-col gap-2 p-3">
                     {group.channels.length === 0 ? (
                       <p className="text-xs text-slate-500 italic px-2 py-1">
-                        No channels in this category.
+                        No channels match filters in this category.
                       </p>
                     ) : (
                       group.channels.map((channel) => renderChannelRow(channel, true))

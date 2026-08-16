@@ -13,6 +13,7 @@ export interface EmbedConfig {
   title?: string;
   description?: string;
   color?: string | number;
+  thumbnail_game_id?: string;
   thumbnail_url?: string;
   image_url?: string;
   images?: string[];
@@ -21,68 +22,63 @@ export interface EmbedConfig {
   [key: string]: any;
 }
 
-function GameIdThumbnail({ value, onChange }: { value: string; onChange: (url: string) => void }) {
-  const [gameId, setGameId] = useState("");
-  const [fetching, setFetching] = useState(false);
-  const [status, setStatus] = useState<"idle" | "ok" | "err">("idle");
+function GameIdThumbnail({
+  gameId,
+  thumbnailUrl,
+  onGameIdChange,
+  onThumbnailChange,
+}: {
+  gameId: string;
+  thumbnailUrl: string;
+  onGameIdChange: (id: string) => void;
+  onThumbnailChange: (url: string) => void;
+}) {
+  const [status, setStatus] = useState<"idle" | "fetching" | "ok" | "err">("idle");
 
-  const fetchThumbnail = async () => {
+  useEffect(() => {
     const id = gameId.trim();
-    if (!id) return;
-    setFetching(true);
-    setStatus("idle");
-    try {
-      const res = await fetch(
-        `https://thumbnails.roblox.com/v1/games/icons?universeIds=${id}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`
-      );
-      const data = await res.json();
-      const url = data?.data?.[0]?.imageUrl;
-      if (url) {
-        onChange(url);
-        setStatus("ok");
-      } else {
+    if (!id) { setStatus("idle"); return; }
+    setStatus("fetching");
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://thumbnails.roblox.com/v1/games/icons?universeIds=${id}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`
+        );
+        const data = await res.json();
+        const url = data?.data?.[0]?.imageUrl;
+        if (url) { onThumbnailChange(url); setStatus("ok"); }
+        else setStatus("err");
+      } catch {
         setStatus("err");
       }
-    } catch {
-      setStatus("err");
-    } finally {
-      setFetching(false);
-    }
-  };
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [gameId]);
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-2">
+      <div className="relative">
         <Input
           value={gameId}
           placeholder="Enter Universe ID (e.g. 6872265039)"
-          onChange={(e) => { setGameId(e.target.value); setStatus("idle"); }}
-          onKeyDown={(e) => e.key === "Enter" && fetchThumbnail()}
-          className="bg-black/50 border-white/10 text-xs text-white flex-1"
+          onChange={(e) => { onGameIdChange(e.target.value); setStatus("idle"); }}
+          className="bg-black/50 border-white/10 text-xs text-white pr-8"
         />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="border-white/10 text-xs text-slate-300 hover:text-white hover:border-white/30 cursor-pointer"
-          onClick={fetchThumbnail}
-          disabled={fetching || !gameId.trim()}
-        >
-          {fetching ? <RotateCwIcon className="h-3.5 w-3.5 animate-spin" /> : "Fetch"}
-        </Button>
+        {status === "fetching" && (
+          <RotateCwIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 animate-spin pointer-events-none" />
+        )}
+        {status === "ok" && (
+          <CheckCircle2Icon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-400 pointer-events-none" />
+        )}
       </div>
-      {status === "ok" && value && (
+      {status === "ok" && thumbnailUrl && (
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-          <CheckCircle2Icon className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-          <img src={value} alt="thumbnail" className="h-8 w-8 rounded object-cover" />
-          <span className="text-[11px] text-emerald-300 truncate font-mono">{value}</span>
+          <img src={thumbnailUrl} alt="thumbnail" className="h-8 w-8 rounded object-cover shrink-0" />
+          <span className="text-[11px] text-emerald-300 truncate font-mono">{thumbnailUrl}</span>
         </div>
       )}
       {status === "err" && (
         <p className="text-[11px] text-rose-400">Could not find thumbnail for that Game ID.</p>
-      )}
-      {value && status === "idle" && (
-        <p className="text-[11px] text-slate-500 truncate font-mono">{value}</p>
       )}
     </div>
   );
@@ -425,8 +421,10 @@ export function AdvancedEmbedEditor({
                   <div>
                     <label className="mb-2 block text-xs font-semibold text-slate-300">Thumbnail — Roblox Game ID</label>
                     <GameIdThumbnail
-                      value={config.thumbnail_url || ""}
-                      onChange={(url) => onChange("thumbnail_url", url)}
+                      gameId={config.thumbnail_game_id || ""}
+                      thumbnailUrl={config.thumbnail_url || ""}
+                      onGameIdChange={(id) => onChange("thumbnail_game_id", id)}
+                      onThumbnailChange={(url) => onChange("thumbnail_url", url)}
                     />
                   </div>
                 </div>

@@ -402,13 +402,14 @@ export default function WebsiteUpdatesPage({ params }: { params: Promise<{ guild
             </div>
           ) : (
             <>
-              {/* Header / Control Bar */}
+              {/* ── Top card: status + config (mirrors announcements layout) ── */}
               <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 backdrop-blur-xl shadow-2xl space-y-5 relative overflow-hidden">
                 <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-amber-500/8 blur-3xl pointer-events-none" />
 
+                {/* Title row */}
                 <div className="flex flex-wrap items-center justify-between gap-4 relative z-10">
                   <div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <h2 className="text-xl font-extrabold text-white tracking-tight">{activeDraft.name}</h2>
                       <span className="rounded-md bg-white/10 border border-white/10 px-2.5 py-0.5 text-xs font-semibold text-slate-300">{activeDraft.category}</span>
                       {activeDraft.last_published_at ? (
@@ -418,15 +419,11 @@ export default function WebsiteUpdatesPage({ params }: { params: Promise<{ guild
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-400">
-                          <span className="h-2 w-2 rounded-full bg-amber-500" /> Draft
+                          <span className="h-2 w-2 rounded-full bg-amber-500" /> Ready to Publish
                         </span>
                       )}
                     </div>
-                    {activeDraft.last_published_at && (
-                      <p className="mt-1 text-xs text-slate-400">
-                        Last published: {new Date(activeDraft.last_published_at).toLocaleString()}
-                      </p>
-                    )}
+                    <p className="mt-1 text-xs text-slate-400">Configure Discord posting, tag, and update content below.</p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -439,28 +436,71 @@ export default function WebsiteUpdatesPage({ params }: { params: Promise<{ guild
                         <><CheckCircle2Icon className="h-3.5 w-3.5 text-slate-400" /><span className="text-slate-400">Ready</span></>
                       )}
                     </div>
-                    <Button
-                      variant="default" size="sm"
-                      className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold rounded-lg"
+                    <Button variant="default" size="sm"
+                      className="bg-emerald-600 text-white hover:bg-emerald-500 font-semibold rounded-lg cursor-pointer"
                       disabled={isSaving}
-                      onClick={async () => { try { await triggerSaveNow(); toast("Saved!", "success"); } catch { toast("Save failed", "error"); } }}
-                    >
+                      onClick={async () => { try { await triggerSaveNow(); toast("Saved!", "success"); } catch { toast("Save failed", "error"); } }}>
                       {isSaving ? <><RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" />Saving...</> : <><SaveIcon className="mr-1.5 h-3.5 w-3.5" />Save Draft</>}
                     </Button>
-                    <Button
-                      variant="default" size="sm"
-                      className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold shadow-lg shadow-amber-600/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                    <Button variant="default" size="sm"
+                      className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold shadow-lg shadow-amber-600/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                       disabled={publishing || !activeDraft.title.trim() || !activeDraft.content.trim()}
-                      onClick={handlePublish}
-                    >
+                      onClick={handlePublish}>
                       {publishing ? <><RotateCwIcon className="mr-1.5 h-3.5 w-3.5 animate-spin" />Publishing...</> : <><SendIcon className="mr-1.5 h-3.5 w-3.5" />Publish Update</>}
                     </Button>
                   </div>
                 </div>
+
+                {/* Discord channel + role (always visible, like announcements) */}
+                <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                      <MessageSquareIcon className="h-3.5 w-3.5 text-blue-400" />
+                      Discord Channel
+                      <span className="text-slate-500 font-normal">(optional)</span>
+                    </label>
+                    <ChannelSelect guildId={guildId} value={activeDraft.channel_id} onChange={(v) => updateField("channel_id", v)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300">Ping Role <span className="text-slate-500 font-normal">(optional)</span></label>
+                    <RoleSelect guildId={guildId} value={activeDraft.ping_role_id} onChange={(v) => updateField("ping_role_id", v)} />
+                  </div>
+                </div>
+
+                {/* Also post to Discord toggle */}
+                <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+                  <div>
+                    <p className="text-xs font-semibold text-white">Also post to Discord</p>
+                    <p className="text-[11px] text-slate-500">Send a Discord embed to the channel above when publishing.</p>
+                  </div>
+                  <button type="button" onClick={() => updateField("post_to_discord", !activeDraft.post_to_discord)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full border transition-all duration-200 cursor-pointer ${
+                      activeDraft.post_to_discord ? "bg-blue-600 border-blue-500" : "bg-white/10 border-white/20"
+                    }`}>
+                    <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${activeDraft.post_to_discord ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
+
+                {/* Metadata footer */}
+                <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400 border-t border-white/5 pt-3">
+                  <div>
+                    <span className="text-slate-500">Last Published:</span>{" "}
+                    {activeDraft.last_published_at
+                      ? <span className="text-slate-300 font-medium">{new Date(activeDraft.last_published_at).toLocaleString()}</span>
+                      : <span className="text-slate-500 italic">Never</span>}
+                  </div>
+                </div>
               </div>
 
-              {/* Content Editor */}
+              {/* ── Bottom card: content editor ── */}
               <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 backdrop-blur-xl shadow-2xl space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Update Content</h3>
+                    <p className="mt-0.5 text-xs text-slate-400">Set the tag, title, body, and optional banner image for the website post.</p>
+                  </div>
+                </div>
+
                 {/* Tag */}
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
@@ -496,54 +536,22 @@ export default function WebsiteUpdatesPage({ params }: { params: Promise<{ guild
                   <label className="text-xs font-semibold text-slate-300">Content <span className="text-rose-400">*</span></label>
                   <Textarea
                     placeholder="Describe the update, patch notes, or announcement in detail..."
-                    rows={8}
+                    rows={10}
                     value={activeDraft.content}
                     onChange={(e) => updateField("content", e.target.value)}
-                    className="bg-black/40 text-sm text-white placeholder:text-slate-500 min-h-[180px] resize-y border-white/10 focus:border-amber-500/50"
+                    className="bg-black/40 text-sm text-white placeholder:text-slate-500 min-h-[200px] resize-y border-white/10 focus:border-amber-500/50"
                   />
                 </div>
 
-                {/* Image URL */}
+                {/* Banner Image */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-300">Banner Image URL (optional)</label>
+                  <label className="text-xs font-semibold text-slate-300">Banner Image URL <span className="text-slate-500 font-normal">(optional)</span></label>
                   <Input
                     placeholder="https://..."
                     value={activeDraft.image_url}
                     onChange={(e) => updateField("image_url", e.target.value)}
                     className="bg-black/40 text-sm text-white placeholder:text-slate-500 border-white/10 focus:border-amber-500/50"
                   />
-                </div>
-
-                {/* Discord cross-post */}
-                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <MessageSquareIcon className="h-4 w-4 text-blue-400" />
-                      <div>
-                        <p className="text-sm font-bold text-white">Also Post to Discord</p>
-                        <p className="text-xs text-slate-400">Send the same update to a Discord channel simultaneously.</p>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => updateField("post_to_discord", !activeDraft.post_to_discord)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full border transition-all duration-200 cursor-pointer ${
-                        activeDraft.post_to_discord ? "bg-blue-600 border-blue-500" : "bg-white/10 border-white/20"
-                      }`}>
-                      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${activeDraft.post_to_discord ? "translate-x-6" : "translate-x-1"}`} />
-                    </button>
-                  </div>
-
-                  {activeDraft.post_to_discord && (
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 pt-1 border-t border-white/5">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-300">Target Channel <span className="text-rose-400">*</span></label>
-                        <ChannelSelect guildId={guildId} value={activeDraft.channel_id} onChange={(v) => updateField("channel_id", v)} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-300">Ping Role (optional)</label>
-                        <RoleSelect guildId={guildId} value={activeDraft.ping_role_id} onChange={(v) => updateField("ping_role_id", v)} />
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Delete */}

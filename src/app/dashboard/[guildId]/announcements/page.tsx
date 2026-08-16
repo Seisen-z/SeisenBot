@@ -52,6 +52,7 @@ type AnnouncementDraft = {
   description: string;
   content: string;
   thumbnail_game_id: string;
+  thumbnail_game_name: string;
   thumbnail_url: string;
   image_url: string;
   images: string[];
@@ -75,6 +76,7 @@ const createEmptyDraft = (name: string = "New Announcement", category: string = 
   description: "",
   content: "",
   thumbnail_game_id: "",
+  thumbnail_game_name: "",
   thumbnail_url: "",
   image_url: "",
   images: [],
@@ -115,6 +117,7 @@ function normalizeDraft(key: string, input: any): AnnouncementDraft {
     description: typeof source.description === "string" ? source.description : "",
     content: typeof source.content === "string" ? source.content : "",
     thumbnail_game_id: typeof source.thumbnail_game_id === "string" ? source.thumbnail_game_id : "",
+    thumbnail_game_name: typeof source.thumbnail_game_name === "string" ? source.thumbnail_game_name : "",
     thumbnail_url: typeof source.thumbnail_url === "string" ? source.thumbnail_url : "",
     image_url: typeof source.image_url === "string" ? source.image_url : "",
     images: Array.isArray(source.images) ? source.images.filter((i: any) => typeof i === "string") : [],
@@ -914,6 +917,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                       title: activeDraft.title,
                       description: activeDraft.description,
                       thumbnail_game_id: activeDraft.thumbnail_game_id,
+                      thumbnail_game_name: activeDraft.thumbnail_game_name,
                       thumbnail_url: activeDraft.thumbnail_url,
                       image_url: activeDraft.image_url,
                       images: activeDraft.images,

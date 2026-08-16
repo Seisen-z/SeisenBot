@@ -27,11 +27,13 @@ function GameIdThumbnail({
   thumbnailUrl,
   onGameIdChange,
   onThumbnailChange,
+  onGameNameChange,
 }: {
   gameId: string;
   thumbnailUrl: string;
   onGameIdChange: (id: string) => void;
   onThumbnailChange: (url: string) => void;
+  onGameNameChange?: (name: string) => void;
 }) {
   const [status, setStatus] = useState<"idle" | "fetching" | "ok" | "err">("idle");
 
@@ -44,8 +46,11 @@ function GameIdThumbnail({
         const res = await fetch(`/api/roblox/thumbnail?universeId=${id}`);
         const data = await res.json();
         const url = data?.imageUrl;
-        if (url) { onThumbnailChange(url); setStatus("ok"); }
-        else setStatus("err");
+        if (url) {
+          onThumbnailChange(url);
+          if (data?.gameName) onGameNameChange?.(data.gameName);
+          setStatus("ok");
+        } else setStatus("err");
       } catch {
         setStatus("err");
       }
@@ -72,7 +77,10 @@ function GameIdThumbnail({
       {status === "ok" && thumbnailUrl && (
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
           <img src={thumbnailUrl} alt="thumbnail" className="h-8 w-8 rounded object-cover shrink-0" />
-          <span className="text-[11px] text-emerald-300 truncate font-mono">{thumbnailUrl}</span>
+          <div className="min-w-0">
+            <p className="text-[11px] text-emerald-300 font-semibold truncate">Resolved successfully</p>
+            <p className="text-[10px] text-emerald-400/60 font-mono truncate">{thumbnailUrl}</p>
+          </div>
         </div>
       )}
       {status === "err" && (
@@ -423,6 +431,7 @@ export function AdvancedEmbedEditor({
                       thumbnailUrl={config.thumbnail_url || ""}
                       onGameIdChange={(id) => onChange("thumbnail_game_id", id)}
                       onThumbnailChange={(url) => onChange("thumbnail_url", url)}
+                      onGameNameChange={(name) => onChange("thumbnail_game_name", name)}
                     />
                   </div>
                 </div>

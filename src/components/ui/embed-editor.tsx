@@ -41,11 +41,9 @@ function GameIdThumbnail({
     setStatus("fetching");
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://thumbnails.roblox.com/v1/games/icons?universeIds=${id}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`
-        );
+        const res = await fetch(`/api/roblox/thumbnail?universeId=${id}`);
         const data = await res.json();
-        const url = data?.data?.[0]?.imageUrl;
+        const url = data?.imageUrl;
         if (url) { onThumbnailChange(url); setStatus("ok"); }
         else setStatus("err");
       } catch {

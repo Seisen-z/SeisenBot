@@ -35,6 +35,15 @@ const PRESET_EMOJIS = ["🎉", "👍", "❤️", "🔥", "✅", "⭐", "🚀", "
 
 type AnnouncementButton = { label: string; url: string };
 
+const WEBSITE_TAGS = ["Update", "New Script", "Patch", "Maintenance", "Announcement"] as const;
+const WEBSITE_TAG_COLORS: Record<string, string> = {
+  "Update":       "border-amber-500/60 bg-amber-500/20 text-amber-300",
+  "New Script":   "border-emerald-500/60 bg-emerald-500/20 text-emerald-300",
+  "Patch":        "border-yellow-500/60 bg-yellow-500/20 text-yellow-300",
+  "Maintenance":  "border-violet-500/60 bg-violet-500/20 text-violet-300",
+  "Announcement": "border-blue-500/60 bg-blue-500/20 text-blue-300",
+};
+
 type AnnouncementDraft = {
   name: string;
   category: string;
@@ -50,6 +59,8 @@ type AnnouncementDraft = {
   ping_role_id: string;
   buttons: AnnouncementButton[];
   auto_reactions: string[];
+  post_to_website: boolean;
+  website_tag: string;
   last_posted_at?: string | null;
   last_message_id?: string | null;
   [key: string]: any;
@@ -70,6 +81,8 @@ const createEmptyDraft = (name: string = "New Announcement", category: string = 
   ping_role_id: "",
   buttons: [],
   auto_reactions: [],
+  post_to_website: false,
+  website_tag: "Announcement",
   last_posted_at: null,
   last_message_id: null,
 });
@@ -115,6 +128,8 @@ function normalizeDraft(key: string, input: any): AnnouncementDraft {
           .slice(0, 5)
       : [],
     auto_reactions,
+    post_to_website: typeof source.post_to_website === "boolean" ? source.post_to_website : false,
+    website_tag: typeof source.website_tag === "string" && source.website_tag.trim() ? source.website_tag : "Announcement",
     last_posted_at: source.last_posted_at ? String(source.last_posted_at) : null,
     last_message_id: source.last_message_id ? String(source.last_message_id) : null,
   };
@@ -718,6 +733,53 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                       (Click preset emojis to select/deselect, or type a custom emoji and press Enter)
                     </span>
                   </div>
+                </div>
+
+                {/* Post to Website */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-base">🌐</span>
+                      <div>
+                        <p className="text-xs font-bold text-white">Also post to Seisen website</p>
+                        <p className="text-[11px] text-slate-500">Publish this as a website update on seisen.vercel.app/updates simultaneously.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateActiveDraftField("post_to_website", !activeDraft.post_to_website)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full border transition-all duration-200 cursor-pointer ${
+                        activeDraft.post_to_website ? "bg-amber-600 border-amber-500" : "bg-white/10 border-white/20"
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${activeDraft.post_to_website ? "translate-x-6" : "translate-x-1"}`} />
+                    </button>
+                  </div>
+
+                  {activeDraft.post_to_website && (
+                    <div className="pt-2 border-t border-white/5 space-y-2">
+                      <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Website Update Tag</label>
+                      <div className="flex flex-wrap gap-2">
+                        {WEBSITE_TAGS.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => updateActiveDraftField("website_tag", tag)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all duration-150 cursor-pointer ${
+                              activeDraft.website_tag === tag
+                                ? WEBSITE_TAG_COLORS[tag] + " scale-105 shadow-md"
+                                : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-white hover:border-white/20"
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        The announcement title and description will be used as the website update content.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Execution Metadata */}

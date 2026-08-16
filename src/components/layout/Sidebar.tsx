@@ -39,7 +39,6 @@ import {
   Smile,
   Tags,
   Lock,
-  Globe,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -96,7 +95,6 @@ export default function Sidebar({
         { name: "Auto Reply", href: `/dashboard/${guildId}/autoreply`, icon: MessageSquareReply },
         { name: "AI Help", href: `/dashboard/${guildId}/ai-help`, icon: Bot },
         { name: "Announcements", href: `/dashboard/${guildId}/announcements`, icon: Megaphone },
-        { name: "Website Updates", href: `/dashboard/${guildId}/website-updates`, icon: Globe },
         { name: "Auto-Post", href: `/dashboard/${guildId}/auto-post`, icon: RotateCw },
         { name: "Sticky Messages", href: `/dashboard/${guildId}/sticky`, icon: Pin },
         { name: "Channel Renamer", href: `/dashboard/${guildId}/rename-channels`, icon: PenLine },

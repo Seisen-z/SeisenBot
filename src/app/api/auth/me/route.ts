@@ -34,6 +34,7 @@ export async function GET() {
     const response = await fetch("https://discord.com/api/users/@me", {
       headers: {
         Authorization: `Bearer ${token}`,
+        "User-Agent": "SeisenHubDashboard/1.0",
       },
       cache: "no-store",
     });

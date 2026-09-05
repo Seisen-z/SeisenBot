@@ -25,7 +25,8 @@ export async function GET() {
   try {
     const res = await fetch("https://discord.com/api/users/@me/guilds?with_counts=true", {
       headers: {
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "SeisenHubDashboard/1.0",
       },
       next: { revalidate: 60 }
     });

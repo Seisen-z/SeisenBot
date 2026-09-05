@@ -93,7 +93,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
 
       const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "SeisenHubDashboard/1.0",
+        },
         body: new URLSearchParams({
           client_id: CLIENT_ID!,
           client_secret: CLIENT_SECRET!,
@@ -109,7 +112,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
       }
 
       const userRes = await fetch("https://discord.com/api/users/@me", {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          "User-Agent": "SeisenHubDashboard/1.0",
+        },
       });
 
       if (!userRes.ok) {

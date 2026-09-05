@@ -75,10 +75,16 @@ export default async function HomePage() {
     try {
       const [resUser, resDashboardGuilds] = await Promise.all([
         fetch("https://discord.com/api/users/@me", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "User-Agent": "SeisenHubDashboard/1.0",
+          },
         }),
         fetch(`${SERVER_API_BASE.replace(/\/api$/, '')}/api/bot/dashboard-guilds`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "User-Agent": "SeisenHubDashboard/1.0",
+          },
           cache: "no-store",
         }),
       ]);

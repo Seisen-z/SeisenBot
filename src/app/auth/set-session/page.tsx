@@ -36,7 +36,7 @@ function SetSessionInner() {
         } catch {
           /* ignore */
         }
-        router.replace(redirectPath);
+        window.location.href = redirectPath;
       } catch {
         router.replace("/login?error=no_session");
       }

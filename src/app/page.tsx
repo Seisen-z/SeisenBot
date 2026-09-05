@@ -20,9 +20,16 @@ function tokenCacheKey(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-const SERVER_API_BASE = process.env.API_PROXY_TARGET
-  ? `${process.env.API_PROXY_TARGET}/api`
-  : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+function resolveServerApiBase(): string {
+  let raw = process.env.BOT_API_URL || process.env.API_PROXY_TARGET || process.env.NEXT_PUBLIC_API_URL || "https://seisenbot.wisp.uno";
+  raw = raw.trim().replace(/\/+$/, "");
+  if (raw.startsWith("http://") && !raw.includes("localhost") && !raw.includes("127.0.0.1")) {
+    raw = raw.replace(/^http:\/\//i, "https://");
+  }
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
+
+const SERVER_API_BASE = resolveServerApiBase();
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 
@@ -89,7 +96,9 @@ export default async function HomePage() {
         }),
       ]);
 
-      if (resUser.status === 401 || resDashboardGuilds.status === 401) {
+      // ONLY require re-auth if Discord itself says the access token is invalid (401).
+      // Never boot the user to /login?error=auth_failed if Discord accepted the user token!
+      if (resUser.status === 401) {
         requiresReauth = true;
       }
 
@@ -101,20 +110,29 @@ export default async function HomePage() {
         botGuildLookupAvailable = true;
       }
 
-      if (resUser.ok && resDashboardGuilds.ok) {
-        _profileCache.set(cacheKey, { user, guilds, expiresAt: now + HOME_CACHE_TTL_MS });
-      } else if (!requiresReauth && cachedProfile) {
-        // Discord likely rate-limited us (429) — fall back to the last known-good
-        // profile/guild list instead of rendering an empty/broken page.
-        user = cachedProfile.user;
-        guilds = cachedProfile.guilds;
+      // Fallback: If bot API call failed/empty but user token is valid, fetch user's guilds directly from Discord API
+      if (guilds.length === 0 && resUser.ok) {
+        try {
+          const resDirectGuilds = await fetch("https://discord.com/api/users/@me/guilds", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "User-Agent": "SeisenHubDashboard/1.0",
+            },
+          });
+          if (resDirectGuilds.ok) {
+            const rawGuilds = await resDirectGuilds.json();
+            if (Array.isArray(rawGuilds)) guilds = rawGuilds;
+          }
+        } catch {
+          /* ignore */
+        }
       }
 
-      if ((!resUser.ok || !resDashboardGuilds.ok) && !requiresReauth && process.env.NODE_ENV === "development") {
-        console.info("Discord profile/guild fetch non-auth failure", {
-          userStatus: resUser.status,
-          guildStatus: resDashboardGuilds.status,
-        });
+      if (resUser.ok && guilds.length > 0) {
+        _profileCache.set(cacheKey, { user, guilds, expiresAt: now + HOME_CACHE_TTL_MS });
+      } else if (!requiresReauth && cachedProfile) {
+        user = cachedProfile.user;
+        guilds = cachedProfile.guilds;
       }
     } catch {
       if (cachedProfile) {

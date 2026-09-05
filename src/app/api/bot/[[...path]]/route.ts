@@ -14,7 +14,11 @@ function resolveRequestTimeoutMs(_path: string[] | undefined) {
 }
 
 function normalizeBase(base: string): string {
-  return String(base || "").trim().replace(/\/+$/, "");
+  let cleaned = String(base || "").trim().replace(/\/+$/, "");
+  if (cleaned.startsWith("http://") && !cleaned.includes("localhost") && !cleaned.includes("127.0.0.1")) {
+    cleaned = cleaned.replace(/^http:\/\//i, "https://");
+  }
+  return cleaned;
 }
 
 function parseCandidateBases(rawValue: string | undefined): string[] {

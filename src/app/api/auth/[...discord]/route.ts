@@ -155,7 +155,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
   // ─── LOGOUT ───────────────────────────────────────────────────────────────
   if (action === "logout") {
     const response = NextResponse.redirect(new URL("/login", req.url));
-    const isSecureContext = req.nextUrl.protocol === "https:";
+    const isSecureContext =
+      process.env.NODE_ENV === "production" ||
+      req.nextUrl.protocol === "https:" ||
+      req.headers.get("x-forwarded-proto") === "https";
     const cookieOptions = {
       maxAge: 0,
       path: "/",

@@ -166,8 +166,12 @@ async function proxyToBotApi(request: NextRequest, path: string[] | undefined) {
         status: upstream.status,
         headers: responseHeaders,
       });
-      if (upstream.status === 401) {
-        clearSessionCookies(response, request.nextUrl.protocol === "https:");
+      if (upstream.status === 401 && sessionFromCookie) {
+        const isSecure =
+          process.env.NODE_ENV === "production" ||
+          request.nextUrl.protocol === "https:" ||
+          request.headers.get("x-forwarded-proto") === "https";
+        clearSessionCookies(response, isSecure);
       }
       return response;
     } catch (error) {

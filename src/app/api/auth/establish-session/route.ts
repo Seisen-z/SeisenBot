@@ -17,7 +17,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "token and user_id required" }, { status: 400 });
   }
 
-  const isSecureContext = req.nextUrl.protocol === "https:";
+  const isSecureContext =
+    process.env.NODE_ENV === "production" ||
+    req.nextUrl.protocol === "https:" ||
+    req.headers.get("x-forwarded-proto") === "https";
   const cookieOptions = {
     maxAge: COOKIE_MAX_AGE,
     path: "/",

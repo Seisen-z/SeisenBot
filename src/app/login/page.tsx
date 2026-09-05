@@ -9,10 +9,11 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; msg?: string; next?: string }>;
 }) {
   const resolvedParams = await searchParams;
-  const errorText = resolvedParams.error ? ERROR_MESSAGES[resolvedParams.error] ?? "Unable to log you in right now." : null;
+  const baseError = resolvedParams.error ? ERROR_MESSAGES[resolvedParams.error] ?? "Unable to log you in right now." : null;
+  const errorText = resolvedParams.msg ? `${baseError || "Login failed"}: ${resolvedParams.msg}` : baseError;
   const nextPath = typeof resolvedParams.next === "string" && resolvedParams.next.startsWith("/")
     ? resolvedParams.next
     : undefined;

@@ -146,10 +146,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
 
       return NextResponse.redirect(handoffUrl);
     } catch (err) {
-      if (process.env.NODE_ENV === "development") {
-        console.info("Auth callback error", err);
-      }
-      return NextResponse.redirect(new URL(`/login?error=auth_failed&next=${encodeURIComponent(nextPath)}`, req.url));
+      const errDetail = err instanceof Error ? err.message : String(err);
+      console.error("[OAuth Callback Error]", err);
+      return NextResponse.redirect(new URL(`/login?error=auth_failed&msg=${encodeURIComponent(errDetail)}&next=${encodeURIComponent(nextPath)}`, req.url));
     }
   }
 

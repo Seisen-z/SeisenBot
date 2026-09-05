@@ -90,12 +90,13 @@ export default function ClientLayout({
 
     (async () => {
       try {
-        const res = await fetch('/api/guilds_proxy', { cache: 'no-store', credentials: 'include' });
+        const res = await fetch('/api/bot/dashboard-guilds', { cache: 'no-store', credentials: 'include' });
         if (!res.ok || cancelled) {
           if (!cancelled) setHasGuildAccess(null);
           return;
         }
-        const guilds = (await res.json().catch(() => [])) as Array<{ id: string; owner?: boolean; permissions?: string; permissions_new?: string }>;
+        const data = (await res.json().catch(() => null)) as { guilds?: Array<{ id: string; owner?: boolean; permissions?: string; permissions_new?: string }> } | null;
+        const guilds = data?.guilds;
         if (!Array.isArray(guilds) || cancelled) return;
 
         const target = guilds.find((guild) => String(guild.id) === String(guildId));

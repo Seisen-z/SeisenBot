@@ -49,15 +49,13 @@ export default function Header({
 
     (async () => {
       try {
-        const [userGuildsRes, botGuildsRes] = await Promise.all([
-          fetch("/api/guilds_proxy", { cache: "no-store", credentials: "include" }),
-          fetch("/api/bot/guilds", { cache: "no-store", credentials: "include" }),
-        ]);
-        if (!userGuildsRes.ok || cancelled) {
+        const dashboardGuildsRes = await fetch("/api/bot/dashboard-guilds", { cache: "no-store", credentials: "include" });
+        if (!dashboardGuildsRes.ok || cancelled) {
           if (!cancelled) setGuildMeta(null);
           return;
         }
-        const guilds = (await userGuildsRes.json().catch(() => [])) as Array<{ id: string; name: string; icon?: string | null }>;
+        const dashboardData = (await dashboardGuildsRes.json().catch(() => null)) as { guilds?: Array<{ id: string; name: string; icon?: string | null }>; bot_guild_ids?: string[]; rate_limited?: boolean } | null;
+        const guilds = dashboardData?.guilds;
         if (cancelled || !Array.isArray(guilds)) return;
         const mappedGuilds = guilds.map((guild: any) => ({
           id: String(guild.id),
@@ -80,9 +78,8 @@ export default function Header({
         // If bot guilds cannot be fetched, fall back to manageable user guilds only.
         let visibleGuilds: Array<{ id: string; name: string; icon: string | null }> = [];
         let botLookupFailed = false;
-        if (botGuildsRes.ok) {
-          const botData = (await botGuildsRes.json().catch(() => null)) as { guild_ids?: string[] } | null;
-          const botGuildIds = new Set((botData?.guild_ids || []).map((id) => String(id)));
+        if (Array.isArray(dashboardData?.bot_guild_ids) && !dashboardData.rate_limited) {
+          const botGuildIds = new Set(dashboardData.bot_guild_ids.map((id) => String(id)));
           visibleGuilds = manageableGuilds.filter((guild) => botGuildIds.has(guild.id));
         } else {
           botLookupFailed = true;

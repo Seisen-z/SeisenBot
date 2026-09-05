@@ -21,13 +21,17 @@ function SetSessionInner() {
 
     (async () => {
       try {
+        console.log("[SetSession] Establishing session for user:", userId, "token length:", token?.length);
         const res = await fetch("/api/auth/establish-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ token, user_id: userId }),
         });
+        console.log("[SetSession] establish-session status:", res.status);
         if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          console.error("[SetSession] establish-session failed:", res.status, errData);
           router.replace("/login?error=no_session");
           return;
         }
@@ -36,8 +40,10 @@ function SetSessionInner() {
         } catch {
           /* ignore */
         }
+        console.log("[SetSession] Session established successfully. Redirecting to:", redirectPath);
         window.location.href = redirectPath;
-      } catch {
+      } catch (err) {
+        console.error("[SetSession] establish-session exception:", err);
         router.replace("/login?error=no_session");
       }
     })();

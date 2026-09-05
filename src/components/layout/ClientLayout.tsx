@@ -34,37 +34,50 @@ export default function ClientLayout({
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
+      console.log(`[DevTools Auth] Checking session at ${pathname} (isPublic: ${isPublicPath})`);
       try {
-        const res = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
-        if (cancelled) return;
-        if (res.ok) {
-          const user = (await res.json().catch(() => null)) as AuthUser | null;
-          setIsAuthenticated(true);
-          setAuthUser(user);
-          try {
-            sessionStorage.setItem('seisenAuth', '1');
-          } catch {
-            /* ignore */
+        const res = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'include' });
+        console.log(`[DevTools Auth] GET /api/auth/me response status: ${res.status}`);
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error(`[DevTools Auth ERROR] /api/auth/me failed with status ${res.status}:`, errData);
+          if (!cancelled) {
+            setIsAuthenticated(false);
+            setAuthUser(null);
+            setAuthChecked(true);
+            if (!isPublicPath) {
+              console.warn(`[DevTools Auth Redirect] Protected route (${pathname}) unauthenticated. Redirecting to /login`);
+              router.replace('/login');
+            }
           }
-        } else {
-          setIsAuthenticated(false);
-          setAuthUser(null);
-          try {
-            sessionStorage.removeItem('seisenAuth');
-          } catch {
-            /* ignore */
-          }
+          return;
         }
-      } catch {
+
+        const data = await res.json().catch(() => null);
+        console.log('[DevTools Auth Success] Current User:', data);
+
         if (!cancelled) {
-          setIsAuthenticated(false);
-          setAuthUser(null);
-        }
-      } finally {
-        if (!cancelled) {
+          const hasUser = Boolean(data?.id);
+          setIsAuthenticated(hasUser);
+          setAuthUser(hasUser ? data : null);
           setAuthChecked(true);
+
+          if (!hasUser && !isPublicPath) {
+            console.warn(`[DevTools Auth Redirect] Missing user ID on protected route (${pathname}). Redirecting to /login`);
+            router.replace('/login');
+          }
+        }
+      } catch (err) {
+        console.error('[DevTools Auth EXCEPTION] Failed to verify session:', err);
+        if (!cancelled) {
+          setIsAuthenticated(false);
+          setAuthUser(null);
+          setAuthChecked(true);
+          if (!isPublicPath) {
+            router.replace('/login');
+          }
         }
       }
     })();
@@ -72,48 +85,57 @@ export default function ClientLayout({
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [isPublicPath, pathname, router]);
 
   useEffect(() => {
-    if (!authChecked || isPublicPath) return;
-    if (!isAuthenticated) {
-      router.replace('/login');
-    }
-  }, [authChecked, isAuthenticated, isPublicPath, router]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!guildId || isPublicPath || !isAuthenticated) {
+    if (!guildId || !isAuthenticated || isPublicPath) {
       setHasGuildAccess(null);
       return;
     }
 
+    let cancelled = false;
     (async () => {
+      console.log(`[DevTools Guild Access] Checking permission for Guild ID: ${guildId}`);
       try {
         const res = await fetch('/api/bot/dashboard-guilds', { cache: 'no-store', credentials: 'include' });
-        if (!res.ok || cancelled) {
+        console.log(`[DevTools Guild Access] GET /api/bot/dashboard-guilds status: ${res.status}`);
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          console.error(`[DevTools Guild Access ERROR] /api/bot/dashboard-guilds failed (${res.status}):`, errText);
           if (!cancelled) setHasGuildAccess(null);
           return;
         }
+
         const data = (await res.json().catch(() => null)) as { guilds?: Array<{ id: string; owner?: boolean; permissions?: string; permissions_new?: string }> } | null;
         const guilds = data?.guilds;
-        if (!Array.isArray(guilds) || cancelled) return;
+        if (!Array.isArray(guilds) || cancelled) {
+          console.error('[DevTools Guild Access ERROR] Invalid guilds response structure:', data);
+          return;
+        }
 
         const target = guilds.find((guild) => String(guild.id) === String(guildId));
         if (!target) {
+          console.warn(`[DevTools Guild Access Denied] Guild ${guildId} not found in manageable guilds list.`);
           setHasGuildAccess(false);
           return;
         }
+
         if (target.owner) {
+          console.log(`[DevTools Guild Access Granted] User is Owner of guild ${guildId}`);
           setHasGuildAccess(true);
           return;
         }
+
         const permissionValue = String(target.permissions ?? target.permissions_new ?? '0');
         const perms = BigInt(permissionValue);
         const hasManageOrAdmin =
           (perms & BigInt(0x8)) === BigInt(0x8) || (perms & BigInt(0x20)) === BigInt(0x20);
+
+        console.log(`[DevTools Guild Access Result] Guild ${guildId} Admin/Manage access: ${hasManageOrAdmin}`);
         setHasGuildAccess(hasManageOrAdmin);
-      } catch {
+      } catch (err) {
+        console.error('[DevTools Guild Access EXCEPTION] Failed to verify guild access:', err);
         if (!cancelled) setHasGuildAccess(null);
       }
     })();
@@ -167,13 +189,13 @@ export default function ClientLayout({
   if (isPublicPath) {
     return <main className="relative flex min-h-screen w-full justify-center">{children}</main>;
   }
+
   const readOnlyMode = Boolean(guildId && hasGuildAccess === false);
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(130,130,130,0.09),_transparent_54%)]" />
       <div className="relative z-10 flex h-full w-full overflow-hidden border-y border-white/10 bg-[rgba(10,10,12,0.78)] lg:border-y-0">
-
         {guildId && (
           <>
             <button

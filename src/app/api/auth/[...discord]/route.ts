@@ -79,7 +79,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ disc
     const redirectUri = resolveRedirectUri(req);
 
     if (oauthError) {
-      return NextResponse.redirect(new URL(`/login?error=auth_failed&next=${encodeURIComponent(nextPath)}`, req.url));
+      return NextResponse.redirect(new URL(`/login?error=auth_failed&msg=${encodeURIComponent(oauthError)}&next=${encodeURIComponent(nextPath)}`, req.url));
     }
 
     if (!code) {

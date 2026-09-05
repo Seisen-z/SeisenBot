@@ -92,7 +92,12 @@ function resolveBotApiBases(): string[] {
 
 function buildTargetUrl(base: string, request: NextRequest, path: string[] | undefined) {
   const suffix = (path || []).map((segment) => encodeURIComponent(segment)).join("/");
-  const apiPath = suffix ? `/api/${suffix}` : "/api";
+  const isBotPrefixed = suffix.startsWith("bot/") || suffix === "bot";
+  const apiPath = suffix
+    ? isBotPrefixed
+      ? `/api/${suffix}`
+      : `/api/bot/${suffix}`
+    : "/api/bot";
   return `${normalizeBase(base)}${apiPath}${request.nextUrl.search}`;
 }
 

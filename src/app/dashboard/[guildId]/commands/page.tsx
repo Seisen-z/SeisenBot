@@ -29,6 +29,7 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "unban", desc: "Unban a user from the server by their ID" },
     { cmd: "invite", desc: "Get a permanent invite link for this server" },
     { cmd: "invitelist", desc: "List all active invites in the server" },
+    { cmd: "report-fixed", desc: "Mark a bug report as fixed and lock forum post" },
   ],
   "Access Control": [
     { cmd: "access list", desc: "List role access for locked commands" },
@@ -43,13 +44,31 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "ai_help setup", desc: "Configure AI monitored channels" },
     { cmd: "ai_help toggle", desc: "Enable or disable AI Help" },
   ],
-  "Activity Rewards": [
+  "Activity & Leveling": [
     { cmd: "activity leaderboard", desc: "Show top activity leaderboard for this server" },
     { cmd: "activity me", desc: "Show your activity stats in this server" },
     { cmd: "activity test", desc: "Test the activity command (debug)" },
+    { cmd: "level rank", desc: "Show your (or another member's) leveling progress" },
+    { cmd: "level leaderboard", desc: "Show the leveling leaderboard for this server" },
+    { cmd: "level tiers", desc: "List the configured leveling tiers and their roles" },
   ],
-  "Utility / Access": [
-    { cmd: "command", desc: "List commands with role-based access configured" },
+  "Anti-Spam System": [
+    { cmd: "antispam status", desc: "Show current anti-spam configuration" },
+    { cmd: "antispam enable", desc: "Enable anti-spam protection for this server" },
+    { cmd: "antispam disable", desc: "Disable anti-spam protection for this server" },
+    { cmd: "antispam configure", desc: "Set spam thresholds and action" },
+    { cmd: "antispam exempt_role", desc: "Add or remove a role exemption from anti-spam" },
+    { cmd: "antispam exempt_channel", desc: "Add or remove a channel exemption from anti-spam" },
+    { cmd: "antispam log_channel", desc: "Set or clear the spam action log channel" },
+  ],
+  "Staff Applications": [
+    { cmd: "apppanel setup", desc: "Create a staff application panel with buttons" },
+    { cmd: "apppanel delete", desc: "Delete the application panel for this server" },
+    { cmd: "application", desc: "Look up a submitted application by its ID code" },
+  ],
+  "AutoMod System": [
+    { cmd: "automod_status", desc: "Show current Auto-Mod configuration for this server" },
+    { cmd: "automod_hash", desc: "Generate SHA-256 hash of an image for blocklist" },
   ],
   "Announcements": [
     { cmd: "announce", desc: "Send an announcement via a form" },
@@ -68,10 +87,17 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
   "Boosting Options": [
     { cmd: "boost addrole", desc: "Add a role to be mentioned on boosts" },
     { cmd: "boost category", desc: "Set category for boost claim channels" },
+    { cmd: "boost close", desc: "Close the current boost claim ticket channel" },
     { cmd: "boost config", desc: "Show current server boost config" },
     { cmd: "boost removerole", desc: "Remove a mentioned boost role" },
     { cmd: "boost setlog", desc: "Set channel for server boost logs" },
     { cmd: "boost test", desc: "Test the boost webhook and log system" },
+  ],
+  "Bot Profile Customization": [
+    { cmd: "bot_profile name", desc: "Change the bot's nickname in this server" },
+    { cmd: "bot_profile avatar", desc: "Change the bot's avatar in this server" },
+    { cmd: "bot_profile description", desc: "Change the bot's About Me description in this server" },
+    { cmd: "bot_profile reset", desc: "Reset server-specific bot profile settings" },
   ],
   "Giveaways": [
     { cmd: "giveaway create", desc: "Create a new reaction-based giveaway" },
@@ -80,24 +106,49 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "giveaway reroll", desc: "Pick new winner(s) from giveaway entrants" },
     { cmd: "giveaway list", desc: "List recent giveaway IDs and status" },
   ],
+  "Key Panels & Key Generation": [
+    { cmd: "generatekeypremium", desc: "Generate a 1 Week Premium key" },
+    { cmd: "generatekeyregular", desc: "Generate a 1 Week Regular key" },
+    { cmd: "keypanel setup", desc: "Create a key generator panel in a channel" },
+    { cmd: "keypanel list", desc: "List all key panels created in this server" },
+    { cmd: "keypanel delete", desc: "Delete a key generator panel" },
+  ],
+  "Macro Import": [
+    { cmd: "import", desc: "Privately import a macro file" },
+    { cmd: "macroimport status", desc: "Show current macro-import configuration" },
+    { cmd: "macroimport toggle", desc: "Enable or disable macro-import responses" },
+    { cmd: "macroimport add-channel", desc: "Watch a channel, forum, or thread for macro files" },
+    { cmd: "macroimport remove-channel", desc: "Stop watching a channel, forum, or thread" },
+  ],
   "Member Counter": [
     { cmd: "membercounter create", desc: "Create a realtime member counter channel" },
     { cmd: "membercounter configure", desc: "Configure an existing channel as member counter" },
     { cmd: "membercounter remove", desc: "Remove the member counter for this server" },
     { cmd: "membercounter status", desc: "Show current member counter configuration" },
   ],
+  "Music Player": [
+    { cmd: "play", desc: "Play a song (YouTube URL or search terms)" },
+    { cmd: "pause", desc: "Pause the current playing track" },
+    { cmd: "resume", desc: "Resume a paused track" },
+    { cmd: "skip", desc: "Skip the current track" },
+    { cmd: "stop", desc: "Stop playback, clear queue and disconnect" },
+    { cmd: "queue", desc: "Display current music queue" },
+    { cmd: "nowplaying", desc: "Show details about current playing track" },
+    { cmd: "volume", desc: "Set playback volume (0–100)" },
+    { cmd: "loop", desc: "Cycle loop mode (Off → Song → Queue → Off)" },
+    { cmd: "removequeue", desc: "Remove a track from queue by position number" },
+    { cmd: "disconnect", desc: "Disconnect the bot from voice" },
+  ],
   "Polls": [
     { cmd: "poll create", desc: "Start a native Discord poll with live results" },
     { cmd: "poll end", desc: "Manually end a native Discord poll" },
   ],
-  "Reaction Roles": [
+  "Reaction Roles & Select Roles": [
     { cmd: "reaction_roles create", desc: "Create a new reaction role message" },
     { cmd: "reaction_roles add_role", desc: "Add a role option to an existing reaction role message" },
     { cmd: "reaction_roles remove_role", desc: "Remove a role option from a reaction role message" },
     { cmd: "reaction_roles list", desc: "List all reaction role messages in this server" },
-  ],
-  "Select Menu Roles": [
-    { cmd: "select_menu_roles create", desc: "Create a new select menu role message" },
+    { cmd: "select_roles create", desc: "Create a new select menu role message" },
   ],
   "Roblox Integration": [
     { cmd: "roblox list", desc: "List active monitored Roblox games" },
@@ -123,10 +174,6 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "vouch", desc: "Create a new vouch for this server" },
     { cmd: "vouch_setup", desc: "Set the channel where vouches post" },
   ],
-  "Key Generation": [
-    { cmd: "generatekeypremium", desc: "Generate a 1 Week Premium key" },
-    { cmd: "generatekeyregular", desc: "Generate a 1 Week Regular key" },
-  ],
   "Fun & Community Commands": [
     { cmd: "8ball", desc: "Ask the magic 8-ball a question" },
     { cmd: "coinflip", desc: "Flip a coin (heads or tails)" },
@@ -138,6 +185,7 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "compliment", desc: "Receive a nice compliment" },
     { cmd: "fact", desc: "Learn a random fun fact" },
     { cmd: "riddle", desc: "Get a riddle to solve" },
+    { cmd: "check", desc: "Check a user's profile by ID, username, or mention" },
   ],
   "General / Miscellaneous": [
     { cmd: "command", desc: "List commands with role-based access configured" },
@@ -149,6 +197,7 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "userinfo", desc: "Display information about a user" },
     { cmd: "serverinfo", desc: "Display information about this server" },
     { cmd: "avatar", desc: "Display a user's avatar" },
+    { cmd: "sync", desc: "Sync slash commands with Discord" },
   ],
 };
 

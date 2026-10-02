@@ -509,6 +509,13 @@ export default function RobloxStoreMonitorsPage({ params }: { params: Promise<{ 
                     <div className="flex flex-col gap-2 max-w-md mx-auto">
                       <div className="bg-[#313338] rounded-xl border border-[#1E1F22] p-4 shadow-inner flex flex-col justify-center min-h-[250px]">
                         <DiscordMessagePreview
+                          botUser={{
+                            username: "Seisen Bot",
+                            // The component's default avatar path (/bot-avatar.png)
+                            // is not in public/, so point at the real bot avatar.
+                            avatar:
+                              "https://cdn.discordapp.com/avatars/1317544078518554655/49605d3c2eb11ef0dcdebcaf17cfebf3.png",
+                          }}
                           message={{
                             content: activeMonitor.role_id ? `<@&${activeMonitor.role_id}>` : null,
                             embeds: [

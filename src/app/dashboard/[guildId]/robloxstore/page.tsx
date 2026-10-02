@@ -24,9 +24,28 @@ interface LatestItem {
   name: string;
   description: string;
   price: number | null;
+  type_label?: string;
   url: string;
   thumbnail_url?: string;
 }
+
+// Shown in the Preview tab until a Group ID resolves to a real item, so the
+// embed always reads as a finished post rather than a half-empty shell. It is a
+// clothing item on purpose: Roblox renders shirts and pants on an avatar
+// mannequin, which is what the real post looks like.
+const SAMPLE_ITEM_ID = "77859894379489";
+const SAMPLE_ITEM: LatestItem = {
+  id: SAMPLE_ITEM_ID,
+  name: "Pet Games Shirt",
+  description: "A shirt from the group store, shown on a Roblox avatar.",
+  price: 45,
+  type_label: "Shirt",
+  url: `https://www.roblox.com/catalog/${SAMPLE_ITEM_ID}/`,
+  // Roblox CDN links expire, so the live copy is refetched below; this is only
+  // the fallback for when the bot API cannot be reached.
+  thumbnail_url:
+    "https://tr.rbxcdn.com/180DAY-352c5c7078246bfd690276a393654931/420/420/Shirt/Png/noFilter",
+};
 
 interface GroupInfo {
   name: string;
@@ -63,6 +82,7 @@ export default function RobloxStoreMonitorsPage({ params }: { params: Promise<{ 
   const [forcing, setForcing] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState<Record<string, boolean>>({});
   const [mode, setMode] = useState<"edit" | "preview">("edit");
+  const [sampleItem, setSampleItem] = useState<LatestItem>(SAMPLE_ITEM);
   const [monitorHealth, setMonitorHealth] = useState<StoreMonitorHealth | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -113,6 +133,14 @@ export default function RobloxStoreMonitorsPage({ params }: { params: Promise<{ 
       .finally(() => {
         if (mounted) setInitialLoadComplete(true);
       });
+
+    // Refresh the sample item so its thumbnail URL is current; the hardcoded
+    // fallback stays in place if the bot API is unreachable.
+    fetchApi(`/robloxitem/${SAMPLE_ITEM_ID}`)
+      .then((item: LatestItem) => {
+        if (mounted && item?.thumbnail_url) setSampleItem(item);
+      })
+      .catch(() => {});
 
     loadMonitorHealth(true);
     const healthTimer = window.setInterval(() => {
@@ -216,7 +244,9 @@ export default function RobloxStoreMonitorsPage({ params }: { params: Promise<{ 
 
   const activeMonitor = monitors[activeIdx];
   const activeGroupInfo = activeMonitor?.group_id ? groupInfos[activeMonitor.group_id] : null;
-  const previewItem = activeGroupInfo?.latest_item || null;
+  const liveItem = activeGroupInfo?.latest_item || null;
+  const previewItem = liveItem || sampleItem;
+  const previewIsSample = liveItem === null;
 
   const formatDateTime = (value: string | null | undefined) => {
     if (!value) return "Never";
@@ -428,7 +458,7 @@ export default function RobloxStoreMonitorsPage({ params }: { params: Promise<{ 
                             <p className="text-sm font-semibold text-white truncate">{activeGroupInfo.name}</p>
                             <p className="text-xs text-discord-text-muted">
                               {activeGroupInfo.member_count.toLocaleString()} members
-                              {previewItem ? ` · newest item: ${previewItem.name}` : " · no store items found"}
+                              {liveItem ? ` · newest item: ${liveItem.name}` : " · no store items found"}
                             </p>
                           </div>
                         </div>
@@ -484,20 +514,21 @@ export default function RobloxStoreMonitorsPage({ params }: { params: Promise<{ 
                             embeds: [
                               {
                                 author: { name: `New item in ${activeGroupInfo?.name || "your group"}'s store` },
-                                title: `🛒 ${previewItem?.name || "New Store Item"}`,
-                                description: previewItem?.description || "The item's description from Roblox appears here.",
+                                title: `🛒 ${previewItem.name}`,
+                                description: previewItem.description || "*No description provided.*",
                                 color: 0x00A2FF,
                                 fields: [
-                                  { name: "💰 Price", value: formatPrice(previewItem?.price), inline: true },
-                                  { name: "🏷️ Type", value: "Shirt", inline: true },
-                                  { name: "🆔 Item ID", value: previewItem?.id || "0000000000", inline: true },
+                                  { name: "💰 Price", value: formatPrice(previewItem.price), inline: true },
+                                  { name: "🏷️ Type", value: previewItem.type_label || "Item", inline: true },
+                                  { name: "🆔 Item ID", value: previewItem.id, inline: true },
+                                  { name: "📅 Uploaded", value: "a few seconds ago", inline: true },
                                   {
                                     name: "🔗 Link",
-                                    value: `[View on Roblox](${previewItem?.url || "https://www.roblox.com/catalog"})`,
+                                    value: `[View on Roblox](${previewItem.url})`,
                                     inline: false,
                                   },
                                 ],
-                                image: previewItem?.thumbnail_url ? { url: previewItem.thumbnail_url } : undefined,
+                                image: previewItem.thumbnail_url ? { url: previewItem.thumbnail_url } : undefined,
                                 footer: { text: "Roblox Group Store Monitor" },
                               },
                             ],
@@ -505,7 +536,9 @@ export default function RobloxStoreMonitorsPage({ params }: { params: Promise<{ 
                         />
                       </div>
                       <p className="text-center text-xs text-discord-text-muted/60">
-                        Preview uses the group&apos;s newest existing item. Real posts use whatever is uploaded next.
+                        {previewIsSample
+                          ? "Sample item — enter a Group ID to preview with that group's newest item."
+                          : "Showing this group's newest existing item. Real posts use whatever is uploaded next."}
                       </p>
                     </div>
                   )}

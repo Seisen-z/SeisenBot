@@ -282,9 +282,11 @@ export default function Sidebar({
                 )}
               >
                 {section.items.map((item) => {
+                  // Match on whole path segments: a plain startsWith would light up
+                  // /roblox for /robloxstore, since one href is a prefix of the other.
                   const isActive = item.exact
                     ? pathname === item.href
-                    : pathname.startsWith(item.href);
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
                   const Icon = item.icon;
 
                   return (

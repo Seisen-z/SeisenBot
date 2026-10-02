@@ -160,6 +160,7 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "robloxstore remove", desc: "Stop monitoring a Roblox group store" },
     { cmd: "robloxstore status", desc: "Show current store monitor configs" },
     { cmd: "robloxstore test", desc: "Post the group's newest store item as a test" },
+    { cmd: "robloxstore backfill", desc: "Announce newest store items that were never posted" },
   ],
   "Role Management": [
     { cmd: "role add", desc: "Add a role to a member" },

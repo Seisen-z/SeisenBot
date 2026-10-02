@@ -39,6 +39,7 @@ import {
   Smile,
   Tags,
   Lock,
+  Store,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -112,6 +113,7 @@ export default function Sidebar({
         { name: "Fun Commands", href: `/dashboard/${guildId}/fun-commands`, icon: Smile },
         { name: "Social Notifications", href: `/dashboard/${guildId}/social`, icon: Bell },
         { name: "Roblox Monitor", href: `/dashboard/${guildId}/roblox`, icon: Gamepad2 },
+        { name: "Roblox Store", href: `/dashboard/${guildId}/robloxstore`, icon: Store },
       ],
     },
     {

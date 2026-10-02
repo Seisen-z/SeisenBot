@@ -156,6 +156,10 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "roblox setup", desc: "Monitor a game and ping on updates" },
     { cmd: "roblox status", desc: "Show current Roblox monitor configs" },
     { cmd: "roblox test", desc: "Send a test update notification" },
+    { cmd: "robloxstore setup", desc: "Announce new group store uploads in a channel" },
+    { cmd: "robloxstore remove", desc: "Stop monitoring a Roblox group store" },
+    { cmd: "robloxstore status", desc: "Show current store monitor configs" },
+    { cmd: "robloxstore test", desc: "Post the group's newest store item as a test" },
   ],
   "Role Management": [
     { cmd: "role add", desc: "Add a role to a member" },

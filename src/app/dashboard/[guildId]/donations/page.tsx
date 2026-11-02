@@ -28,6 +28,7 @@ interface DonationSettings {
   role_min_total: number;
   announce: boolean;
   dm_thanks: boolean;
+  bump_panel: boolean;
 }
 
 interface DonationStats {
@@ -225,6 +226,10 @@ export default function DonationsPage({ params }: { params: Promise<{ guildId: s
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={settings.dm_thanks} onChange={(e) => update("dm_thanks", e.target.checked)} />
               DM the donor a thank-you
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={settings.bump_panel} onChange={(e) => update("bump_panel", e.target.checked)} />
+              Keep panel at the bottom (re-post it under each thank-you)
             </label>
           </div>
         </div>

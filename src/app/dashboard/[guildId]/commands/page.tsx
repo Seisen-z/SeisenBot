@@ -117,6 +117,15 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "donationpanel setup", desc: "Post or refresh the PayPal donation panel" },
     { cmd: "donationpanel delete", desc: "Delete the donation panel message" },
   ],
+  "Trading": [
+    { cmd: "trading channels", desc: "Pick trading channels and stats channels" },
+    { cmd: "trading setup", desc: "Make a channel a trading channel" },
+    { cmd: "trading remove", desc: "Stop treating a channel as a trading channel" },
+    { cmd: "trading staff_add", desc: "Add a staff role to every trade thread" },
+    { cmd: "trading staff_remove", desc: "Remove a staff role from trade threads" },
+    { cmd: "trading toggle", desc: "Enable or disable trading" },
+    { cmd: "trading status", desc: "Show the trading configuration" },
+  ],
   "Macro Import": [
     { cmd: "import", desc: "Privately import a macro file" },
     { cmd: "macroimport status", desc: "Show current macro-import configuration" },

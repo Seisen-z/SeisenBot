@@ -221,6 +221,17 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
   ],
 };
 
+// Commands Discord hides from regular members (Manage Server permission). Mirrors ADMIN_ONLY_COMMANDS in
+// modules/access_control.py plus the commands that already set their own permission.
+const ADMIN_ONLY_ROOTS = new Set([
+  "access", "ai_help", "announce", "announce_draft", "apppanel", "application", "autoreply", "automod_hash",
+  "automod_status", "boost", "bot_profile", "donationpanel", "generatekeypremium", "generatekeyregular",
+  "keypanel", "membercounter", "reaction_roles", "report-fixed", "roblox", "robloxstore", "role", "say",
+  "select_roles", "sticky", "tradeadmin", "vouch_setup", "ban", "baninfo", "banlist", "clear", "kick", "purge",
+  "unban", "invitelist", "antispam", "macroimport", "sync",
+]);
+const isAdminOnly = (cmd: string) => ADMIN_ONLY_ROOTS.has(cmd.split(" ")[0]);
+
 // ─── Role pill colours (cycles through a small palette) ──────────────────────
 const PILL_COLORS = [
   "bg-[#5865F2]/20 text-[#8b9bff] border-[#5865F2]/30",
@@ -449,6 +460,8 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
       {!hasSelection && (
         <p className="text-xs text-[#6b7280] -mt-2">
           Click any command row to select it. Select multiple, then assign roles from the bar that appears at the bottom.
+          Commands marked <b>Admin only</b> are hidden from regular members in Discord. A role you assign can still run
+          them, but to see them in its command list also allow the role in Server Settings → Integrations.
         </p>
       )}
 
@@ -554,6 +567,22 @@ export default function CommandAccessPage({ params }: { params: Promise<{ guildI
                         {/* Description */}
                         <div className="flex-1 min-w-0">
                           <span className="text-xs text-[#6b7280] truncate block">{desc}</span>
+                        </div>
+
+                        {/* Visibility badge */}
+                        <div className="shrink-0">
+                          {isAdminOnly(cmd) ? (
+                            <span
+                              title="Hidden from regular members in Discord's command list"
+                              className="inline-flex rounded-full border border-[#ED4245]/30 bg-[#ED4245]/15 px-2 py-0.5 text-[10px] font-semibold text-[#ED4245]"
+                            >
+                              Admin only
+                            </span>
+                          ) : (
+                            <span className="inline-flex rounded-full border border-[#57F287]/30 bg-[#57F287]/15 px-2 py-0.5 text-[10px] font-semibold text-[#57F287]">
+                              Public
+                            </span>
+                          )}
                         </div>
 
                         {/* Role pills */}

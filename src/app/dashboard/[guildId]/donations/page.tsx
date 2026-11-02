@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useRef, useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -55,16 +55,47 @@ export default function DonationsPage({ params }: { params: Promise<{ guildId: s
   const [paypal, setPaypal] = useState<DonationsResponse["paypal"] | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [autoState, setAutoState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const lastSavedRef = useRef("");
+
+  // message_id is set by publishing, not by editing, so it never counts as an unsaved change.
+  const comparable = (s: DonationSettings) => JSON.stringify({ ...s, message_id: undefined });
 
   useEffect(() => {
     fetchApi(`/guilds/${guildId}/donations`)
       .then((data: DonationsResponse) => {
+        lastSavedRef.current = comparable(data.settings);
         setSettings(data.settings);
         setStats(data.stats);
         setPaypal(data.paypal);
       })
       .catch(() => toast("Failed to load donation settings", "error"));
   }, [guildId, toast]);
+
+  // Auto-save: persist 800ms after the last edit. Invalid limits are skipped (manual save explains why).
+  useEffect(() => {
+    if (!settings) return;
+    const snapshot = comparable(settings);
+    if (snapshot === lastSavedRef.current) return;
+    if (settings.min_amount < 1 || (settings.max_amount > 0 && settings.max_amount < settings.min_amount)) return;
+
+    const timer = setTimeout(async () => {
+      setAutoState("saving");
+      try {
+        await fetchApi(`/guilds/${guildId}/donations`, undefined, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(settings),
+        });
+        lastSavedRef.current = snapshot;
+        setAutoState("saved");
+      } catch {
+        setAutoState("error");
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, guildId]);
 
   if (!settings) {
     return <div className="glass-card rounded-3xl p-6 text-discord-text-muted">Loading...</div>;
@@ -94,6 +125,8 @@ export default function DonationsPage({ params }: { params: Promise<{ guildId: s
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
+      lastSavedRef.current = comparable(settings);
+      setAutoState("saved");
       toast("Donation settings saved!");
       return true;
     } catch (e: any) {
@@ -145,6 +178,11 @@ export default function DonationsPage({ params }: { params: Promise<{ guildId: s
         ]}
         actions={
           <>
+            {autoState !== "idle" && (
+              <span className={`text-xs ${autoState === "error" ? "text-red-400" : "text-green-400"}`}>
+                {autoState === "saving" ? "Saving..." : autoState === "saved" ? "All changes saved" : "Auto-save failed"}
+              </span>
+            )}
             <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Settings"}
             </Button>
@@ -181,7 +219,7 @@ export default function DonationsPage({ params }: { params: Promise<{ guildId: s
           </div>
         </div>
         <p className="mt-2 text-[10px] text-discord-text-muted">
-          Limits apply instantly. Click &quot;Update Live Panel&quot; to also refresh the numbers shown on the panel message.
+          Limits apply as soon as they are saved (changes auto-save). Donors see them in the amount pop-up.
         </p>
       </div>
 

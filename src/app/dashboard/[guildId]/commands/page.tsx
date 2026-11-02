@@ -113,6 +113,10 @@ const COMMAND_GROUPS: Record<string, { cmd: string; desc: string }[]> = {
     { cmd: "keypanel list", desc: "List all key panels created in this server" },
     { cmd: "keypanel delete", desc: "Delete a key generator panel" },
   ],
+  "Donations": [
+    { cmd: "donationpanel setup", desc: "Post or refresh the PayPal donation panel" },
+    { cmd: "donationpanel delete", desc: "Delete the donation panel message" },
+  ],
   "Macro Import": [
     { cmd: "import", desc: "Privately import a macro file" },
     { cmd: "macroimport status", desc: "Show current macro-import configuration" },

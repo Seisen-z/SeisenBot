@@ -26,6 +26,7 @@ import {
   Users,
   ShieldAlert,
   Key,
+  Heart,
   ClipboardListIcon,
   AtSign,
   TrendingUp,
@@ -130,6 +131,7 @@ export default function Sidebar({
       items: [
         { name: "Tickets", href: `/dashboard/${guildId}/tickets`, icon: Ticket },
         { name: "Key Panels", href: `/dashboard/${guildId}/key-panels`, icon: Key },
+        { name: "Donations", href: `/dashboard/${guildId}/donations`, icon: Heart },
         { name: "Applications", href: `/dashboard/${guildId}/applications`, icon: ClipboardListIcon },
         { name: "Polls", href: `/dashboard/${guildId}/polls`, icon: BarChart3 },
         { name: "Command Access", href: `/dashboard/${guildId}/commands`, icon: Settings2 },

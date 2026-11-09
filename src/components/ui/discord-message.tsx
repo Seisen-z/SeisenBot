@@ -179,12 +179,12 @@ function NewDiscordMessagePreview({
                 <img
                   src={embed.header.url}
                   alt="Cover"
-                  className="block w-full object-cover"
+                  className="block w-full aspect-[2.6/1] object-cover object-[50%_30%]"
                   onError={(e) => (e.currentTarget.style.display = 'none')}
                 />
                 {embed.header.text && (
                   <div
-                    className="absolute inset-x-3 bottom-[10%] text-center font-extrabold leading-tight text-white text-[1.6rem]"
+                    className="absolute left-[4%] right-[6%] top-[80%] -translate-y-1/2 text-left font-extrabold leading-tight text-white text-[1.6rem]"
                     style={{ WebkitTextStroke: '5px black', paintOrder: 'stroke fill' }}
                   >
                     {embed.header.text}

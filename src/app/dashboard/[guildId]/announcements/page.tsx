@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
+import { BannerBotPreview, BannerDesignerModal } from "@/components/ui/banner-designer";
+import { createUpdateCardDesign, normalizeBannerDesign, type BannerDesign } from "@/lib/banner-designer";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import {
   ChevronDownIcon,
@@ -63,6 +65,7 @@ type AnnouncementDraft = {
   auto_reactions: string[];
   post_to_website: boolean;
   website_tag: string;
+  dynamic_image: BannerDesign | null;
   last_posted_at?: string | null;
   last_message_id?: string | null;
   [key: string]: any;
@@ -87,6 +90,7 @@ const createEmptyDraft = (name: string = "New Announcement", category: string = 
   auto_reactions: [],
   post_to_website: false,
   website_tag: "Announcement",
+  dynamic_image: null,
   last_posted_at: null,
   last_message_id: null,
 });
@@ -136,6 +140,7 @@ function normalizeDraft(key: string, input: any): AnnouncementDraft {
     auto_reactions,
     post_to_website: typeof source.post_to_website === "boolean" ? source.post_to_website : false,
     website_tag: typeof source.website_tag === "string" && source.website_tag.trim() ? source.website_tag : "Announcement",
+    dynamic_image: normalizeBannerDesign(source.dynamic_image),
     last_posted_at: source.last_posted_at ? String(source.last_posted_at) : null,
     last_message_id: source.last_message_id ? String(source.last_message_id) : null,
   };
@@ -161,6 +166,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [bannerOpen, setBannerOpen] = useState(false);
 
   const [promptState, setPromptState] = useState<{
     open: boolean;
@@ -978,6 +984,45 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                           )}
                         </div>
 
+                        <div className="rounded-xl border border-white/10 bg-black/20 p-3.5 space-y-3">
+                          <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                            <ImageIcon className="h-3.5 w-3.5 text-blue-400" /> Banner Designer
+                          </label>
+                          <p className="text-[11px] text-slate-500">
+                            Design a banner with text and logo layers. It is rendered by the bot and replaces the main image when published.
+                          </p>
+                          {activeDraft.dynamic_image && (
+                            <div className="max-w-xl cursor-pointer" onClick={() => setBannerOpen(true)}>
+                              <BannerBotPreview guildId={guildId} design={activeDraft.dynamic_image} />
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-dashed border-white/20 text-xs text-slate-300 hover:border-blue-500 hover:text-blue-400 rounded-lg"
+                              onClick={() => {
+                                if (!activeDraft.dynamic_image) {
+                                  updateActiveDraftField("dynamic_image", createUpdateCardDesign());
+                                }
+                                setBannerOpen(true);
+                              }}
+                            >
+                              <PlusIcon className="mr-1.5 h-3.5 w-3.5" /> {activeDraft.dynamic_image ? "Edit Banner" : "Design Banner"}
+                            </Button>
+                            {activeDraft.dynamic_image && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs"
+                                onClick={() => updateActiveDraftField("dynamic_image", null)}
+                              >
+                                Remove Banner
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="pt-2">
                           <ImageUploader
                             onApplyImage={(url) => updateActiveDraftField("image_url", url)}
@@ -1022,6 +1067,14 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
         defaultValue={promptState.defaultValue || ""}
         onConfirm={handlePromptConfirm}
         onCancel={() => setPromptState((prev) => ({ ...prev, open: false }))}
+      />
+
+      <BannerDesignerModal
+        guildId={guildId}
+        open={bannerOpen}
+        onClose={() => setBannerOpen(false)}
+        design={activeDraft?.dynamic_image || null}
+        onChange={(next) => updateActiveDraftField("dynamic_image", next)}
       />
     </div>
   );

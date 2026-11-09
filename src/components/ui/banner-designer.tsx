@@ -63,7 +63,6 @@ import type {
   BannerLayerType,
   BannerStroke,
 } from "@/lib/banner-designer";
-import { ImageUploader } from "./image-uploader";
 
 // ------------------------------------------------------------------ rendering (matches modules/banner_render.py)
 
@@ -617,7 +616,9 @@ function BannerDesignerInner({ guildId, onClose, design, onChange, tokens = {}, 
   const [viewport, setViewport] = useState({ width: 800, height: 600 });
   const [lockRatio, setLockRatio] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [imagePicker, setImagePicker] = useState<{ layerId: string; fillId: string } | null>(null);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadTargetRef = useRef<{ layerId: string; fillId: string } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [exporting, setExporting] = useState("");
   const [, setHistoryTick] = useState(0);
@@ -795,6 +796,44 @@ function BannerDesignerInner({ guildId, onClose, design, onChange, tokens = {}, 
     }
   };
 
+  // Pick a picture from the computer: it is uploaded to the server and the fill uses the saved link
+  const startUpload = (layerId: string, fillId: string) => {
+    uploadTargetRef.current = { layerId, fillId };
+    fileInputRef.current?.click();
+  };
+
+  const uploadFromComputer = async (file: File) => {
+    const target = uploadTargetRef.current;
+    if (!target) return;
+    const finish = (message: string, after: number) => {
+      setUploadStatus(message);
+      window.setTimeout(() => setUploadStatus(""), after);
+    };
+    if (!file.type.startsWith("image/")) {
+      finish("Could not upload: pick an image file.", 4000);
+      return;
+    }
+    setUploadStatus(`Uploading ${file.name}...`);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const response = await fetch(`/api/bot/guilds/${guildId}/upload_assets`, { method: "POST", body: form });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail?.detail || "the server refused the file");
+      }
+      const data = await response.json();
+      if (!data?.url) throw new Error("the server returned no link");
+      const layer = designRef.current.layers.find((entry) => entry.id === target.layerId);
+      if (layer) {
+        patchLayer(layer.id, { fills: layer.fills.map((fill) => (fill.id === target.fillId ? { ...fill, url: data.url, source: "url" } : fill)) });
+      }
+      finish("Image uploaded", 2000);
+    } catch (error) {
+      finish(`Could not upload: ${error instanceof Error ? error.message : "try again"}`, 5000);
+    }
+  };
+
   // ---------------------------------------------------------------- keyboard
 
   useEffect(() => {
@@ -883,7 +922,7 @@ function BannerDesignerInner({ guildId, onClose, design, onChange, tokens = {}, 
         } else if (drawTool === "image") {
           const fill = createFill("image", { url: "" });
           const layer = addLayerAt("rectangle", final, { name: "Image", fills: [fill] });
-          setImagePicker({ layerId: layer.id, fillId: fill.id });
+          startUpload(layer.id, fill.id);
         } else {
           addLayerAt(drawTool === "ellipse" ? "ellipse" : "rectangle", final);
         }
@@ -1234,8 +1273,8 @@ function BannerDesignerInner({ guildId, onClose, design, onChange, tokens = {}, 
               </button>
             ))}
             <span className="mx-1 h-4 w-px bg-white/15" />
-            <button type="button" onClick={() => setImagePicker({ layerId: primary.id, fillId: topImageFill.id })} className="rounded-md px-2.5 py-1 text-[11px] text-white hover:bg-white/10">
-              Replace image
+            <button type="button" onClick={() => startUpload(primary.id, topImageFill.id)} className="rounded-md px-2.5 py-1 text-[11px] text-white hover:bg-white/10">
+              Upload image
             </button>
           </div>
         )}
@@ -1344,7 +1383,7 @@ function BannerDesignerInner({ guildId, onClose, design, onChange, tokens = {}, 
               onAlign={alignSelected}
               onDuplicate={duplicateSelected}
               onDelete={deleteSelected}
-              onPickImage={(fillId) => setImagePicker({ layerId: primary.id, fillId })}
+              onPickImage={(fillId) => startUpload(primary.id, fillId)}
             />
           )}
 
@@ -1352,41 +1391,23 @@ function BannerDesignerInner({ guildId, onClose, design, onChange, tokens = {}, 
         </div>
       </div>
 
-      {imagePicker && (
-        <ImagePickerModal
-          onClose={() => setImagePicker(null)}
-          onPick={(url) => {
-            const layer = designRef.current.layers.find((entry) => entry.id === imagePicker.layerId);
-            if (layer) {
-              patchLayer(layer.id, { fills: layer.fills.map((fill) => (fill.id === imagePicker.fillId ? { ...fill, url, source: "url" } : fill)) });
-            }
-            setImagePicker(null);
-          }}
-        />
+      {/* Pick a picture from your computer: it is uploaded to the server and used from there */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) void uploadFromComputer(file);
+        }}
+      />
+      {uploadStatus && (
+        <div className="fixed left-1/2 top-4 z-[70] -translate-x-1/2 rounded-lg px-4 py-2 text-[12px] text-white shadow-xl" style={{ background: uploadStatus.startsWith("Could not") ? "#b42318" : ACCENT }}>
+          {uploadStatus}
+        </div>
       )}
-    </div>
-  );
-}
-
-function ImagePickerModal({ onClose, onPick }: { onClose: () => void; onPick: (url: string) => void }) {
-  const [url, setUrl] = useState("");
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div className="w-full max-w-lg rounded-xl p-4 shadow-2xl" style={{ background: PANEL, border: `1px solid ${BORDER}` }}>
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-semibold text-white">Choose an image</p>
-          <IconButton title="Close" onClick={onClose}><XIcon className="h-4 w-4" /></IconButton>
-        </div>
-        <Label>Paste an image link</Label>
-        <div className="mt-1 flex gap-2">
-          <TextInput value={url} onChange={setUrl} placeholder="https://..." />
-          <button type="button" disabled={!url.trim()} onClick={() => onPick(url.trim())} className="h-7 shrink-0 rounded-md px-3 text-[11px] font-semibold text-white disabled:opacity-40" style={{ background: ACCENT }}>Use</button>
-        </div>
-        <p className="mb-1 mt-4 text-[11px] text-[#8c8c8c]">Or pick one you uploaded</p>
-        <div className="max-h-72 overflow-y-auto rounded-lg bg-black/20 p-2">
-          <ImageUploader onApplyImage={onPick} />
-        </div>
-      </div>
     </div>
   );
 }
@@ -1987,7 +2008,7 @@ function FillPopover({
           {fill.source === "url" ? (
             <>
               <TextInput value={fill.url} placeholder="https://..." onChange={(value) => onChange({ ...fill, url: value })} />
-              <button type="button" onClick={onPickImage} className="h-7 w-full rounded-md text-[11px] text-white" style={{ background: FIELD }}>Choose from uploaded images</button>
+              <button type="button" onClick={onPickImage} className="h-7 w-full rounded-md text-[11px] text-white" style={{ background: FIELD }}>Upload from computer</button>
             </>
           ) : (
             <>

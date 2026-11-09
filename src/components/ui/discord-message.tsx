@@ -30,6 +30,9 @@ interface DiscordMessage {
       url?: string;
       icon_url?: string;
     };
+    header?: {
+      url?: string;
+    };
     thumbnail?: {
       url?: string;
     };
@@ -169,6 +172,15 @@ function NewDiscordMessagePreview({
               className="absolute bottom-0 left-0 top-0 w-1 rounded-l-[4px]"
               style={{ backgroundColor: embedColor }}
             />
+
+            {embed.header?.url && (
+              <img
+                src={embed.header.url}
+                alt="Cover"
+                className="block w-full pl-1 object-cover"
+                onError={(e) => (e.currentTarget.style.display = 'none')}
+              />
+            )}
 
             <div className="flex flex-col p-4 pl-5">
               <div className="flex justify-between gap-4">

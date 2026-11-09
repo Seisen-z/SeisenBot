@@ -24,33 +24,33 @@ export interface EmbedConfig {
 
 function GameIdThumbnail({
   gameId,
-  thumbnailUrl,
+  coverUrl,
   onGameIdChange,
-  onThumbnailChange,
+  onCoverChange,
   onGameNameChange,
 }: {
   gameId: string;
-  thumbnailUrl: string;
+  coverUrl: string;
   onGameIdChange: (id: string) => void;
-  onThumbnailChange: (url: string) => void;
+  onCoverChange: (url: string) => void;
   onGameNameChange?: (name: string) => void;
 }) {
   const [status, setStatus] = useState<"idle" | "fetching" | "ok" | "err">("idle");
 
   useEffect(() => {
     const id = gameId.trim();
-    if (!id) { setStatus("idle"); return; }
+    if (!id) { setStatus("idle"); onCoverChange(""); return; }
     setStatus("fetching");
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/roblox/thumbnail?universeId=${id}`);
+        const res = await fetch(`/api/roblox/thumbnail?universeId=${id}&type=cover`);
         const data = await res.json();
         const url = data?.imageUrl;
         if (url) {
-          onThumbnailChange(url);
+          onCoverChange(url);
           if (data?.gameName) onGameNameChange?.(data.gameName);
           setStatus("ok");
-        } else setStatus("err");
+        } else { onCoverChange(""); setStatus("err"); }
       } catch {
         setStatus("err");
       }
@@ -74,17 +74,17 @@ function GameIdThumbnail({
           <CheckCircle2Icon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-emerald-400 pointer-events-none" />
         )}
       </div>
-      {status === "ok" && thumbnailUrl && (
+      {status === "ok" && coverUrl && (
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-          <img src={thumbnailUrl} alt="thumbnail" className="h-8 w-8 rounded object-cover shrink-0" />
+          <img src={coverUrl} alt="cover" className="h-8 w-14 rounded object-cover shrink-0" />
           <div className="min-w-0">
             <p className="text-[11px] text-emerald-300 font-semibold truncate">Resolved successfully</p>
-            <p className="text-[10px] text-emerald-400/60 font-mono truncate">{thumbnailUrl}</p>
+            <p className="text-[10px] text-emerald-400/60 font-mono truncate">{coverUrl}</p>
           </div>
         </div>
       )}
       {status === "err" && (
-        <p className="text-[11px] text-rose-400">Could not find thumbnail for that Game ID.</p>
+        <p className="text-[11px] text-rose-400">Could not find a cover photo for that Game ID.</p>
       )}
     </div>
   );
@@ -104,6 +104,7 @@ export function AdvancedEmbedEditor({
   const [tab, setTab] = useState<"visual" | "raw" | "preview">("visual");
   const [rawText, setRawText] = useState("");
   const [rawError, setRawError] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasConfigKey = (key: string) => Object.prototype.hasOwnProperty.call(config, key);
@@ -425,12 +426,12 @@ export function AdvancedEmbedEditor({
                     </div>
                   </div>
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-slate-300">Thumbnail — Roblox Game ID</label>
+                    <label className="mb-2 block text-xs font-semibold text-slate-300">Cover Photo — Roblox Game ID</label>
                     <GameIdThumbnail
                       gameId={config.thumbnail_game_id || ""}
-                      thumbnailUrl={config.thumbnail_url || ""}
+                      coverUrl={coverUrl}
                       onGameIdChange={(id) => onChange("thumbnail_game_id", id)}
-                      onThumbnailChange={(url) => onChange("thumbnail_url", url)}
+                      onCoverChange={setCoverUrl}
                       onGameNameChange={(name) => onChange("thumbnail_game_name", name)}
                     />
                   </div>
@@ -561,6 +562,7 @@ export function AdvancedEmbedEditor({
                     color: typeof config.color === "string" && config.color.startsWith("#") 
                       ? parseInt(config.color.replace("#", ""), 16) 
                       : parseInt(String(config.color)) || 5814783,
+                    header: coverUrl ? { url: coverUrl } : undefined,
                     thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : undefined,
                     image: config.image_url ? { url: config.image_url } : undefined,
                     images: Array.isArray(config.images) && config.images.length > 0 ? config.images.map(url => ({ url })) : undefined,

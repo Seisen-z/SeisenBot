@@ -50,6 +50,7 @@ export interface WelcomeDynamicImageLayer {
   image_url: string;
   color: string;
   font_weight: "normal" | "bold";
+  font_style?: "normal" | "italic";
   text_align: "left" | "center" | "right";
   text_vertical_align: "top" | "middle" | "bottom";
   x: number;
@@ -454,6 +455,7 @@ export function normalizeWelcomeDynamicImages(raw: unknown): WelcomeDynamicImage
         image_url: toStringValue(layer.image_url, ""),
         color: toStringValue(layer.color, normalizedType === "block" ? "#1F232B" : "#FFFFFF"),
         font_weight: fontWeight,
+        font_style: layer.font_style === "italic" ? "italic" : "normal",
         text_align: textAlign,
         text_vertical_align: textVerticalAlign,
         x: clampNumber(layer.x, 20, 0, 5000),
@@ -964,6 +966,7 @@ function DynamicImageCanvas({
                   fontSize: `${Math.max(8, layer.font_size)}px`,
                   lineHeight: 1.16,
                   fontWeight: layer.font_weight === "bold" ? 700 : 400,
+                  fontStyle: layer.font_style || "normal",
                   fontFamily: '"Segoe UI", Arial, sans-serif',
                   textAlign: layer.text_align || "left",
                   display: "flex",

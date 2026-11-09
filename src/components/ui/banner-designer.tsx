@@ -348,10 +348,11 @@ export function BannerStaticPreview({ design, tokens = {}, className }: { design
 }
 
 // Asks the bot for the image. outputScale 2 is crisp enough for previews; announcements are posted at up to 4x.
-async function renderOnBot(guildId: string, design: BannerDesign, tokens: BannerTokens, outputScale = 2): Promise<string> {
+// trim cuts the empty transparent margin, like the posted announcement does; Export keeps the design as drawn.
+async function renderOnBot(guildId: string, design: BannerDesign, tokens: BannerTokens, outputScale = 2, trim = true): Promise<string> {
   const result = await fetchApi("/trigger/render_announcement_dynamic_image", undefined, {
     method: "POST",
-    body: JSON.stringify({ guild_id: guildId, payload: { dynamic_image: { ...design, output_scale: outputScale, tokens } } }),
+    body: JSON.stringify({ guild_id: guildId, payload: { dynamic_image: { ...design, output_scale: outputScale, tokens, trim } } }),
   });
   const base64 = String(result?.image_base64 || "").trim();
   if (!base64) throw new Error("The bot returned no image");
@@ -785,7 +786,7 @@ function BannerDesignerInner({ guildId, onClose, design, onChange, tokens = {}, 
   const exportPng = async (outputScale: number) => {
     setExporting("Exporting...");
     try {
-      const url = await renderOnBot(guildId, design, tokens, outputScale);
+      const url = await renderOnBot(guildId, design, tokens, outputScale, false);
       const link = document.createElement("a");
       link.href = url;
       link.download = `${design.name || "banner"}${outputScale > 1 ? `@${outputScale}x` : ""}.png`;

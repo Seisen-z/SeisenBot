@@ -11,7 +11,7 @@ import { ImageUploader } from "@/components/ui/image-uploader";
 import { AdvancedEmbedEditor } from "@/components/ui/embed-editor";
 import { DashboardPageHero } from "@/components/ui/dashboard-page-hero";
 import { BannerBotPreview, BannerDesignerModal } from "@/components/ui/banner-designer";
-import { createUpdateCardDesign, normalizeBannerDesign, type BannerDesign } from "@/lib/banner-designer";
+import { createHeaderBannerDesign, createUpdateCardDesign, normalizeBannerDesign, type BannerDesign } from "@/lib/banner-designer";
 import { useDebouncedAutoSave } from "@/hooks/use-debounced-auto-save";
 import {
   ChevronDownIcon,
@@ -66,6 +66,7 @@ type AnnouncementDraft = {
   post_to_website: boolean;
   website_tag: string;
   dynamic_image: BannerDesign | null;
+  banner_mode: "only" | "header";
   last_posted_at?: string | null;
   last_message_id?: string | null;
   [key: string]: any;
@@ -91,6 +92,7 @@ const createEmptyDraft = (name: string = "New Announcement", category: string = 
   post_to_website: false,
   website_tag: "Announcement",
   dynamic_image: null,
+  banner_mode: "only",
   last_posted_at: null,
   last_message_id: null,
 });
@@ -141,6 +143,7 @@ function normalizeDraft(key: string, input: any): AnnouncementDraft {
     post_to_website: typeof source.post_to_website === "boolean" ? source.post_to_website : false,
     website_tag: typeof source.website_tag === "string" && source.website_tag.trim() ? source.website_tag : "Announcement",
     dynamic_image: normalizeBannerDesign(source.dynamic_image),
+    banner_mode: source.banner_mode === "header" ? "header" : "only",
     last_posted_at: source.last_posted_at ? String(source.last_posted_at) : null,
     last_message_id: source.last_message_id ? String(source.last_message_id) : null,
   };
@@ -988,8 +991,22 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                           <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                             <ImageIcon className="h-3.5 w-3.5 text-blue-400" /> Banner Designer
                           </label>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[11px] text-slate-400">Posting style</span>
+                            <select
+                              value={activeDraft.banner_mode}
+                              onChange={(event) => updateActiveDraftField("banner_mode", event.target.value === "header" ? "header" : "only")}
+                              className="h-8 rounded-lg border border-white/10 bg-black/40 px-2 text-xs text-white"
+                            >
+                              <option value="only">Banner only (just the picture)</option>
+                              <option value="header">Header above the embed (picture, then the normal embed)</option>
+                            </select>
+                          </div>
                           <p className="text-[11px] text-slate-500">
-                            When a banner is set, only the banner is posted: no embed text, thumbnail or footer. Its text comes from this announcement's Title, Description and Footer, so editing them above updates the banner. The role ping and link buttons are still sent.
+                            {activeDraft.banner_mode === "header"
+                              ? "The banner is posted as a strip above the normal embed, which keeps its title, text, game icon and footer. Text the banner shows through ${title}, ${description} or ${footer} is not repeated in the embed."
+                              : "Only the banner is posted: no embed text, game icon or footer. Its text comes from this announcement's Title, Description and Footer, so editing them above updates the banner."}{" "}
+                            The role ping and link buttons are still sent.
                           </p>
                           {activeDraft.dynamic_image && (
                             <div className="max-w-xl cursor-pointer" onClick={() => setBannerOpen(true)}>
@@ -1007,7 +1024,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                               className="border-dashed border-white/20 text-xs text-slate-300 hover:border-blue-500 hover:text-blue-400 rounded-lg"
                               onClick={() => {
                                 if (!activeDraft.dynamic_image) {
-                                  updateActiveDraftField("dynamic_image", createUpdateCardDesign());
+                                  updateActiveDraftField("dynamic_image", activeDraft.banner_mode === "header" ? createHeaderBannerDesign() : createUpdateCardDesign());
                                 }
                                 setBannerOpen(true);
                               }}

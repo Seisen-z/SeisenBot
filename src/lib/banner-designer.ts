@@ -428,8 +428,32 @@ export function createBlankBanner(): BannerDesign {
   };
 }
 
+// A wide strip meant to sit above a normal embed (posting style "Header above the embed")
+export function createHeaderBannerDesign(): BannerDesign {
+  return {
+    id: uid("banner"),
+    name: "Header Banner",
+    width: 800,
+    height: 160,
+    background_color: "transparent",
+    layers: [
+      createBannerLayer("rectangle", {
+        name: "Cover", x: 0, y: 0, width: 800, height: 160, radius_tl: 16, radius_tr: 16, radius_br: 0, radius_bl: 0,
+        fills: [createFill("image", { source: "roblox_cover", game_id: "" })],
+      }),
+      createBannerLayer("text", {
+        ...TEXT_BASE, name: "Title", x: 28, y: 40, width: 744, height: 80, text: "Game Update", font_size: 56,
+        text_vertical_align: "middle", text_wrap: false, fills: solid("#FFFFFF"),
+        strokes: [createStroke({ width: 4, color: "#222222", position: "outside" })],
+        effects: [createEffect("drop_shadow", { opacity: 70, x: 2, y: 3, blur: 3 })],
+      }),
+    ],
+  };
+}
+
 export const BANNER_TEMPLATES = [
   { id: "update-card", label: "Update card", create: createUpdateCardDesign },
+  { id: "header", label: "Header strip (above an embed)", create: createHeaderBannerDesign },
   { id: "blank", label: "Blank banner", create: createBlankBanner },
 ] as const;
 

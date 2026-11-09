@@ -989,7 +989,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                             <ImageIcon className="h-3.5 w-3.5 text-blue-400" /> Banner Designer
                           </label>
                           <p className="text-[11px] text-slate-500">
-                            The banner is a template. Its text comes from this announcement's Title, Description and Footer, so editing them above updates the banner. Text the banner already shows is not repeated in the Discord embed.
+                            When a banner is set, only the banner is posted: no embed text, thumbnail or footer. Its text comes from this announcement's Title, Description and Footer, so editing them above updates the banner. The role ping and link buttons are still sent.
                           </p>
                           {activeDraft.dynamic_image && (
                             <div className="max-w-xl cursor-pointer" onClick={() => setBannerOpen(true)}>

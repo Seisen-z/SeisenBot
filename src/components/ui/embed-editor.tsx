@@ -557,13 +557,14 @@ export function AdvancedEmbedEditor({
                 message={{
                   content: config.content,
                   embeds: [{
-                    title: config.title,
+                    // With a cover photo the title is written on the cover and there is no small icon
+                    title: coverUrl ? undefined : config.title,
                     description: config.description,
                     color: typeof config.color === "string" && config.color.startsWith("#") 
                       ? parseInt(config.color.replace("#", ""), 16) 
                       : parseInt(String(config.color)) || 5814783,
-                    header: coverUrl ? { url: coverUrl } : undefined,
-                    thumbnail: config.thumbnail_url ? { url: config.thumbnail_url } : undefined,
+                    header: coverUrl ? { url: coverUrl, text: config.title } : undefined,
+                    thumbnail: !coverUrl && config.thumbnail_url ? { url: config.thumbnail_url } : undefined,
                     image: config.image_url ? { url: config.image_url } : undefined,
                     images: Array.isArray(config.images) && config.images.length > 0 ? config.images.map(url => ({ url })) : undefined,
                     footer: config.footer ? { text: config.footer } : undefined,

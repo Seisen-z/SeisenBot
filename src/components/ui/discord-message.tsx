@@ -32,6 +32,7 @@ interface DiscordMessage {
     };
     header?: {
       url?: string;
+      text?: string;
     };
     thumbnail?: {
       url?: string;
@@ -174,12 +175,22 @@ function NewDiscordMessagePreview({
             />
 
             {embed.header?.url && (
-              <img
-                src={embed.header.url}
-                alt="Cover"
-                className="block w-full pl-1 object-cover"
-                onError={(e) => (e.currentTarget.style.display = 'none')}
-              />
+              <div className="relative pl-1">
+                <img
+                  src={embed.header.url}
+                  alt="Cover"
+                  className="block w-full object-cover"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+                {embed.header.text && (
+                  <div
+                    className="absolute inset-x-3 bottom-[10%] text-center font-extrabold leading-tight text-white text-[1.6rem]"
+                    style={{ WebkitTextStroke: '5px black', paintOrder: 'stroke fill' }}
+                  >
+                    {embed.header.text}
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="flex flex-col p-4 pl-5">

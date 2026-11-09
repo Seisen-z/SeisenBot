@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import {
   AlignCenterHorizontalIcon,
@@ -10,6 +10,7 @@ import {
   AlignStartHorizontalIcon,
   AlignStartVerticalIcon,
   BoldIcon,
+  BlendIcon,
   ChevronDownIcon,
   CircleIcon,
   CopyIcon,
@@ -79,6 +80,21 @@ const PREVIEW_TOKENS: Record<string, string> = {
 const previewText = (text: string) =>
   Object.entries(PREVIEW_TOKENS).reduce((output, [token, value]) => output.split(token).join(value), text || "");
 
+// The announcement's own text, which banner text layers can show with ${title}, ${description} and ${footer}
+export type BannerTokens = { title?: string; description?: string; footer?: string };
+const TokenContext = createContext<BannerTokens>({});
+
+const applyAnnouncementTokens = (text: string, tokens: BannerTokens) =>
+  text
+    .split("${title}").join(tokens.title ?? "")
+    .split("${description}").join(tokens.description ?? "")
+    .split("${footer}").join(tokens.footer ?? "");
+
+function useTokenText() {
+  const tokens = useContext(TokenContext);
+  return (text: string) => previewText(applyAnnouncementTokens(text || "", tokens));
+}
+
 function useBannerFonts() {
   useEffect(() => {
     if (document.getElementById("banner-designer-fonts")) return;
@@ -93,7 +109,52 @@ function useBannerFonts() {
 const visibleFills = (layer: BannerLayer) => layer.fills.filter((fill) => fill.visible);
 const visibleStrokes = (layer: BannerLayer) => layer.strokes.filter((stroke) => stroke.visible && stroke.width > 0);
 const visibleEffects = (layer: BannerLayer, type: BannerEffectType) => layer.effects.filter((effect) => effect.visible && effect.type === type);
-const hasHttp = (url: string) => previewText(url).startsWith("http");
+
+// A Roblox game's cover photo / icon, looked up through the dashboard and cached per game
+type GameImage = { url: string; name: string };
+const gameImageCache = new Map<string, Promise<GameImage | null>>();
+
+function loadGameImage(gameId: string, kind: "cover" | "icon"): Promise<GameImage | null> {
+  const key = `${kind}:${gameId}`;
+  let pending = gameImageCache.get(key);
+  if (!pending) {
+    pending = fetch(`/api/roblox/thumbnail?universeId=${gameId}&type=${kind}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => (data?.imageUrl ? { url: String(data.imageUrl), name: String(data.gameName || "") } : null))
+      .catch(() => null);
+    gameImageCache.set(key, pending);
+    pending.then((found) => {
+      if (!found) gameImageCache.delete(key); // try again next time
+    });
+  }
+  return pending;
+}
+
+// The picture an image fill shows right now: its link, or the looked-up cover / icon of its game
+function useFillImage(fill: BannerFill): { url: string; name: string; pending: boolean } {
+  const gameId = fill.source !== "url" && /^\d+$/.test(fill.game_id) ? fill.game_id : "";
+  const kind = fill.source === "roblox_icon" ? "icon" : "cover";
+  const key = `${kind}:${gameId}`;
+  const [found, setFound] = useState<(GameImage & { key: string }) | null>(null);
+
+  useEffect(() => {
+    if (!gameId) return;
+    let cancelled = false;
+    loadGameImage(gameId, kind).then((result) => {
+      if (!cancelled) setFound(result ? { ...result, key } : { url: "", name: "", key });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, kind, key]);
+
+  // "/api/bot/assets/..." (an upload) is served by the dashboard itself, so a leading slash counts as a link too
+  const link = previewText(fill.url);
+  if (fill.source === "url") return { url: link.startsWith("http") || link.startsWith("/") ? link : "", name: "", pending: false };
+  if (!gameId) return { url: "", name: "", pending: false };
+  const resolved = found && found.key === key ? found : null;
+  return { url: resolved?.url ?? "", name: resolved?.name ?? "", pending: resolved === null };
+}
 
 function strokeShadow(stroke: BannerStroke): string {
   const color = withAlpha(stroke.color, stroke.opacity);
@@ -103,12 +164,30 @@ function strokeShadow(stroke: BannerStroke): string {
 }
 
 function FillView({ fill }: { fill: BannerFill }) {
+  const image = useFillImage(fill);
   const style: CSSProperties = { position: "absolute", inset: 0, opacity: fill.opacity / 100 };
   if (fill.type === "image") {
-    const url = previewText(fill.url);
-    if (!url.startsWith("http")) return null;
+    if (!image.url) {
+      if (image.pending) return null;
+      return (
+        <div
+          style={{
+            ...style,
+            border: "1px dashed rgba(255,255,255,0.35)",
+            background: "rgba(255,255,255,0.06)",
+            color: "rgba(255,255,255,0.55)",
+            fontSize: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {fill.source === "url" || !fill.game_id ? "Add image" : "Game not found"}
+        </div>
+      );
+    }
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" draggable={false} style={{ ...style, width: "100%", height: "100%", objectFit: fill.fit === "stretch" ? "fill" : fill.fit }} />;
+    return <img src={image.url} alt="" draggable={false} style={{ ...style, width: "100%", height: "100%", objectFit: fill.fit === "stretch" ? "fill" : fill.fit }} />;
   }
   if (fill.type === "gradient") {
     return <div style={{ ...style, background: `linear-gradient(${fill.angle}deg, ${fill.color}, ${fill.color2})` }} />;
@@ -117,6 +196,7 @@ function FillView({ fill }: { fill: BannerFill }) {
 }
 
 function BannerLayerView({ layer, hideText = false }: { layer: BannerLayer; hideText?: boolean }) {
+  const withTokens = useTokenText();
   if (!layer.enabled) return null;
 
   const [tl, tr, br, bl] = layerRadii(layer);
@@ -183,13 +263,12 @@ function BannerLayerView({ layer, hideText = false }: { layer: BannerLayer; hide
             paintOrder: "stroke fill",
           }}
         >
-          {previewText(layer.text)}
+          {withTokens(layer.text)}
         </div>
       </div>
     );
   } else {
     const fills = visibleFills(layer);
-    const showPlaceholder = fills.length === 0 || fills.every((fill) => fill.type === "image" && !hasHttp(fill.url));
     const strokes = visibleStrokes(layer);
     const innerShadows = visibleEffects(layer, "inner_shadow");
     content = (
@@ -198,23 +277,6 @@ function BannerLayerView({ layer, hideText = false }: { layer: BannerLayer; hide
           {fills.map((fill) => (
             <FillView key={fill.id} fill={fill} />
           ))}
-          {showPlaceholder && fills.some((fill) => fill.type === "image") && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                border: "1px dashed rgba(255,255,255,0.35)",
-                background: "rgba(255,255,255,0.06)",
-                color: "rgba(255,255,255,0.55)",
-                fontSize: 12,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              Add image
-            </div>
-          )}
           {innerShadows.map((effect) => (
             <div
               key={effect.id}
@@ -256,7 +318,7 @@ function BannerLayerView({ layer, hideText = false }: { layer: BannerLayer; hide
 }
 
 // Non-interactive scaled preview of a design (used as the fallback and on the announcement page)
-export function BannerStaticPreview({ design, className }: { design: BannerDesign; className?: string }) {
+export function BannerStaticPreview({ design, tokens = {}, className }: { design: BannerDesign; tokens?: BannerTokens; className?: string }) {
   useBannerFonts();
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(design.width);
@@ -274,20 +336,23 @@ export function BannerStaticPreview({ design, className }: { design: BannerDesig
 
   const scale = Math.max(0.01, width / design.width);
   return (
-    <div ref={frameRef} className={`relative w-full overflow-hidden ${className || ""}`} style={{ height: design.height * scale }}>
-      <div style={{ position: "absolute", left: 0, top: 0, width: design.width, height: design.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-        {design.layers.map((layer) => (
-          <BannerLayerView key={layer.id} layer={layer} />
-        ))}
+    <TokenContext.Provider value={tokens}>
+      <div ref={frameRef} className={`relative w-full overflow-hidden ${className || ""}`} style={{ height: design.height * scale }}>
+        <div style={{ position: "absolute", left: 0, top: 0, width: design.width, height: design.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+          {design.layers.map((layer) => (
+            <BannerLayerView key={layer.id} layer={layer} />
+          ))}
+        </div>
       </div>
-    </div>
+    </TokenContext.Provider>
   );
 }
 
-async function renderOnBot(guildId: string, design: BannerDesign): Promise<string> {
+// Asks the bot for the image. outputScale 2 is crisp enough for previews; announcements are posted at up to 4x.
+async function renderOnBot(guildId: string, design: BannerDesign, tokens: BannerTokens, outputScale = 2): Promise<string> {
   const result = await fetchApi("/trigger/render_announcement_dynamic_image", undefined, {
     method: "POST",
-    body: JSON.stringify({ guild_id: guildId, payload: { dynamic_image: design } }),
+    body: JSON.stringify({ guild_id: guildId, payload: { dynamic_image: { ...design, output_scale: outputScale, tokens } } }),
   });
   const base64 = String(result?.image_base64 || "").trim();
   if (!base64) throw new Error("The bot returned no image");
@@ -295,11 +360,11 @@ async function renderOnBot(guildId: string, design: BannerDesign): Promise<strin
 }
 
 // The exact image the bot will post, rendered by the bot itself
-export function BannerBotPreview({ guildId, design, className }: { guildId: string; design: BannerDesign; className?: string }) {
+export function BannerBotPreview({ guildId, design, tokens = {}, className }: { guildId: string; design: BannerDesign; tokens?: BannerTokens; className?: string }) {
   const [src, setSrc] = useState("");
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  const signature = JSON.stringify(design);
+  const signature = JSON.stringify({ design, tokens });
 
   useEffect(() => {
     let cancelled = false;
@@ -307,7 +372,7 @@ export function BannerBotPreview({ guildId, design, className }: { guildId: stri
       setLoading(true);
       setFailed(false);
       try {
-        const next = await renderOnBot(guildId, design);
+        const next = await renderOnBot(guildId, design, tokens);
         if (!cancelled) setSrc(next);
       } catch {
         if (!cancelled) {
@@ -331,7 +396,7 @@ export function BannerBotPreview({ guildId, design, className }: { guildId: stri
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="Bot render" className="h-auto w-full" />
       ) : (
-        <BannerStaticPreview design={design} />
+        <BannerStaticPreview design={design} tokens={tokens} />
       )}
       {loading && <p className="mt-2 text-xs text-slate-400">Rendering exact bot preview...</p>}
       {failed && <p className="mt-2 text-xs text-amber-300">Bot preview unavailable. Showing the editor preview.</p>}
@@ -499,11 +564,38 @@ interface BannerDesignerModalProps {
   onClose: () => void;
   design: BannerDesign | null;
   onChange: (design: BannerDesign) => void;
+  // The announcement's own text. Banner text layers show it with ${title}, ${description} and ${footer}.
+  tokens?: BannerTokens;
+  onTokensChange?: (patch: BannerTokens) => void;
 }
 
 export function BannerDesignerModal(props: BannerDesignerModalProps) {
   if (!props.open || !props.design) return null;
-  return <BannerDesignerInner {...props} design={props.design} />;
+  return (
+    <TokenContext.Provider value={props.tokens ?? {}}>
+      <BannerDesignerInner {...props} design={props.design} />
+    </TokenContext.Provider>
+  );
+}
+
+// Colours already used in the design, for the "On this page" row of the pickers
+function collectPalette(design: BannerDesign): string[] {
+  const found: string[] = [];
+  const add = (color: string) => {
+    const hex = normalizeHex(color);
+    if (hex && !found.includes(hex)) found.push(hex);
+  };
+  for (const layer of design.layers) {
+    for (const fill of layer.fills) {
+      if (fill.type === "solid") add(fill.color);
+      if (fill.type === "gradient") {
+        add(fill.color);
+        add(fill.color2);
+      }
+    }
+    for (const stroke of layer.strokes) add(stroke.color);
+  }
+  return found.slice(0, 16);
 }
 
 type Tool = "move" | "rectangle" | "ellipse" | "text" | "image";
@@ -511,8 +603,9 @@ type Align = "left" | "center" | "right" | "top" | "middle" | "bottom";
 
 const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2];
 
-function BannerDesignerInner({ guildId, onClose, design, onChange }: Omit<BannerDesignerModalProps, "open" | "design"> & { design: BannerDesign }) {
+function BannerDesignerInner({ guildId, onClose, design, onChange, tokens = {}, onTokensChange }: Omit<BannerDesignerModalProps, "open" | "design"> & { design: BannerDesign }) {
   useBannerFonts();
+  const palette = collectPalette(design);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [tool, setTool] = useState<Tool>("move");
@@ -691,7 +784,7 @@ function BannerDesignerInner({ guildId, onClose, design, onChange }: Omit<Banner
   const exportPng = async (outputScale: number) => {
     setExporting("Exporting...");
     try {
-      const url = await renderOnBot(guildId, { ...design, output_scale: outputScale });
+      const url = await renderOnBot(guildId, design, tokens, outputScale);
       const link = document.createElement("a");
       link.href = url;
       link.download = `${design.name || "banner"}${outputScale > 1 ? `@${outputScale}x` : ""}.png`;
@@ -997,7 +1090,7 @@ function BannerDesignerInner({ guildId, onClose, design, onChange }: Omit<Banner
           {previewMode ? (
             <div className="flex min-h-full items-center justify-center p-10">
               <div style={{ width: design.width * scale }}>
-                <BannerBotPreview guildId={guildId} design={design} />
+                <BannerBotPreview guildId={guildId} design={design} tokens={tokens} />
               </div>
             </div>
           ) : (
@@ -1201,6 +1294,25 @@ function BannerDesignerInner({ guildId, onClose, design, onChange }: Omit<Banner
                 </div>
                 <p className="text-[10px] leading-relaxed text-[#6b6b6b]">The image is transparent outside your shapes. Add a rectangle for a background.</p>
               </Section>
+              {onTokensChange && (
+                <Section title="Announcement text">
+                  <p className="text-[10px] leading-relaxed text-[#6b6b6b]">
+                    The same text as the announcement. Text layers show it when they contain {"${title}"}, {"${description}"} or {"${footer}"}. Change it here or in the announcement.
+                  </p>
+                  <Label>Title</Label>
+                  <TextInput value={tokens.title ?? ""} onChange={(value) => onTokensChange({ title: value })} />
+                  <Label>Description</Label>
+                  <textarea
+                    rows={6}
+                    value={tokens.description ?? ""}
+                    onChange={(event) => onTokensChange({ description: event.target.value })}
+                    className="w-full resize-y rounded-md border border-transparent p-2 text-[11px] text-white outline-none focus:border-[#0d99ff]"
+                    style={{ background: FIELD }}
+                  />
+                  <Label>Footer</Label>
+                  <TextInput value={tokens.footer ?? ""} onChange={(value) => onTokensChange({ footer: value })} />
+                </Section>
+              )}
               <Section title="Template">
                 <SelectInput value="" onChange={(value) => value && applyTemplate(value)}>
                   <option value="">Replace with a template...</option>
@@ -1225,6 +1337,7 @@ function BannerDesignerInner({ guildId, onClose, design, onChange }: Omit<Banner
           {primary && (
             <LayerProperties
               layer={primary}
+              palette={palette}
               lockRatio={lockRatio}
               setLockRatio={setLockRatio}
               patch={(patch, key) => patchLayer(primary.id, patch, key)}
@@ -1235,7 +1348,7 @@ function BannerDesignerInner({ guildId, onClose, design, onChange }: Omit<Banner
             />
           )}
 
-          <ExportSection onExport={exportPng} status={exporting} name={design.name} />
+          <ExportSection onExport={exportPng} status={exporting} name={design.name} guildId={guildId} design={design} tokens={tokens} />
         </div>
       </div>
 
@@ -1245,7 +1358,7 @@ function BannerDesignerInner({ guildId, onClose, design, onChange }: Omit<Banner
           onPick={(url) => {
             const layer = designRef.current.layers.find((entry) => entry.id === imagePicker.layerId);
             if (layer) {
-              patchLayer(layer.id, { fills: layer.fills.map((fill) => (fill.id === imagePicker.fillId ? { ...fill, url } : fill)) });
+              patchLayer(layer.id, { fills: layer.fills.map((fill) => (fill.id === imagePicker.fillId ? { ...fill, url, source: "url" } : fill)) });
             }
             setImagePicker(null);
           }}
@@ -1295,22 +1408,39 @@ function AlignRow({ onAlign }: { onAlign: (axis: Align) => void }) {
   );
 }
 
-function ExportSection({ onExport, status, name }: { onExport: (scale: number) => void; status: string; name: string }) {
+function ExportSection({
+  onExport,
+  status,
+  name,
+  guildId,
+  design,
+  tokens,
+}: {
+  onExport: (scale: number) => void;
+  status: string;
+  name: string;
+  guildId: string;
+  design: BannerDesign;
+  tokens: BannerTokens;
+}) {
   const [rows, setRows] = useState<number[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
   return (
     <Section
       title="Export"
       noBorder
-      action={<IconButton title="Add export setting" onClick={() => setRows((current) => [...current, 1])}><PlusIcon className="h-4 w-4" /></IconButton>}
+      action={<IconButton title="Add export setting" onClick={() => setRows((current) => [...current, 2])}><PlusIcon className="h-4 w-4" /></IconButton>}
     >
       {rows.map((scaleValue, index) => (
-        <div key={index} className="flex items-center gap-2">
+        <div key={index} className="flex items-center gap-1.5">
           <SelectInput value={String(scaleValue)} onChange={(value) => setRows((current) => current.map((entry, i) => (i === index ? Number(value) : entry)))}>
             {[1, 2, 3, 4].map((option) => (
               <option key={option} value={option}>{option}x</option>
             ))}
           </SelectInput>
-          <span className="shrink-0 text-[11px] text-[#8c8c8c]">PNG</span>
+          <SelectInput value="png" onChange={() => undefined}>
+            <option value="png">PNG</option>
+          </SelectInput>
           <IconButton title="Remove" onClick={() => setRows((current) => current.filter((_, i) => i !== index))}><MinusIcon className="h-4 w-4" /></IconButton>
         </div>
       ))}
@@ -1321,6 +1451,10 @@ function ExportSection({ onExport, status, name }: { onExport: (scale: number) =
       )}
       {rows.length === 0 && <p className="text-[10px] text-[#6b6b6b]">Press + to download this banner as a PNG.</p>}
       {status && <p className="text-[10px] text-[#8c8c8c]">{status}</p>}
+      <button type="button" onClick={() => setShowPreview((value) => !value)} className="flex items-center gap-1.5 text-[11px] text-[#b3b3b3] hover:text-white">
+        <span className="inline-block w-3">{showPreview ? "▾" : "▸"}</span> Preview
+      </button>
+      {showPreview && <BannerBotPreview guildId={guildId} design={design} tokens={tokens} />}
     </Section>
   );
 }
@@ -1329,6 +1463,7 @@ function ExportSection({ onExport, status, name }: { onExport: (scale: number) =
 
 function LayerProperties({
   layer,
+  palette,
   lockRatio,
   setLockRatio,
   patch,
@@ -1338,6 +1473,7 @@ function LayerProperties({
   onPickImage,
 }: {
   layer: BannerLayer;
+  palette: string[];
   lockRatio: boolean;
   setLockRatio: (value: boolean) => void;
   patch: (patch: Partial<BannerLayer>, key?: string) => void;
@@ -1347,8 +1483,8 @@ function LayerProperties({
   onPickImage: (fillId: string) => void;
 }) {
   const isText = layer.type === "text";
-  const hasCorners = layer.radius_tl !== undefined || layer.radius_tr !== undefined || layer.radius_br !== undefined || layer.radius_bl !== undefined;
-  const [corners, setCorners] = useState(hasCorners);
+  // Independent corners are on whenever the layer has its own per-corner values (follows the selected layer)
+  const corners = layer.radius_tl !== undefined || layer.radius_tr !== undefined || layer.radius_br !== undefined || layer.radius_bl !== undefined;
   const single = fontIsSingleStyle(layer.font_family);
   const [effectMenu, setEffectMenu] = useState(false);
   const typeLabel = isText ? "Text" : layer.type === "ellipse" ? "Ellipse" : layer.fills.some((fill) => fill.type === "image") ? "Image" : "Rectangle";
@@ -1363,13 +1499,8 @@ function LayerProperties({
   };
 
   const toggleCorners = () => {
-    if (corners) {
-      setCorners(false);
-      patch({ radius_tl: undefined, radius_tr: undefined, radius_br: undefined, radius_bl: undefined });
-    } else {
-      setCorners(true);
-      patch({ radius_tl: layer.radius, radius_tr: layer.radius, radius_br: layer.radius, radius_bl: layer.radius });
-    }
+    if (corners) patch({ radius: layer.radius_tl ?? layer.radius, radius_tl: undefined, radius_tr: undefined, radius_br: undefined, radius_bl: undefined });
+    else patch({ radius_tl: layer.radius, radius_tr: layer.radius, radius_br: layer.radius, radius_bl: layer.radius });
   };
 
   const updateFills = (next: BannerFill[]) => patch({ fills: next });
@@ -1472,7 +1603,13 @@ function LayerProperties({
             <div className="min-w-0 flex-1 space-y-1.5">
               <Label>Corner radius</Label>
               <div className="flex items-center gap-1">
-                <NumInput prefix="◜" value={layer.radius} min={0} max={5000} onChange={(value) => patch(corners ? { radius: value, radius_tl: value, radius_tr: value, radius_br: value, radius_bl: value } : { radius: value }, "radius")} />
+                {corners && [layer.radius_tr, layer.radius_br, layer.radius_bl].some((value) => (value ?? layer.radius) !== (layer.radius_tl ?? layer.radius)) ? (
+                  <div className="flex h-7 min-w-0 flex-1 items-center rounded-md px-1.5 text-[11px] text-white" style={{ background: FIELD }}>
+                    <span className="mr-1.5 flex w-4 shrink-0 justify-center text-[#8c8c8c]">◜</span>Mixed
+                  </div>
+                ) : (
+                  <NumInput prefix="◜" value={layer.radius_tl ?? layer.radius} min={0} max={5000} onChange={(value) => patch(corners ? { radius: value, radius_tl: value, radius_tr: value, radius_br: value, radius_bl: value } : { radius: value }, "radius")} />
+                )}
                 <IconButton title="Independent corners" active={corners} onClick={toggleCorners}><SquareIcon className="h-3.5 w-3.5" /></IconButton>
               </div>
             </div>
@@ -1494,6 +1631,7 @@ function LayerProperties({
             key={fill.id}
             fill={fill}
             textOnly={isText}
+            palette={palette}
             onChange={(next) => updateFills(layer.fills.map((entry) => (entry.id === fill.id ? next : entry)))}
             onRemove={() => updateFills(layer.fills.filter((entry) => entry.id !== fill.id))}
             onPickImage={() => onPickImage(fill.id)}
@@ -1508,6 +1646,7 @@ function LayerProperties({
             key={stroke.id}
             stroke={stroke}
             textOnly={isText}
+            palette={palette}
             onChange={(next) => updateStrokes(layer.strokes.map((entry) => (entry.id === stroke.id ? next : entry)))}
             onRemove={() => updateStrokes(layer.strokes.filter((entry) => entry.id !== stroke.id))}
           />
@@ -1543,6 +1682,7 @@ function LayerProperties({
           <EffectRow
             key={effect.id}
             effect={effect}
+            palette={palette}
             onChange={(next) => updateEffects(layer.effects.map((entry) => (entry.id === effect.id ? next : entry)))}
             onRemove={() => updateEffects(layer.effects.filter((entry) => entry.id !== effect.id))}
           />
@@ -1552,159 +1692,440 @@ function LayerProperties({
   );
 }
 
-// ------------------------------------------------------------------ list rows (Fill / Stroke / Effects)
+// ------------------------------------------------------------------ colour picker (Figma style)
 
-function RowShell({
-  head,
-  visible,
-  onToggle,
-  onRemove,
-  children,
-}: {
-  head: ReactNode;
-  visible: boolean;
-  onToggle: () => void;
-  onRemove: () => void;
-  children?: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
+type Hsv = { h: number; s: number; v: number };
+
+const normalizeHex = (value: string): string | null => {
+  const text = value.trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(text)) return `#${text.split("").map((c) => c + c).join("")}`.toUpperCase();
+  if (/^[0-9a-f]{6}$/i.test(text)) return `#${text}`.toUpperCase();
+  return null;
+};
+
+function hexToHsv(hex: string): Hsv {
+  const normalized = normalizeHex(hex) ?? "#000000";
+  const r = parseInt(normalized.slice(1, 3), 16) / 255;
+  const g = parseInt(normalized.slice(3, 5), 16) / 255;
+  const b = parseInt(normalized.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const delta = max - Math.min(r, g, b);
+  let h = 0;
+  if (delta) {
+    if (max === r) h = ((g - b) / delta) % 6;
+    else if (max === g) h = (b - r) / delta + 2;
+    else h = (r - g) / delta + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h, s: max ? delta / max : 0, v: max };
+}
+
+function hsvToHex({ h, s, v }: Hsv): string {
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  const part = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, "0");
+  return `#${part(r)}${part(g)}${part(b)}`.toUpperCase();
+}
+
+// Press and drag inside an element: reports the pointer position as 0..1 on both axes
+function dragIn(event: ReactPointerEvent<HTMLElement>, onMove: (x: number, y: number) => void) {
+  event.preventDefault();
+  const element = event.currentTarget;
+  const apply = (clientX: number, clientY: number) => {
+    const rect = element.getBoundingClientRect();
+    onMove(clamp((clientX - rect.left) / rect.width, 0, 1), clamp((clientY - rect.top) / rect.height, 0, 1));
+  };
+  apply(event.clientX, event.clientY);
+  const move = (moveEvent: PointerEvent) => apply(moveEvent.clientX, moveEvent.clientY);
+  const up = () => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+}
+
+const CHECKER = "repeating-conic-gradient(#555 0% 25%, #888 0% 50%) 50% / 8px 8px";
+
+function ColorPicker({ color, opacity, onColor, onOpacity }: { color: string; opacity: number; onColor: (hex: string) => void; onOpacity: (value: number) => void }) {
+  const hex = normalizeHex(color) ?? "#000000";
+  const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(color));
+  const [hexDraft, setHexDraft] = useState<string | null>(null);
+
+  useEffect(() => {
+    // The colour changed from outside (palette swatch, hex field): follow it, but keep the hue for greys
+    setHsv((current) => {
+      if (hsvToHex(current) === hex) return current;
+      const next = hexToHsv(hex);
+      return next.s === 0 || next.v === 0 ? { ...next, h: current.h } : next;
+    });
+  }, [hex]);
+
+  const change = (next: Hsv) => {
+    setHsv(next);
+    onColor(hsvToHex(next));
+  };
+
   return (
-    <div>
-      <div className="flex h-7 items-center gap-1">
-        <button type="button" onClick={() => setOpen((value) => !value)} className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 text-left hover:bg-white/5">
-          {head}
-        </button>
-        <IconButton title={visible ? "Hide" : "Show"} onClick={onToggle}>{visible ? <EyeIcon className="h-3.5 w-3.5" /> : <EyeOffIcon className="h-3.5 w-3.5" />}</IconButton>
-        <IconButton title="Remove" onClick={onRemove}><MinusIcon className="h-3.5 w-3.5" /></IconButton>
+    <div className="space-y-3">
+      <div
+        onPointerDown={(event) => dragIn(event, (x, y) => change({ ...hsv, s: x, v: 1 - y }))}
+        className="relative h-44 cursor-crosshair rounded-md"
+        style={{ background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h}, 100%, 50%))` }}
+      >
+        <div
+          className="pointer-events-none absolute h-3.5 w-3.5 rounded-full"
+          style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, transform: "translate(-50%, -50%)", border: "2px solid #fff", boxShadow: "0 0 0 1px rgba(0,0,0,0.45)", background: hex }}
+        />
       </div>
-      {open && <div className="mb-1 mt-1 space-y-2 rounded-md p-2" style={{ background: "rgba(0,0,0,0.18)" }}>{children}</div>}
+
+      <div className="space-y-2.5 px-0.5">
+        <div
+          onPointerDown={(event) => dragIn(event, (x) => change({ ...hsv, h: x * 360 }))}
+          className="relative h-3 cursor-pointer rounded-full"
+          style={{ background: "linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)" }}
+        >
+          <div className="pointer-events-none absolute top-1/2 h-4 w-4 rounded-full" style={{ left: `${(hsv.h / 360) * 100}%`, transform: "translate(-50%, -50%)", border: "2px solid #fff", boxShadow: "0 0 0 1px rgba(0,0,0,0.45)", background: `hsl(${hsv.h}, 100%, 50%)` }} />
+        </div>
+        <div onPointerDown={(event) => dragIn(event, (x) => onOpacity(Math.round(x * 100)))} className="relative h-3 cursor-pointer rounded-full" style={{ background: CHECKER }}>
+          <div className="absolute inset-0 rounded-full" style={{ background: `linear-gradient(to right, transparent, ${hex})` }} />
+          <div className="pointer-events-none absolute top-1/2 h-4 w-4 rounded-full" style={{ left: `${opacity}%`, transform: "translate(-50%, -50%)", border: "2px solid #fff", boxShadow: "0 0 0 1px rgba(0,0,0,0.45)", background: withAlpha(hex, opacity) }} />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-14 shrink-0 items-center rounded-md px-2 text-[11px] text-[#8c8c8c]" style={{ background: FIELD }}>Hex</div>
+        <input
+          className="h-7 min-w-0 flex-1 rounded-md border border-transparent px-2 text-[11px] uppercase text-white outline-none focus:border-[#0d99ff]"
+          style={{ background: FIELD }}
+          value={hexDraft ?? hex.replace("#", "")}
+          spellCheck={false}
+          onFocus={(event) => event.target.select()}
+          onChange={(event) => {
+            setHexDraft(event.target.value);
+            const parsed = normalizeHex(event.target.value);
+            if (parsed) onColor(parsed);
+          }}
+          onBlur={() => setHexDraft(null)}
+        />
+        <div className="w-[68px] shrink-0">
+          <NumInput suffix="%" value={opacity} min={0} max={100} onChange={onOpacity} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function Swatch({ background }: { background: string }) {
-  return <span className="h-4 w-4 shrink-0 rounded-sm border border-white/25" style={{ background }} />;
+// A panel that floats to the left of the Design panel, like Figma's pickers
+function FloatingPanel({ anchor, onClose, children, width = 248 }: { anchor: HTMLElement | null; onClose: () => void; children: ReactNode; width?: number }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [top, setTop] = useState(80);
+
+  useEffect(() => {
+    const place = () => {
+      if (!anchor || !ref.current) return;
+      const rect = anchor.getBoundingClientRect();
+      setTop(clamp(rect.top - 40, 8, Math.max(8, window.innerHeight - ref.current.offsetHeight - 8)));
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [anchor]);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (ref.current?.contains(target) || anchor?.contains(target)) return;
+      onClose();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [anchor, onClose]);
+
+  return (
+    <div ref={ref} className="fixed z-[70] rounded-xl p-3 shadow-2xl" style={{ right: 276, top, width, background: PANEL, border: `1px solid ${BORDER}` }}>
+      {children}
+    </div>
+  );
 }
 
-function FillRow({ fill, textOnly, onChange, onRemove, onPickImage }: { fill: BannerFill; textOnly: boolean; onChange: (fill: BannerFill) => void; onRemove: () => void; onPickImage: () => void }) {
-  const label = fill.type === "solid" ? fill.color.replace("#", "").toUpperCase() : fill.type === "gradient" ? "Linear" : "Image";
-  const swatch =
-    fill.type === "gradient"
-      ? `linear-gradient(90deg, ${fill.color}, ${fill.color2})`
-      : fill.type === "image"
-      ? "repeating-conic-gradient(#555 0% 25%, #888 0% 50%) 50% / 8px 8px"
-      : fill.color;
+function PanelHeader({ onClose }: { onClose: () => void }) {
   return (
-    <RowShell
-      visible={fill.visible}
-      onToggle={() => onChange({ ...fill, visible: !fill.visible })}
-      onRemove={onRemove}
-      head={
-        <>
-          <Swatch background={swatch} />
-          <span className="min-w-0 flex-1 truncate text-[11px] text-white">{label}</span>
-          <span className="shrink-0 text-[11px] text-[#8c8c8c]">{fill.opacity}%</span>
-        </>
-      }
-    >
+    <div className="mb-3 flex items-center justify-between">
+      <span className="rounded-md px-2.5 py-1 text-[11px] font-semibold text-white" style={{ background: "rgba(255,255,255,0.1)" }}>Custom</span>
+      <IconButton title="Close" onClick={onClose}><XIcon className="h-4 w-4" /></IconButton>
+    </div>
+  );
+}
+
+function PaletteRow({ palette, onPick }: { palette: string[]; onPick: (hex: string) => void }) {
+  if (palette.length === 0) return null;
+  return (
+    <div className="mt-3 border-t pt-3" style={{ borderColor: BORDER }}>
+      <p className="mb-2 text-[11px] text-[#8c8c8c]">On this page</p>
+      <div className="flex flex-wrap gap-1.5">
+        {palette.map((swatch) => (
+          <button key={swatch} type="button" title={swatch} onClick={() => onPick(swatch)} className="h-5 w-5 rounded-sm border border-white/25" style={{ background: swatch }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ list rows (Fill / Stroke / Effects)
+
+function Swatch({ background }: { background: string }) {
+  return <span className="block h-5 w-5 shrink-0 rounded border border-white/25" style={{ background }} />;
+}
+
+function HexField({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      className="h-7 min-w-0 flex-1 rounded-md border border-transparent px-2 text-[11px] uppercase text-white outline-none hover:border-[#4d4d4d] focus:border-[#0d99ff]"
+      style={{ background: FIELD }}
+      value={draft ?? value.replace("#", "")}
+      spellCheck={false}
+      onFocus={(event) => event.target.select()}
+      onChange={(event) => {
+        setDraft(event.target.value);
+        const parsed = normalizeHex(event.target.value);
+        if (parsed) onChange(parsed);
+      }}
+      onBlur={() => setDraft(null)}
+    />
+  );
+}
+
+function RowEnd({ visible, onToggle, onRemove }: { visible: boolean; onToggle: () => void; onRemove: () => void }) {
+  return (
+    <>
+      <IconButton title={visible ? "Hide" : "Show"} onClick={onToggle}>{visible ? <EyeIcon className="h-3.5 w-3.5" /> : <EyeOffIcon className="h-3.5 w-3.5" />}</IconButton>
+      <IconButton title="Remove" onClick={onRemove}><MinusIcon className="h-3.5 w-3.5" /></IconButton>
+    </>
+  );
+}
+
+function FillPopover({
+  fill,
+  textOnly,
+  palette,
+  anchor,
+  onChange,
+  onPickImage,
+  onClose,
+}: {
+  fill: BannerFill;
+  textOnly: boolean;
+  palette: string[];
+  anchor: HTMLElement | null;
+  onChange: (fill: BannerFill) => void;
+  onPickImage: () => void;
+  onClose: () => void;
+}) {
+  const [stop, setStop] = useState<"color" | "color2">("color");
+  const image = useFillImage(fill);
+  const types: Array<[BannerFill["type"], string, ReactNode]> = [
+    ["solid", "Solid", <SquareIcon key="s" className="h-4 w-4" />],
+    ["gradient", "Linear gradient", <BlendIcon key="g" className="h-4 w-4" />],
+    ["image", "Image", <ImageIcon key="i" className="h-4 w-4" />],
+  ];
+
+  return (
+    <FloatingPanel anchor={anchor} onClose={onClose}>
+      <PanelHeader onClose={onClose} />
       {!textOnly && (
-        <SelectInput value={fill.type} onChange={(value) => onChange({ ...fill, type: value as BannerFill["type"] })}>
-          <option value="solid">Solid</option>
-          <option value="gradient">Linear gradient</option>
-          <option value="image">Image</option>
-        </SelectInput>
-      )}
-      {fill.type !== "image" && (
-        <div className="flex items-center gap-2">
-          <ColorInput value={fill.color} onChange={(value) => onChange({ ...fill, color: value })} />
+        <div className="mb-3 flex gap-1 border-b pb-3" style={{ borderColor: BORDER }}>
+          {types.map(([type, title, icon]) => (
+            <IconButton key={type} title={title} active={fill.type === type} onClick={() => onChange({ ...fill, type })}>{icon}</IconButton>
+          ))}
         </div>
       )}
-      {fill.type === "gradient" && (
+
+      {fill.type === "solid" && (
         <>
-          <ColorInput value={fill.color2} onChange={(value) => onChange({ ...fill, color2: value })} />
-          <NumInput prefix="∠" suffix="°" value={fill.angle} min={-360} max={360} onChange={(value) => onChange({ ...fill, angle: value })} />
+          <ColorPicker color={fill.color} opacity={fill.opacity} onColor={(hex) => onChange({ ...fill, color: hex })} onOpacity={(value) => onChange({ ...fill, opacity: value })} />
+          <PaletteRow palette={palette} onPick={(hex) => onChange({ ...fill, color: hex })} />
         </>
       )}
+
+      {fill.type === "gradient" && (
+        <div className="space-y-3">
+          <div className="relative h-5 rounded-md" style={{ background: `linear-gradient(90deg, ${fill.color}, ${fill.color2})` }}>
+            {(["color", "color2"] as const).map((which, index) => (
+              <button
+                key={which}
+                type="button"
+                title={index === 0 ? "Start colour" : "End colour"}
+                onClick={() => setStop(which)}
+                className="absolute top-1/2 h-4 w-4 rounded-sm"
+                style={{ left: index === 0 ? 0 : "100%", transform: "translate(-50%, -50%)", background: fill[which], border: `2px solid ${stop === which ? ACCENT : "#fff"}` }}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <NumInput prefix="∠" suffix="°" value={fill.angle} min={-360} max={360} onChange={(value) => onChange({ ...fill, angle: value })} />
+            <button type="button" onClick={() => onChange({ ...fill, color: fill.color2, color2: fill.color })} className="h-7 shrink-0 rounded-md px-2.5 text-[11px] text-white" style={{ background: FIELD }}>Swap</button>
+          </div>
+          <ColorPicker color={fill[stop]} opacity={fill.opacity} onColor={(hex) => onChange({ ...fill, [stop]: hex })} onOpacity={(value) => onChange({ ...fill, opacity: value })} />
+          <PaletteRow palette={palette} onPick={(hex) => onChange({ ...fill, [stop]: hex })} />
+        </div>
+      )}
+
       {fill.type === "image" && (
-        <>
-          <TextInput value={fill.url} placeholder="https://..." onChange={(value) => onChange({ ...fill, url: value })} />
-          <button type="button" onClick={onPickImage} className="h-7 w-full rounded-md text-[11px] text-white" style={{ background: FIELD }}>Choose / upload image</button>
+        <div className="space-y-2.5">
+          <div className="h-24 overflow-hidden rounded-md" style={{ background: image.url ? `url(${image.url}) center / cover` : CHECKER }} />
+          <SelectInput value={fill.source} onChange={(value) => onChange({ ...fill, source: value as BannerFill["source"] })}>
+            <option value="url">Image link or upload</option>
+            <option value="roblox_cover">Roblox game cover photo</option>
+            <option value="roblox_icon">Roblox game icon</option>
+          </SelectInput>
+          {fill.source === "url" ? (
+            <>
+              <TextInput value={fill.url} placeholder="https://..." onChange={(value) => onChange({ ...fill, url: value })} />
+              <button type="button" onClick={onPickImage} className="h-7 w-full rounded-md text-[11px] text-white" style={{ background: FIELD }}>Choose from uploaded images</button>
+            </>
+          ) : (
+            <>
+              <TextInput value={fill.game_id} placeholder="Game ID (same as game.GameId)" onChange={(value) => onChange({ ...fill, game_id: value.replace(/\D/g, "") })} />
+              <p className="text-[10px] leading-relaxed text-[#8c8c8c]">
+                {!fill.game_id
+                  ? "Type the game's ID. The bot looks up its current picture every time the banner is made."
+                  : image.pending
+                  ? "Looking up the game..."
+                  : image.url
+                  ? `Found: ${image.name || "game"}`
+                  : "No game found with that ID."}
+              </p>
+            </>
+          )}
           <SelectInput value={fill.fit} onChange={(value) => onChange({ ...fill, fit: value as BannerFill["fit"] })}>
             <option value="cover">Fill (crop to fit)</option>
             <option value="contain">Fit (whole image)</option>
             <option value="stretch">Stretch</option>
           </SelectInput>
-        </>
+          <NumInput prefix="◐" suffix="%" value={fill.opacity} min={0} max={100} onChange={(value) => onChange({ ...fill, opacity: value })} />
+        </div>
       )}
-      <NumInput prefix="◐" suffix="%" value={fill.opacity} min={0} max={100} onChange={(value) => onChange({ ...fill, opacity: value })} />
-    </RowShell>
+    </FloatingPanel>
   );
 }
 
-function StrokeRow({ stroke, textOnly, onChange, onRemove }: { stroke: BannerStroke; textOnly: boolean; onChange: (stroke: BannerStroke) => void; onRemove: () => void }) {
+function FillRow({ fill, textOnly, palette, onChange, onRemove, onPickImage }: { fill: BannerFill; textOnly: boolean; palette: string[]; onChange: (fill: BannerFill) => void; onRemove: () => void; onPickImage: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const image = useFillImage(fill);
+  const label =
+    fill.type === "gradient"
+      ? "Linear"
+      : fill.source === "roblox_cover"
+      ? "Game cover"
+      : fill.source === "roblox_icon"
+      ? "Game icon"
+      : "Image";
+  const swatch = fill.type === "gradient" ? `linear-gradient(90deg, ${fill.color}, ${fill.color2})` : fill.type === "image" ? (image.url ? `url(${image.url}) center / cover` : CHECKER) : fill.color;
+
   return (
-    <RowShell
-      visible={stroke.visible}
-      onToggle={() => onChange({ ...stroke, visible: !stroke.visible })}
-      onRemove={onRemove}
-      head={
-        <>
-          <Swatch background={stroke.color} />
-          <span className="min-w-0 flex-1 truncate text-[11px] text-white">{stroke.color.replace("#", "").toUpperCase()}</span>
-          <span className="shrink-0 text-[11px] text-[#8c8c8c]">{stroke.width}px</span>
-        </>
-      }
-    >
-      <ColorInput value={stroke.color} onChange={(value) => onChange({ ...stroke, color: value })} />
-      <div className="flex gap-2">
-        <NumInput prefix="▭" value={stroke.width} min={0} max={40} onChange={(value) => onChange({ ...stroke, width: value })} />
-        <NumInput prefix="◐" suffix="%" value={stroke.opacity} min={0} max={100} onChange={(value) => onChange({ ...stroke, opacity: value })} />
+    <div>
+      <div className="flex h-8 items-center gap-1.5">
+        <button ref={setAnchor} type="button" title="Edit fill" onClick={() => setOpen((value) => !value)}><Swatch background={swatch} /></button>
+        {fill.type === "solid" ? (
+          <HexField value={fill.color} onChange={(hex) => onChange({ ...fill, color: hex })} />
+        ) : (
+          <button type="button" onClick={() => setOpen((value) => !value)} className="h-7 min-w-0 flex-1 truncate rounded-md px-2 text-left text-[11px] text-white" style={{ background: FIELD }}>{label}</button>
+        )}
+        <div className="w-[60px] shrink-0">
+          <NumInput suffix="%" value={fill.opacity} min={0} max={100} onChange={(value) => onChange({ ...fill, opacity: value })} />
+        </div>
+        <RowEnd visible={fill.visible} onToggle={() => onChange({ ...fill, visible: !fill.visible })} onRemove={onRemove} />
       </div>
-      {!textOnly && (
-        <SelectInput value={stroke.position} onChange={(value) => onChange({ ...stroke, position: value as BannerStroke["position"] })}>
-          <option value="inside">Inside</option>
-          <option value="center">Center</option>
-          <option value="outside">Outside</option>
-        </SelectInput>
-      )}
-    </RowShell>
+      {open && <FillPopover fill={fill} textOnly={textOnly} palette={palette} anchor={anchor} onChange={onChange} onPickImage={onPickImage} onClose={() => setOpen(false)} />}
+    </div>
   );
 }
 
-function EffectRow({ effect, onChange, onRemove }: { effect: BannerEffect; onChange: (effect: BannerEffect) => void; onRemove: () => void }) {
+function StrokeRow({ stroke, textOnly, palette, onChange, onRemove }: { stroke: BannerStroke; textOnly: boolean; palette: string[]; onChange: (stroke: BannerStroke) => void; onRemove: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex h-8 items-center gap-1.5">
+        <button ref={setAnchor} type="button" title="Edit stroke colour" onClick={() => setOpen((value) => !value)}><Swatch background={stroke.color} /></button>
+        <HexField value={stroke.color} onChange={(hex) => onChange({ ...stroke, color: hex })} />
+        <div className="w-[60px] shrink-0">
+          <NumInput suffix="%" value={stroke.opacity} min={0} max={100} onChange={(value) => onChange({ ...stroke, opacity: value })} />
+        </div>
+        <RowEnd visible={stroke.visible} onToggle={() => onChange({ ...stroke, visible: !stroke.visible })} onRemove={onRemove} />
+      </div>
+      <div className="flex gap-2">
+        {!textOnly && (
+          <SelectInput value={stroke.position} onChange={(value) => onChange({ ...stroke, position: value as BannerStroke["position"] })}>
+            <option value="inside">Inside</option>
+            <option value="center">Center</option>
+            <option value="outside">Outside</option>
+          </SelectInput>
+        )}
+        <NumInput prefix="▭" value={stroke.width} min={0} max={40} onChange={(value) => onChange({ ...stroke, width: value })} />
+      </div>
+      {open && (
+        <FloatingPanel anchor={anchor} onClose={() => setOpen(false)}>
+          <PanelHeader onClose={() => setOpen(false)} />
+          <ColorPicker color={stroke.color} opacity={stroke.opacity} onColor={(hex) => onChange({ ...stroke, color: hex })} onOpacity={(value) => onChange({ ...stroke, opacity: value })} />
+          <PaletteRow palette={palette} onPick={(hex) => onChange({ ...stroke, color: hex })} />
+        </FloatingPanel>
+      )}
+    </div>
+  );
+}
+
+function EffectRow({ effect, palette, onChange, onRemove }: { effect: BannerEffect; palette: string[]; onChange: (effect: BannerEffect) => void; onRemove: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const isShadow = effect.type === "drop_shadow" || effect.type === "inner_shadow";
   return (
-    <RowShell
-      visible={effect.visible}
-      onToggle={() => onChange({ ...effect, visible: !effect.visible })}
-      onRemove={onRemove}
-      head={
-        <>
-          <span className="h-4 w-4 shrink-0 rounded-sm border border-white/25" style={{ background: isShadow ? withAlpha(effect.color, effect.opacity) : "linear-gradient(90deg, #888, transparent)" }} />
-          <span className="min-w-0 flex-1 truncate text-[11px] text-white">{EFFECT_LABELS[effect.type]}</span>
-        </>
-      }
-    >
-      <SelectInput value={effect.type} onChange={(value) => onChange({ ...effect, type: value as BannerEffectType })}>
-        {(Object.keys(EFFECT_LABELS) as BannerEffectType[]).map((type) => (
-          <option key={type} value={type}>{EFFECT_LABELS[type]}</option>
-        ))}
-      </SelectInput>
-      {isShadow && (
-        <>
-          <div className="flex gap-2">
-            <NumInput prefix="X" value={effect.x} min={-400} max={400} onChange={(value) => onChange({ ...effect, x: value })} />
-            <NumInput prefix="Y" value={effect.y} min={-400} max={400} onChange={(value) => onChange({ ...effect, y: value })} />
-          </div>
-          <div className="flex gap-2">
+    <div>
+      <div className="flex h-8 items-center gap-1.5">
+        <button
+          ref={setAnchor}
+          type="button"
+          title="Effect settings"
+          onClick={() => setOpen((value) => !value)}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/25"
+          style={{ background: isShadow ? withAlpha(effect.color, Math.max(effect.opacity, 35)) : "linear-gradient(90deg, #888, transparent)" }}
+        />
+        <div className="min-w-0 flex-1">
+          <SelectInput value={effect.type} onChange={(value) => onChange({ ...effect, type: value as BannerEffectType })}>
+            {(Object.keys(EFFECT_LABELS) as BannerEffectType[]).map((type) => (
+              <option key={type} value={type}>{EFFECT_LABELS[type]}</option>
+            ))}
+          </SelectInput>
+        </div>
+        <RowEnd visible={effect.visible} onToggle={() => onChange({ ...effect, visible: !effect.visible })} onRemove={onRemove} />
+      </div>
+      {open && (
+        <FloatingPanel anchor={anchor} onClose={() => setOpen(false)}>
+          <PanelHeader onClose={() => setOpen(false)} />
+          <div className="space-y-2.5">
+            {isShadow && (
+              <div className="flex gap-2">
+                <NumInput prefix="X" value={effect.x} min={-400} max={400} onChange={(value) => onChange({ ...effect, x: value })} />
+                <NumInput prefix="Y" value={effect.y} min={-400} max={400} onChange={(value) => onChange({ ...effect, y: value })} />
+              </div>
+            )}
             <NumInput prefix="B" value={effect.blur} min={0} max={200} onChange={(value) => onChange({ ...effect, blur: value })} />
-            <NumInput prefix="◐" suffix="%" value={effect.opacity} min={0} max={100} onChange={(value) => onChange({ ...effect, opacity: value })} />
+            {isShadow && (
+              <>
+                <ColorPicker color={effect.color} opacity={effect.opacity} onColor={(hex) => onChange({ ...effect, color: hex })} onOpacity={(value) => onChange({ ...effect, opacity: value })} />
+                <PaletteRow palette={palette} onPick={(hex) => onChange({ ...effect, color: hex })} />
+              </>
+            )}
           </div>
-          <ColorInput value={effect.color} onChange={(value) => onChange({ ...effect, color: value })} />
-        </>
+        </FloatingPanel>
       )}
-      {!isShadow && <NumInput prefix="B" value={effect.blur} min={0} max={200} onChange={(value) => onChange({ ...effect, blur: value })} />}
-    </RowShell>
+    </div>
   );
 }
-

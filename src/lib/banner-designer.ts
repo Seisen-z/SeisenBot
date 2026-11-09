@@ -4,6 +4,8 @@
 export type BannerLayerType = "rectangle" | "ellipse" | "text";
 export type BannerHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 export type BannerFillType = "solid" | "gradient" | "image";
+// Where an image fill comes from: a link, or a Roblox game's cover photo / icon looked up by game ID
+export type BannerImageSource = "url" | "roblox_cover" | "roblox_icon";
 export type BannerStrokePosition = "inside" | "center" | "outside";
 export type BannerEffectType = "drop_shadow" | "inner_shadow" | "layer_blur" | "background_blur";
 
@@ -18,6 +20,8 @@ export interface BannerFill {
   angle: number; // gradient angle, CSS semantics
   url: string; // image fill
   fit: "cover" | "contain" | "stretch";
+  source: BannerImageSource;
+  game_id: string; // Roblox universe ID (the same number as game.GameId), for the Roblox sources
 }
 
 export interface BannerStroke {
@@ -133,6 +137,8 @@ export function createFill(type: BannerFillType = "solid", overrides: Partial<Ba
     angle: 90,
     url: "",
     fit: "cover",
+    source: "url",
+    game_id: "",
     ...overrides,
   };
 }
@@ -226,6 +232,8 @@ function normalizeFill(raw: unknown): BannerFill | null {
     angle: toNumber(entry.angle, 90, -360, 360),
     url: str(entry.url, ""),
     fit: pick(entry.fit, ["cover", "contain", "stretch"] as const, "cover"),
+    source: pick(entry.source, ["url", "roblox_cover", "roblox_icon"] as const, "url"),
+    game_id: str(entry.game_id, "").replace(/\D/g, ""),
   };
 }
 
@@ -377,13 +385,13 @@ export function createUpdateCardDesign(): BannerDesign {
         fills: [createFill("image", { url: "" })],
       }),
       createBannerLayer("text", {
-        ...TEXT_BASE, name: "Title", x: 56, y: 62, width: 380, height: 44, text: "Pet Simulator Update", font_size: 26,
+        ...TEXT_BASE, name: "Title", x: 56, y: 62, width: 380, height: 44, text: "${title}", font_size: 26,
         fills: solid("#FFFFFF"), strokes: [createStroke({ width: 3, color: "#222222", position: "outside" })],
         effects: [createEffect("drop_shadow", { opacity: 70, x: 2, y: 3, blur: 2 })], text_wrap: false,
       }),
       createBannerLayer("text", {
         ...TEXT_BASE, name: "Update text", x: 52, y: 114, width: 394, height: 246, fills: solid("#000000"),
-        text: "New Update\n\n[*] Added:\n> • Your new feature here\n\n[*] Fixed:\n> • Your fix here",
+        text: "${description}",
         font_size: 11.5, text_align: "center", line_height: 118,
       }),
       createBannerLayer("rectangle", { name: "Logo", x: 217, y: 368, width: 50, height: 50, fills: [createFill("image", { url: "" })] }),
@@ -392,7 +400,7 @@ export function createUpdateCardDesign(): BannerDesign {
       }),
       createBannerLayer("text", {
         ...TEXT_BASE, name: "Footer text", x: 44, y: 422, width: 406, height: 36, fills: solid("#000000"),
-        text: "Game Release • Your Game • ${guildname}", font_size: 11, text_align: "center",
+        text: "${footer}", font_size: 11, text_align: "center",
         text_vertical_align: "middle", text_wrap: false,
       }),
     ],
@@ -409,11 +417,11 @@ export function createBlankBanner(): BannerDesign {
     layers: [
       createBannerLayer("rectangle", { name: "Card", x: 24, y: 24, width: 752, height: 252, radius: 28, fills: solid("#1F232B") }),
       createBannerLayer("text", {
-        ...TEXT_BASE, name: "Title", x: 56, y: 90, width: 688, height: 70, text: "Announcement", font_size: 48,
+        ...TEXT_BASE, name: "Title", x: 56, y: 90, width: 688, height: 70, text: "${title}", font_size: 48,
         font_style: "normal", fills: solid("#FFFFFF"), text_wrap: false,
       }),
       createBannerLayer("text", {
-        name: "Subtitle", x: 56, y: 170, width: 688, height: 40, text: "${guildname}", font_size: 24,
+        name: "Subtitle", x: 56, y: 170, width: 688, height: 40, text: "${description}", font_size: 24,
         fills: solid("#D4D4D8"), text_wrap: false,
       }),
     ],

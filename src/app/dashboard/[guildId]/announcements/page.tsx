@@ -989,11 +989,15 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                             <ImageIcon className="h-3.5 w-3.5 text-blue-400" /> Banner Designer
                           </label>
                           <p className="text-[11px] text-slate-500">
-                            Design a banner with text and logo layers. It is rendered by the bot and replaces the main image when published.
+                            The banner is a template. Its text comes from this announcement's Title, Description and Footer, so editing them above updates the banner. Text the banner already shows is not repeated in the Discord embed.
                           </p>
                           {activeDraft.dynamic_image && (
                             <div className="max-w-xl cursor-pointer" onClick={() => setBannerOpen(true)}>
-                              <BannerBotPreview guildId={guildId} design={activeDraft.dynamic_image} />
+                              <BannerBotPreview
+                                guildId={guildId}
+                                design={activeDraft.dynamic_image}
+                                tokens={{ title: activeDraft.title, description: activeDraft.description, footer: activeDraft.footer }}
+                              />
                             </div>
                           )}
                           <div className="flex gap-2">
@@ -1075,6 +1079,8 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
         onClose={() => setBannerOpen(false)}
         design={activeDraft?.dynamic_image || null}
         onChange={(next) => updateActiveDraftField("dynamic_image", next)}
+        tokens={{ title: activeDraft?.title, description: activeDraft?.description, footer: activeDraft?.footer }}
+        onTokensChange={(patch) => Object.entries(patch).forEach(([field, value]) => updateActiveDraftField(field, value))}
       />
     </div>
   );

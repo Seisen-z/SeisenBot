@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useParams } from "next/navigation";
+import { fetchApi } from "@/lib/api";
 import { Button } from "./button";
 import { Input } from "./input";
 import { Textarea } from "./textarea";
@@ -105,6 +107,27 @@ export function AdvancedEmbedEditor({
   const [rawText, setRawText] = useState("");
   const [rawError, setRawError] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState("");
+  const [coverPicture, setCoverPicture] = useState("");
+  const guildId = String(useParams()?.guildId || "");
+
+  // The exact header picture the bot posts (cover photo with the title written on it)
+  useEffect(() => {
+    const gameId = (config.thumbnail_game_id || "").trim();
+    if (!coverUrl || !gameId || !guildId) { setCoverPicture(""); return; }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const result = await fetchApi("/trigger/render_announcement_cover", undefined, {
+          method: "POST",
+          body: JSON.stringify({ guild_id: guildId, payload: { game_id: gameId, title: config.title || "" } }),
+        });
+        if (!cancelled) setCoverPicture(result?.image_base64 ? `data:image/png;base64,${result.image_base64}` : "");
+      } catch {
+        if (!cancelled) setCoverPicture("");
+      }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [coverUrl, config.thumbnail_game_id, config.title, guildId]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasConfigKey = (key: string) => Object.prototype.hasOwnProperty.call(config, key);
@@ -563,7 +586,7 @@ export function AdvancedEmbedEditor({
                     color: typeof config.color === "string" && config.color.startsWith("#") 
                       ? parseInt(config.color.replace("#", ""), 16) 
                       : parseInt(String(config.color)) || 5814783,
-                    header: coverUrl ? { url: coverUrl, text: config.title } : undefined,
+                    header: coverUrl ? { url: coverPicture || coverUrl, text: coverPicture ? undefined : config.title } : undefined,
                     thumbnail: !coverUrl && config.thumbnail_url ? { url: config.thumbnail_url } : undefined,
                     image: config.image_url ? { url: config.image_url } : undefined,
                     images: Array.isArray(config.images) && config.images.length > 0 ? config.images.map(url => ({ url })) : undefined,

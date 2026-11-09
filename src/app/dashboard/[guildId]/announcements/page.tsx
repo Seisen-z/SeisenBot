@@ -999,13 +999,13 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                               onChange={(event) => updateActiveDraftField("banner_mode", event.target.value === "header" ? "header" : "only")}
                               className="h-8 rounded-lg border border-white/10 bg-black/40 px-2 text-xs text-white"
                             >
-                              <option value="header">Header above the embed (recommended)</option>
+                              <option value="header">Header at the top of the embed (recommended)</option>
                               <option value="only">Picture only (no embed text)</option>
                             </select>
                           </div>
                           <p className="text-[11px] text-slate-500">
                             {activeDraft.banner_mode === "header"
-                              ? "The header is posted as a strip above the normal embed, which keeps its title, text, game icon and footer. Publishing posts both together. Text the header shows through ${title}, ${description} or ${footer} is not repeated in the embed."
+                              ? "The header sits at the top of the embed card, with the title, text, game icon, footer and link buttons under it, all posted together. Text the header shows through ${title}, ${description} or ${footer} is not repeated in the card."
                               : "Only the picture is posted: no embed text, game icon or footer. Its text comes from this announcement's Title, Description and Footer, so editing them above updates it."}{" "}
                             The role ping and link buttons are still sent.
                           </p>

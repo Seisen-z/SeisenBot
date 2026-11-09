@@ -92,7 +92,7 @@ const createEmptyDraft = (name: string = "New Announcement", category: string = 
   post_to_website: false,
   website_tag: "Announcement",
   dynamic_image: null,
-  banner_mode: "only",
+  banner_mode: "header",
   last_posted_at: null,
   last_message_id: null,
 });
@@ -143,7 +143,8 @@ function normalizeDraft(key: string, input: any): AnnouncementDraft {
     post_to_website: typeof source.post_to_website === "boolean" ? source.post_to_website : false,
     website_tag: typeof source.website_tag === "string" && source.website_tag.trim() ? source.website_tag : "Announcement",
     dynamic_image: normalizeBannerDesign(source.dynamic_image),
-    banner_mode: source.banner_mode === "header" ? "header" : "only",
+    // New announcements use the header strip above the embed; a draft saved earlier with a full-card banner keeps posting it alone
+    banner_mode: source.banner_mode === "header" ? "header" : source.banner_mode === "only" && source.dynamic_image ? "only" : "header",
     last_posted_at: source.last_posted_at ? String(source.last_posted_at) : null,
     last_message_id: source.last_message_id ? String(source.last_message_id) : null,
   };
@@ -989,7 +990,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
 
                         <div className="rounded-xl border border-white/10 bg-black/20 p-3.5 space-y-3">
                           <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                            <ImageIcon className="h-3.5 w-3.5 text-blue-400" /> Banner Designer
+                            <ImageIcon className="h-3.5 w-3.5 text-blue-400" /> Embed Header
                           </label>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-[11px] text-slate-400">Posting style</span>
@@ -998,14 +999,14 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                               onChange={(event) => updateActiveDraftField("banner_mode", event.target.value === "header" ? "header" : "only")}
                               className="h-8 rounded-lg border border-white/10 bg-black/40 px-2 text-xs text-white"
                             >
-                              <option value="only">Banner only (just the picture)</option>
-                              <option value="header">Header above the embed (picture, then the normal embed)</option>
+                              <option value="header">Header above the embed (recommended)</option>
+                              <option value="only">Picture only (no embed text)</option>
                             </select>
                           </div>
                           <p className="text-[11px] text-slate-500">
                             {activeDraft.banner_mode === "header"
-                              ? "The banner is posted as a strip above the normal embed, which keeps its title, text, game icon and footer. Text the banner shows through ${title}, ${description} or ${footer} is not repeated in the embed."
-                              : "Only the banner is posted: no embed text, game icon or footer. Its text comes from this announcement's Title, Description and Footer, so editing them above updates the banner."}{" "}
+                              ? "The header is posted as a strip above the normal embed, which keeps its title, text, game icon and footer. Publishing posts both together. Text the header shows through ${title}, ${description} or ${footer} is not repeated in the embed."
+                              : "Only the picture is posted: no embed text, game icon or footer. Its text comes from this announcement's Title, Description and Footer, so editing them above updates it."}{" "}
                             The role ping and link buttons are still sent.
                           </p>
                           {activeDraft.dynamic_image && (
@@ -1029,7 +1030,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                                 setBannerOpen(true);
                               }}
                             >
-                              <PlusIcon className="mr-1.5 h-3.5 w-3.5" /> {activeDraft.dynamic_image ? "Edit Banner" : "Design Banner"}
+                              <PlusIcon className="mr-1.5 h-3.5 w-3.5" /> {activeDraft.dynamic_image ? "Edit Header" : "Design Header"}
                             </Button>
                             {activeDraft.dynamic_image && (
                               <Button
@@ -1038,7 +1039,7 @@ export default function AnnouncementsPage({ params }: { params: Promise<{ guildI
                                 className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs"
                                 onClick={() => updateActiveDraftField("dynamic_image", null)}
                               >
-                                Remove Banner
+                                Remove Header
                               </Button>
                             )}
                           </div>

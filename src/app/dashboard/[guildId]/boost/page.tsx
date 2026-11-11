@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, use } from "react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -14,19 +15,32 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
   const resolvedParams = use(params);
   const guildId = resolvedParams.guildId;
   const { toast } = useToast();
-  const [config, setConfig] = useState<any>({ roles: [] });
+  const [config, setConfig] = useState<any>({ roles: [], days_per_boost: 15 });
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    setInitialLoadComplete(false);
+    setLastSaved(null);
     fetchApi(`/guilds/${guildId}/boost`)
-      .then((data) => setConfig(data || { roles: [] }))
-      .catch(() => toast("Failed to load boost config", "error"))
-      .finally(() => setInitialLoadComplete(true));
+      .then((data) => {
+        if (cancelled) return;
+        setConfig({ roles: [], days_per_boost: 15, ...data });
+        setInitialLoadComplete(true);
+      })
+      .catch(() => { if (!cancelled) toast("Failed to load boost config", "error"); });
+    return () => { cancelled = true; };
   }, [guildId, toast]);
 
+  const daysPerBoost = config.days_per_boost;
+  const durationValid = Number.isInteger(daysPerBoost) && daysPerBoost >= 1 && daysPerBoost <= 365;
+
   const persistConfig = useCallback(async (nextConfig: any) => {
+    if (!Number.isInteger(nextConfig.days_per_boost) || nextConfig.days_per_boost < 1 || nextConfig.days_per_boost > 365) {
+      throw new Error("Days per boost must be a whole number from 1 to 365.");
+    }
     await fetchApi(`/guilds/${guildId}/boost`, undefined, {
       method: "PUT",
       body: JSON.stringify({
@@ -41,7 +55,7 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
 
   useDebouncedAutoSave({
     value: config,
-    enabled: initialLoadComplete,
+    enabled: initialLoadComplete && durationValid,
     contextKey: guildId,
     delay: 1400,
     onSave: persistConfig,
@@ -72,7 +86,7 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
       <DashboardPageHero
         icon={GemIcon}
         title="Server Boost Rewards"
-        subtitle="Configure boost log channels, claim category routing, and who gets notified when boosters arrive."
+        subtitle="Configure reward days per boost, claim routing, and booster notifications."
         stats={[
           { label: "Log Channel", value: hasLogChannel ? "Configured" : "Missing" },
           { label: "Claim Category", value: hasCategory ? "Configured" : "Missing" },
@@ -86,7 +100,7 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
                 Saved {new Date().getTime() - lastSaved.getTime() < 10000 ? "just now" : "recently"}
               </span>
             )}
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving || !initialLoadComplete || !durationValid}>
               {saving ? "Saving..." : "Save Config"}
             </Button>
           </div>
@@ -96,6 +110,27 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
 
       <div className="flex xl:flex-row flex-col gap-6">
         <div className="flex-1 flex flex-col gap-6 rounded-xl border border-[#1E1F22] bg-[#2B2D31] p-6">
+          <div>
+            <label htmlFor="boost-reward-days" className="mb-2 block text-sm font-medium text-discord-text-muted">Days per boost</label>
+            <Input
+              id="boost-reward-days"
+              type="number"
+              min={1}
+              max={365}
+              step={1}
+              value={daysPerBoost}
+              disabled={!initialLoadComplete}
+              aria-invalid={!durationValid}
+              aria-describedby="boost-duration-help"
+              onChange={(event) => updateConfig("days_per_boost", event.target.value === "" ? "" : Number(event.target.value))}
+            />
+            <p id="boost-duration-help" className="mt-2 text-xs text-discord-text-muted">
+              {durationValid ? `1 boost = ${daysPerBoost} days; 2 boosts = ${daysPerBoost * 2} days total.` : "Enter a whole number from 1 to 365."}
+              {" "}Applies to new boost credits only. Existing rewards and pending credits keep their saved duration.
+              {" "}The bot needs its provider API key to set the first key duration and extend it; your generation webhook can stay at 15 days.
+            </p>
+          </div>
+
           <div>
             <label className="mb-2 block text-sm font-medium text-discord-text-muted">Boost Log Channel</label>
             <ChannelSelect
@@ -137,7 +172,7 @@ export default function BoostRewardsPage({ params }: { params: Promise<{ guildId
               timestamp="Today at 10:24 AM"
               content={(config.roles || []).map((id:string) => `<@&${id}>`).join(" ")}
               title="🌟 New Server Booster! 🌟"
-              description="Thank you **Seisen88** for boosting the server!\nPlease click the button below to open a ticket and claim your boost rewards!"
+              description={`Thank you **Seisen88** for boosting the server!\n${durationValid ? `${daysPerBoost} premium days per boost.` : "Set reward days to preview the reward."}\nPlease open a ticket to claim your boost rewards!`}
               color="#f47fff"
               thumbnailUrl="https://cdn.discordapp.com/emojis/862241680658792468.png"
               footerText="Server Boost #14"
